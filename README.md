@@ -324,5 +324,3 @@ It is optimized for depth.
 # 📜 License
 
 Private project.
-
----
