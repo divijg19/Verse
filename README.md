@@ -281,7 +281,7 @@ go run cmd/server/main.go
 Tailwind (watch mode):
 
 ```bash id="t3w67k"
-npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch
+bunx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch
 ```
 
 ---
@@ -321,12 +321,8 @@ It is optimized for depth.
 
 ---
 
-# Final Note
+# 📜 License
 
-`Verse` is not about perfect poems.
+Private project.
 
-It is about showing up daily.
-
-Write.
-Reflect.
-Return.
+---
