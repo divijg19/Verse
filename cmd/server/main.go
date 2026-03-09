@@ -7,10 +7,13 @@ import (
 )
 
 func main() {
+
 	r := chi.NewRouter()
 
-	r.Get("/", homeHandler)
-	r.Post("/poem", savePoemHandler)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("`Verse` is running"))
+	})
 
 	http.ListenAndServe(":8080", r)
+
 }
