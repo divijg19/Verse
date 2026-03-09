@@ -1,0 +1,19 @@
+package templ
+
+templ Layout(content templ.Component) {
+<html>
+<head>
+<title>`Verse`</title>
+<link rel="stylesheet" href="/static/css/output.css">
+<script src="https://unpkg.com/htmx.org"></script>
+</head>
+
+<body class="bg-neutral-950 text-neutral-200">
+
+<div class="max-w-3xl mx-auto p-8">
+{ content }
+</div>
+
+</body>
+</html>
+}
