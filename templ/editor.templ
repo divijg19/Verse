@@ -1,0 +1,24 @@
+package templ
+
+templ Editor() {
+
+<h1 class="text-3xl mb-6">Write</h1>
+
+<form hx-post="/poem" hx-target="#result">
+
+<textarea
+name="content"
+class="w-full h-80 bg-neutral-900 p-4 rounded"
+placeholder="Write your poem..."
+></textarea>
+
+<button
+class="mt-4 px-4 py-2 bg-purple-600 rounded">
+Save Bloom
+</button>
+
+</form>
+
+<div id="result"></div>
+
+}
