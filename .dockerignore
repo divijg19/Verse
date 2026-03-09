@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+vendor
+static/css/output.css
+*.log
+server.pid
+bin
+dist
+README.md

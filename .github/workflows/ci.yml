@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6 
+        with:
+            go-version-file: 'go.mod'
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Node dependencies
+        run: bun ci
+
+      - name: Regenerate templ artifacts
+        run: go run github.com/a-h/templ/cmd/templ@latest generate ./templ
+
+      - name: Build Tailwind CSS
+        run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
+
+      - name: Build Go packages
+        run: go build ./...
+
+      - name: Build server binary
+        run: go build -o verse ./cmd/server
+
+      - name: Start server (background)
+        run: |
+          nohup ./verse > server.log 2>&1 &
+          echo $! > server.pid
+
+      - name: Wait for server
+        run: sleep 2
+
+      - name: Smoke test GET /
+        run: curl -fsS http://localhost:8080/
+
+      - name: Smoke test POST /poem
+        run: |
+          curl -fsS -X POST -d "content=ci-test" http://localhost:8080/poem | grep -q "Bloom recorded."
+
+      - name: Stop server
+        if: always()
+        run: |
+          kill $(cat server.pid) || true
