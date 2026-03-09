@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/divijg19/Verse/internal/handlers"
 	"github.com/divijg19/Verse/templ"
@@ -36,6 +37,11 @@ func main() {
 	// Optional: prompt endpoint
 	r.Get("/prompt", handlers.PromptHandler)
 
-	log.Println("listening on :8080")
-	http.ListenAndServe(":8080", r)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Println("listening on :" + port)
+	http.ListenAndServe(":"+port, r)
 }
