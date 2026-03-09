@@ -1,19 +1,28 @@
 package templ
 
-templ Layout(content templ.Component) {
-<html>
+templ Layout() {
+<!DOCTYPE html>
+<html lang="en">
+
 <head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>`Verse`</title>
+
 <link rel="stylesheet" href="/static/css/output.css">
+
 <script src="https://unpkg.com/htmx.org"></script>
+
 </head>
 
-<body class="bg-neutral-950 text-neutral-200">
+<body class="bg-neutral-950 text-neutral-200 min-h-screen">
 
 <div class="max-w-3xl mx-auto p-8">
-{ content }
+{ Editor() }
 </div>
 
 </body>
+
 </html>
 }
