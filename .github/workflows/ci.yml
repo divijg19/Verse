@@ -22,11 +22,10 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install Node dependencies
+      - name: Install Bun dependencies
         run: bun ci
 
-      - name: Regenerate templ artifacts
-        run: go run github.com/a-h/templ/cmd/templ@latest generate ./templ
+      # Note: templ artifacts are committed; skipping regeneration to avoid generator/runtime mismatches
 
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
