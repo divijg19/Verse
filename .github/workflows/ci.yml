@@ -26,7 +26,11 @@ jobs:
         run: bun ci
 
       - name: Regenerate templ artifacts
-        run: go run github.com/a-h/templ/cmd/templ@latest generate ./templ
+        run: |
+          # Use the templ version pinned in go.mod to keep generator/runtime in sync
+          TEMPL_VER=$(awk '/github.com\/a-h\/templ/ {print $2; exit}' go.mod)
+          echo "Using templ version: $TEMPL_VER"
+          go run github.com/a-h/templ/cmd/templ@"${TEMPL_VER}" generate ./templ
 
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
