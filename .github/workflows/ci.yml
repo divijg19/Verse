@@ -25,27 +25,7 @@ jobs:
       - name: Install Bun dependencies
         run: bun ci
 
-      - name: Regenerate templ artifacts
-        run: |
-          set -euo pipefail
-          # Ensure module metadata is available
-          go mod download
-
-          # Try to get the templ module version from 'go list -m'
-          TEMPL_VER="$(go list -m -f '{{.Version}}' github.com/a-h/templ 2>/dev/null || true)"
-
-          # Fallback to parsing go.mod if go list didn't return a version
-          if [ -z "$TEMPL_VER" ]; then
-            TEMPL_VER="$(grep -E '\bgithub.com/a-h/templ\b' go.mod | awk '{print $2}' || true)"
-          fi
-
-          if [ -z "$TEMPL_VER" ]; then
-            echo "templ version not found in go list or go.mod; generating with latest"
-            go run github.com/a-h/templ/cmd/templ@latest generate ./templ
-          else
-            echo "Using templ version: $TEMPL_VER"
-            go run github.com/a-h/templ/cmd/templ@${TEMPL_VER} generate ./templ
-          fi
+      # Note: templ artifacts are committed; skipping regeneration to avoid generator/runtime mismatches
 
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
