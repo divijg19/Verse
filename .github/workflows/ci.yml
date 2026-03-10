@@ -42,7 +42,25 @@ jobs:
           echo $! > server.pid
 
       - name: Wait for server
-        run: sleep 2
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
+              echo "server is up"
+              exit 0
+            fi
+            echo "waiting for server... ($i/30)"
+            sleep 1
+          done
+          echo "server did not start within timeout; dumping server.log"
+          if [ -f server.log ]; then
+            echo "---- server.log (last 200 lines) ----"
+            tail -n 200 server.log || true
+            echo "-------------------------------------"
+          else
+            echo "server.log not found"
+          fi
+          exit 1
 
       - name: Smoke test GET /
         run: curl -fsS http://localhost:8080/
