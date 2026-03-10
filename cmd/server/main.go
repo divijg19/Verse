@@ -13,11 +13,17 @@ import (
 )
 
 func main() {
-	r := chi.NewRouter()
-
+	// Initialize database (fail fast if not available)
 	if err := database.Connect(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("database connection failed: %v", err)
 	}
+	defer func() {
+		if database.Pool != nil {
+			database.Pool.Close()
+		}
+	}()
+
+	r := chi.NewRouter()
 
 	// Serve static files from ./static
 	fs := http.FileServer(http.Dir("static"))
