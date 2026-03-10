@@ -9,14 +9,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: verse
+          POSTGRES_PASSWORD: verse
+          POSTGRES_DB: verse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U verse"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v6 
+        uses: actions/setup-go@v6
         with:
-            go-version-file: 'go.mod'
+          go-version-file: 'go.mod'
+          cache: true
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -25,7 +46,7 @@ jobs:
       - name: Install Bun dependencies
         run: bun ci
 
-      # Note: templ artifacts are committed; skipping regeneration to avoid generator/runtime mismatches
+      # templ artifacts are committed; skipping regeneration to avoid generator/runtime mismatches
 
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
@@ -33,8 +54,33 @@ jobs:
       - name: Build Go packages
         run: go build ./...
 
+      - name: Run go vet
+        run: go vet ./...
+
       - name: Build server binary
         run: go build -o verse ./cmd/server
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 20); do
+            if pg_isready -h localhost -U verse; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres... ($i/20)"
+            sleep 1
+          done
+          echo "Postgres did not become ready"
+          exit 1
+
+      - name: Run migrations
+        run: |
+          psql "$DATABASE_URL" -f migrations/001_create_poems.sql
 
       - name: Start server (background)
         run: |
@@ -60,6 +106,7 @@ jobs:
           else
             echo "server.log not found"
           fi
+          curl -v http://localhost:8080/ || true
           exit 1
 
       - name: Smoke test GET /
@@ -68,6 +115,10 @@ jobs:
       - name: Smoke test POST /poem
         run: |
           curl -fsS -X POST -d "content=ci-test" http://localhost:8080/poem | grep -q "Bloom recorded."
+
+      - name: Verify DB insert
+        run: |
+          psql -At -d "$DATABASE_URL" -c "SELECT count(*) FROM poems;" | tr -d ' ' | grep -q '^1$'
 
       - name: Stop server
         if: always()
