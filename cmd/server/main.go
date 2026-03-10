@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/handlers"
 	"github.com/divijg19/Verse/templ"
 	"github.com/go-chi/chi/v5"
@@ -13,6 +14,10 @@ import (
 
 func main() {
 	r := chi.NewRouter()
+
+	if err := database.Connect(); err != nil {
+		log.Fatal(err)
+	}
 
 	// Serve static files from ./static
 	fs := http.FileServer(http.Dir("static"))
@@ -26,7 +31,7 @@ func main() {
 			return
 		}
 
-		page := "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>`Verse`</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div class=\"max-w-3xl mx-auto p-8\">" + buf.String() + "</div></body></html>"
+		page := "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div class=\"max-w-3xl mx-auto p-8\">" + buf.String() + "</div></body></html>"
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(page))
