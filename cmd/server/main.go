@@ -29,7 +29,7 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
-	// Render editor at / by composing the editor HTML into a simple layout
+	// Render editor at / by composing the editor HTML into the layout's #screen
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		var buf bytes.Buffer
 		if err := templ.Editor().Render(r.Context(), &buf); err != nil {
@@ -37,7 +37,21 @@ func main() {
 			return
 		}
 
-		page := "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div class=\"max-w-3xl mx-auto p-8\">" + buf.String() + "</div></body></html>"
+		page := "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div id=\"viewport\" class=\"min-h-screen flex items-center justify-center\"><div id=\"screen\" class=\"max-w-3xl w-full transition-all duration-200 ease-out p-8\">" + buf.String() + "</div></div><script src=\"/static/js/navigation.js\"></script></body></html>"
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write([]byte(page))
+	})
+
+	// Caelum screen route
+	r.Get("/caelum", func(w http.ResponseWriter, r *http.Request) {
+		var buf bytes.Buffer
+		if err := templ.Caelum().Render(r.Context(), &buf); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		page := "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Caelum — Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div id=\"viewport\" class=\"min-h-screen flex items-center justify-center\"><div id=\"screen\" class=\"max-w-3xl w-full transition-all duration-200 ease-out p-8\">" + buf.String() + "</div></div><script src=\"/static/js/navigation.js\"></script></body></html>"
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(page))

@@ -18,9 +18,13 @@ templ Layout() {
 
 <body class="bg-neutral-950 text-neutral-200 min-h-screen">
 
-<div class="max-w-3xl mx-auto p-8">
-{ Editor() }
+<div id="viewport" class="min-h-screen flex items-center justify-center">
+<div id="screen" class="max-w-3xl w-full transition-all duration-200 ease-out p-8">
+@Editor()
 </div>
+</div>
+
+<script src="/static/js/navigation.js"></script>
 
 </body>
 

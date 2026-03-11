@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16
+    container_name: verse-postgres
+    environment:
+      POSTGRES_USER: verse
+      POSTGRES_PASSWORD: verse
+      POSTGRES_DB: verse
+    ports:
+      - "5432:5432"
+    volumes:
+      - verse_pgdata:/var/lib/postgresql/data
+
+volumes:
+  verse_pgdata:

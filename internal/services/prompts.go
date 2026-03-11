@@ -1,9 +1,32 @@
 package services
 
-// Prompts is a list of example writing prompts used by the handlers.
+import (
+	"math/rand"
+	"time"
+)
+
+// Prompts is a list of conceptual, poetic prompts (non-imperative).
 var Prompts = []string{
-	"Write about something that once frightened you.",
-	"Describe ambition as a storm.",
-	"Write from the perspective of a wilting flower.",
-	"Describe a memory as weather.",
+	"a forgotten shoreline",
+	"silence within a crowd",
+	"the moon as witness",
+	"a door left slightly open",
+	"winter without snow",
+	"dust in late sunlight",
+	"a letter never sent",
+	"footsteps fading into fog",
+	"the weight of unsaid things",
+	"lanterns across dark water",
+}
+
+func init() {
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+}
+
+// RandomPrompt returns a random prompt from the static pool.
+func RandomPrompt() string {
+	if len(Prompts) == 0 {
+		return ""
+	}
+	return Prompts[rand.Intn(len(Prompts))]
 }
