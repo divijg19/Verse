@@ -8,7 +8,7 @@ package templ
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Editor() templ.Component {
+func CaelumContent() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +29,7 @@ func Editor() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><div class=\"flex items-center justify-between\"><button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Caelum\" title=\"Caelum inspiration\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▲ <span class=\"text-xs block\">Caelum</span></button><h1 class=\"text-3xl font-serif\">Write</h1><div></div></div><form hx-post=\"/poem\" hx-target=\"#result\" hx-swap=\"innerHTML\" class=\"space-y-4\"><textarea name=\"content\" placeholder=\"Write your poem...\" class=\"w-full h-[420px] bg-neutral-900 rounded-md p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600\"></textarea> <button type=\"submit\" class=\"px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\">Save Bloom</button></form><div id=\"result\" class=\"text-sm text-neutral-400\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"prompt\" class=\"mb-6 text-purple-400 italic\"></div><button hx-get=\"/prompt\" hx-target=\"#prompt\" hx-swap=\"innerHTML\" class=\"px-4 py-2 bg-purple-600 rounded\">generate prompt</button> <button hx-get=\"/\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Return to editor\" title=\"Return to editor\">▼ <span class=\"text-xs block\">Editor</span></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
