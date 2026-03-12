@@ -1,12 +1,12 @@
 package services
 
 import (
-    "context"
-    "fmt"
-    "sort"
-    "time"
+	"context"
+	"fmt"
+	"sort"
+	"time"
 
-    "github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/database"
 )
 
 // TotalPoems returns the total number of poems in the database.
