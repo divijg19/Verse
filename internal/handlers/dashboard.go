@@ -1,12 +1,12 @@
 package handlers
 
 import (
-    "bytes"
-    "net/http"
-    "time"
+	"bytes"
+	"net/http"
+	"time"
 
-    "github.com/divijg19/Verse/internal/services"
-    "github.com/divijg19/Verse/templ"
+	"github.com/divijg19/Verse/internal/services"
+	"github.com/divijg19/Verse/templ"
 )
 
 // DashboardHandler renders the dashboard surface. If the request is an HTMX request,

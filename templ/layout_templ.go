@@ -5,8 +5,10 @@ package templ
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import "github.com/a-h/templ"
-import templruntime "github.com/a-h/templ/runtime"
+import (
+	"github.com/a-h/templ"
+	templruntime "github.com/a-h/templ/runtime"
+)
 
 func Layout() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -29,11 +31,7 @@ func Layout() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script><style> #nav-top { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); } #nav-left { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); } #nav-right { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); } #nav-bottom { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); } </style></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div id=\"viewport\" class=\"min-h-screen flex items-center justify-center\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div id=\"nav-top\"><button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Caelum\" title=\"Caelum inspiration\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▲ <span class=\"text-xs block\">Caelum</span></button></div><div id=\"nav-left\"><button hx-get=\"/dashboard\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Dashboard\" title=\"Dashboard\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">◀ <span class=\"text-xs block\">Dashboard</span></button></div><div id=\"nav-right\"><button hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Library\" title=\"Library\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▶ <span class=\"text-xs block\">Library</span></button></div><div id=\"nav-bottom\"><button hx-get=\"/share\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Share\" title=\"Share\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▼ <span class=\"text-xs block\">Share</span></button></div><div id=\"screen\" class=\"max-w-3xl w-full transition-all duration-200 ease-out p-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script><style>\n\t/* Fixed edge navigation positions */\n\t#nav-top { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); }\n\t#nav-left { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); }\n\t#nav-right { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); }\n\t#nav-bottom { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); }\n</style></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div id=\"viewport\" class=\"min-h-screen flex items-center justify-center\"><div id=\"nav-top\"><button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Caelum\" title=\"Caelum inspiration\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▲ <span class=\"text-xs block\">Caelum</span></button></div><div id=\"nav-left\"><button hx-get=\"/dashboard\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Dashboard\" title=\"Dashboard\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">◀ <span class=\"text-xs block\">Dashboard</span></button></div><div id=\"nav-right\"><button hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Library\" title=\"Library\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▶ <span class=\"text-xs block\">Library</span></button></div><div id=\"nav-bottom\"><button hx-get=\"/share\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Navigate to Share\" title=\"Share\" class=\"px-3 py-1 rounded hover:bg-neutral-900\">▼ <span class=\"text-xs block\">Share</span></button></div><div id=\"screen\" class=\"max-w-3xl w-full transition-all duration-200 ease-out p-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -41,7 +39,7 @@ func Layout() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></div><script src=\"/static/js/navigation.js\"></script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div></div><script src=\"/static/js/navigation.js\"></script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

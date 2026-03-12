@@ -5,14 +5,12 @@ templ CaelumContent() {
 <div id="prompt" class="mb-6 text-purple-400 italic"></div>
 
 <button
-hx-get="/prompt"
-hx-target="#prompt"
-hx-swap="innerHTML"
-
-
-▼
-<span class="text-xs block">Editor</span>
-
+	hx-get="/prompt"
+	hx-target="#prompt"
+	hx-swap="innerHTML"
+	class="px-4 py-2 bg-purple-600 rounded"
+>
+	generate prompt
 </button>
 
 }
