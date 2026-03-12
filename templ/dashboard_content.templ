@@ -1,0 +1,43 @@
+package templ
+
+templ DashboardContent(total int, currentStreak int, longestStreak int, days []DayActivity) {
+
+<div class="space-y-6">
+
+<div class="space-y-2">
+<p class="text-sm">Total Poems: <strong class="text-purple-400">{ total }</strong></p>
+<p class="text-sm">Current Streak: <strong class="text-purple-400">{ currentStreak } days</strong></p>
+<p class="text-sm">Longest Streak: <strong class="text-purple-400">{ longestStreak } days</strong></p>
+</div>
+
+<h2 class="text-lg">Activity</h2>
+
+@ActivityGrid(days)
+
+<div class="flex gap-2 mt-4">
+  <button
+    hx-get="/editor"
+    hx-target="#screen"
+    hx-swap="innerHTML"
+    aria-label="Write"
+    title="Write"
+    class="px-4 py-2 bg-purple-600 rounded"
+  >
+    Write
+  </button>
+
+  <button
+    hx-get="/caelum"
+    hx-target="#screen"
+    hx-swap="innerHTML"
+    aria-label="Caelum"
+    title="Caelum"
+    class="px-4 py-2 bg-neutral-800 rounded"
+  >
+    Caelum
+  </button>
+</div>
+
+</div>
+
+}

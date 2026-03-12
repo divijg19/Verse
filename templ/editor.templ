@@ -3,24 +3,7 @@ package templ
 templ Editor() {
 
 <div class="space-y-6">
-
-<div class="flex items-center justify-between">
-<button
-hx-get="/caelum"
-hx-target="#screen"
-hx-swap="innerHTML"
-aria-label="Navigate to Caelum"
-title="Caelum inspiration"
-class="px-3 py-1 rounded hover:bg-neutral-900"
->
-▲
-<span class="text-xs block">Caelum</span>
-</button>
-
 <h1 class="text-3xl font-serif">Write</h1>
-
-<div></div>
-</div>
 
 <form 
 hx-post="/poem"
