@@ -29,7 +29,7 @@ func CaelumContent() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"prompt\" class=\"mb-6 text-purple-400 italic\"></div><button hx-get=\"/prompt\" hx-target=\"#prompt\" hx-swap=\"innerHTML\" class=\"px-4 py-2 bg-purple-600 rounded\">generate prompt</button> <button hx-get=\"/\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Return to editor\" title=\"Return to editor\">▼ <span class=\"text-xs block\">Editor</span></button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"prompt\" class=\"mb-6 text-purple-400 italic\"></div><button hx-get=\"/prompt\" hx-target=\"#prompt\" hx-swap=\"innerHTML\" class=\"px-4 py-2 bg-purple-600 rounded\">generate prompt</button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
