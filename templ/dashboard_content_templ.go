@@ -76,7 +76,7 @@ func DashboardContent(total int, currentStreak int, longestStreak int, days []Da
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"flex gap-2 mt-4\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Write\" title=\"Write\" class=\"px-4 py-2 bg-purple-600 rounded\">Write</button> <button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Caelum\" title=\"Caelum\" class=\"px-4 py-2 bg-neutral-800 rounded\">Caelum</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"flex gap-2 mt-4\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Write\" title=\"Write\" class=\"px-4 py-2 bg-purple-600 rounded\">Write</button> <button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Look to Caelum\" title=\"Look to Caelum\" class=\"px-4 py-2 bg-neutral-800 rounded\">Look to Caelum</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

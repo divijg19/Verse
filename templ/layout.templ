@@ -1,6 +1,6 @@
 package templ
 
-templ Layout(surface string) {
+templ Layout(surface string, content templ.Component) {
 <!DOCTYPE html>
 <html lang="en">
 
@@ -16,6 +16,7 @@ templ Layout(surface string) {
 
 <style>
 	/* Fixed edge navigation positions */
+	#nav-top, #nav-left, #nav-right, #nav-bottom { z-index: 40; }
 	#nav-top { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); }
 	#nav-left { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); }
 	#nav-right { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); }
@@ -31,7 +32,7 @@ templ Layout(surface string) {
 	@Nav(surface)
 
 	<div id="screen" class="max-w-3xl w-full transition-all duration-200 ease-out p-8">
-	@Children()
+	@content
 	</div>
 
 </div>

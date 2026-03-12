@@ -8,7 +8,7 @@ package templ
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Layout(surface string) templ.Component {
+func Layout(surface string, content templ.Component) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +29,7 @@ func Layout(surface string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script><style>\n\t/* Fixed edge navigation positions */\n\t#nav-top { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); }\n\t#nav-left { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); }\n\t#nav-right { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); }\n\t#nav-bottom { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); }\n</style></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div id=\"viewport\" class=\"min-h-screen flex items-center justify-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Verse</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org\"></script><style>\n\t/* Fixed edge navigation positions */\n\t#nav-top, #nav-left, #nav-right, #nav-bottom { z-index: 40; }\n\t#nav-top { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); }\n\t#nav-left { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); }\n\t#nav-right { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); }\n\t#nav-bottom { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); }\n</style></head><body class=\"bg-neutral-950 text-neutral-200 min-h-screen\"><div id=\"viewport\" class=\"min-h-screen flex items-center justify-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -41,7 +41,7 @@ func Layout(surface string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = Children().Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = content.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
