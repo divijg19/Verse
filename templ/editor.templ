@@ -9,6 +9,7 @@ templ Editor() {
 hx-post="/poem"
 hx-target="#result"
 hx-swap="innerHTML"
+hx-on::after-request="this.querySelector('textarea').focus()"
 class="space-y-4"
 >
 
