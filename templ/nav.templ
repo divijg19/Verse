@@ -1,173 +1,75 @@
 package templ
 
 templ Nav(surface string) {
+	@navSlot("nav-top", surface, "up", false)
+	@navSlot("nav-left", surface, "left", false)
+	@navSlot("nav-right", surface, "right", false)
+	@navSlot("nav-bottom", surface, "down", false)
+}
 
-<div id="nav-top">
-@If (surface == "dashboard" || surface == "editor" || surface == "library") {
-    <button
-        hx-get="/caelum"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Caelum"
-        title="Caelum"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ▲
-        <span class="text-xs block">Caelum</span>
-    </button>
+templ NavOOB(surface string) {
+	@navSlot("nav-top", surface, "up", true)
+	@navSlot("nav-left", surface, "left", true)
+	@navSlot("nav-right", surface, "right", true)
+	@navSlot("nav-bottom", surface, "down", true)
 }
-@If (surface == "share") {
-    <button
-        hx-get="/editor"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Editor"
-        title="Editor"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ▲
-        <span class="text-xs block">Editor</span>
-    </button>
-}
-</div>
 
-<div id="nav-left">
-@If (surface == "editor") {
-    <button
-        hx-get="/dashboard"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Dashboard"
-        title="Dashboard"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ◀
-        <span class="text-xs block">Dashboard</span>
-    </button>
+templ navSlot(id string, surface string, direction string, oob bool) {
+	@If(oob) {
+		<div id={ id } hx-swap-oob="outerHTML">
+			@navButtonFor(surface, direction)
+		</div>
+	}
+	@If(!oob) {
+		<div id={ id }>
+			@navButtonFor(surface, direction)
+		</div>
+	}
 }
-@If (surface == "library") {
-    <button
-        hx-get="/editor"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Editor"
-        title="Editor"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ◀
-        <span class="text-xs block">Editor</span>
-    </button>
-}
-@If (surface == "caelum") {
-    <button
-        hx-get="/dashboard"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Dashboard"
-        title="Dashboard"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ◀
-        <span class="text-xs block">Dashboard</span>
-    </button>
-}
-@If (surface == "share") {
-    <button
-        hx-get="/dashboard"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Dashboard"
-        title="Dashboard"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ◀
-        <span class="text-xs block">Dashboard</span>
-    </button>
-}
-</div>
 
-<div id="nav-right">
-    @If (surface == "dashboard") {
-        <button
-            hx-get="/editor"
-            hx-target="#screen"
-            hx-swap="innerHTML"
-            aria-label="Navigate to Editor"
-            title="Editor"
-            class="px-3 py-1 rounded hover:bg-neutral-900"
-        >
-            ▶
-            <span class="text-xs block">Editor</span>
-        </button>
-    }
-    @If (surface == "editor") {
-        <button
-            hx-get="/library"
-            hx-target="#screen"
-            hx-swap="innerHTML"
-            aria-label="Navigate to Library"
-            title="Library"
-            class="px-3 py-1 rounded hover:bg-neutral-900"
-        >
-            ▶
-            <span class="text-xs block">Library</span>
-        </button>
-    }
-    @If (surface == "caelum") {
-        <button
-            hx-get="/library"
-            hx-target="#screen"
-            hx-swap="innerHTML"
-            aria-label="Navigate to Library"
-            title="Library"
-            class="px-3 py-1 rounded hover:bg-neutral-900"
-        >
-            ▶
-            <span class="text-xs block">Library</span>
-        </button>
-    }
-    @If (surface == "share") {
-        <button
-            hx-get="/library"
-            hx-target="#screen"
-            hx-swap="innerHTML"
-            aria-label="Navigate to Library"
-            title="Library"
-            class="px-3 py-1 rounded hover:bg-neutral-900"
-        >
-            ▶
-            <span class="text-xs block">Library</span>
-        </button>
-    }
-</div>
+templ navButtonFor(surface string, direction string) {
+	@If(direction == "left" && surface == "editor") {
+		@navButton("/dashboard", "Dashboard", "◀")
+	}
+	@If(direction == "left" && surface == "library") {
+		@navButton("/editor", "Editor", "◀")
+	}
+	@If(direction == "left" && (surface == "caelum" || surface == "share")) {
+		@navButton("/dashboard", "Dashboard", "◀")
+	}
 
-<div id="nav-bottom">
-@If (surface == "dashboard" || surface == "editor" || surface == "library") {
-    <button
-        hx-get="/share"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Share"
-        title="Share"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ▼
-        <span class="text-xs block">Share</span>
-    </button>
-}
-@If (surface == "caelum") {
-    <button
-        hx-get="/editor"
-        hx-target="#screen"
-        hx-swap="innerHTML"
-        aria-label="Navigate to Editor"
-        title="Editor"
-        class="px-3 py-1 rounded hover:bg-neutral-900"
-    >
-        ▼
-        <span class="text-xs block">Editor</span>
-    </button>
-}
-</div>
+	@If(direction == "right" && surface == "dashboard") {
+		@navButton("/editor", "Editor", "▶")
+	}
+	@If(direction == "right" && (surface == "editor" || surface == "caelum" || surface == "share")) {
+		@navButton("/library", "Library", "▶")
+	}
 
+	@If(direction == "up" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
+		@navButton("/caelum", "Caelum", "▲")
+	}
+	@If(direction == "up" && surface == "share") {
+		@navButton("/editor", "Editor", "▲")
+	}
+
+	@If(direction == "down" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
+		@navButton("/share", "Share", "▼")
+	}
+	@If(direction == "down" && surface == "caelum") {
+		@navButton("/editor", "Editor", "▼")
+	}
+}
+
+templ navButton(path string, label string, icon string) {
+	<button
+		hx-get={ path }
+		hx-target="#screen"
+		hx-swap="innerHTML"
+		aria-label={ "Navigate to " + label }
+		title={ label }
+		class="inline-flex min-w-28 flex-col items-center gap-1 rounded-full border border-neutral-800 bg-neutral-950/90 px-4 py-3 text-center text-[0.7rem] uppercase tracking-[0.28em] text-neutral-100 shadow-lg shadow-black/20 transition hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-400"
+	>
+		<span aria-hidden="true" class="text-base leading-none">{ icon }</span>
+		<span>{ label }</span>
+	</button>
 }

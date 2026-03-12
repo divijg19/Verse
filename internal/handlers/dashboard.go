@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"net/http"
 	"time"
 
@@ -34,25 +33,5 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 		days = append(days, templ.DayActivity{Date: d, Active: active})
 	}
 
-	var buf bytes.Buffer
-	if err := templ.Dashboard(total, current, longest, days).Render(ctx, &buf); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// If HTMX request, return only inner HTML for #screen
-	if r.Header.Get("HX-Request") == "true" || r.Header.Get("Hx-Request") == "true" {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(buf.Bytes())
-		return
-	}
-
-	// Otherwise render full page with dynamic navigation
-	var pageBuf bytes.Buffer
-	if err := templ.LayoutWithSurface("dashboard", templ.Dashboard(total, current, longest, days)).Render(ctx, &pageBuf); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(pageBuf.Bytes())
+	renderSurface(w, r, "dashboard", templ.Dashboard(total, current, longest, days))
 }
