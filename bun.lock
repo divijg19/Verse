@@ -4,11 +4,11 @@
   "workspaces": {
     "": {
       "dependencies": {
-        "@tailwindcss/cli": "latest",
+        "@tailwindcss/cli": "^4.2.1",
       },
       "devDependencies": {
-        "@types/bun": "latest",
-        "tailwindcss": "latest",
+        "@types/bun": "^1.3.10",
+        "tailwindcss": "^4.2.1",
       },
     },
   },

@@ -29,7 +29,7 @@ func Editor() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><h1 class=\"text-3xl font-serif\">Write</h1><form hx-post=\"/poem\" hx-target=\"#result\" hx-swap=\"innerHTML\" class=\"space-y-4\"><textarea name=\"content\" placeholder=\"Write your poem...\" class=\"w-full h-[420px] bg-neutral-900 rounded-md p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600\"></textarea> <button type=\"submit\" class=\"px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\">Save Bloom</button></form><div id=\"result\" class=\"text-sm text-neutral-400\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><h1 class=\"text-3xl font-serif\">Write</h1><form hx-post=\"/poem\" hx-target=\"#result\" hx-swap=\"innerHTML\" hx-on::after-request=\"this.querySelector('textarea').focus()\" class=\"space-y-4\"><textarea name=\"content\" placeholder=\"Write your poem...\" class=\"w-full h-[420px] bg-neutral-900 rounded-md p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600\"></textarea> <button type=\"submit\" class=\"px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\">Save Bloom</button></form><div id=\"result\" class=\"text-sm text-neutral-400\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

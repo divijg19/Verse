@@ -28,5 +28,5 @@ func SavePoemHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<span class="text-purple-400">Bloom recorded.</span>`))
+	w.Write([]byte(`<span class="text-purple-400 italic">Bloom recorded.</span>`))
 }

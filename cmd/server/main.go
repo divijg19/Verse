@@ -23,9 +23,21 @@ func main() {
 
 	r := chi.NewRouter()
 
-	// Serve static files from ./static
+	// Health endpoint (fast, no DB, no templates)
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
+	// Serve static files from ./static with caching headers
 	fs := http.FileServer(http.Dir("static"))
-	r.Handle("/static/*", http.StripPrefix("/static/", fs))
+	staticHandler := http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+		}
+		fs.ServeHTTP(w, r)
+	}))
+	r.Handle("/static/*", staticHandler)
 
 	// Dashboard as landing page
 	r.Get("/", handlers.DashboardHandler)
