@@ -72,6 +72,7 @@ templ EditorContent(title string, poemID string, content string) {
 				position: fixed;
 				inset: 0;
 				z-index: 70;
+				overflow: hidden;
 			}
 
 			.verse-editor-overlay-backdrop {
@@ -90,11 +91,13 @@ templ EditorContent(title string, poemID string, content string) {
 				align-items: stretch;
 				justify-content: center;
 				padding: 1rem;
+				overflow: hidden;
 			}
 
 			.verse-editor-overlay-card {
 				display: flex;
 				height: 100%;
+				max-height: 100%;
 				width: 100%;
 				max-width: 76rem;
 				flex-direction: column;
@@ -160,6 +163,7 @@ templ EditorContent(title string, poemID string, content string) {
 				flex-direction: column;
 				gap: 1rem;
 				padding: 1.35rem;
+				overflow: hidden;
 			}
 
 			.verse-editor-overlay-well {
@@ -167,6 +171,7 @@ templ EditorContent(title string, poemID string, content string) {
 				min-height: 0;
 				flex: 1;
 				flex-direction: column;
+				overflow: hidden;
 				border: 1px solid rgb(23 23 23);
 				border-radius: 1.35rem;
 				background:

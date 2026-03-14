@@ -18,19 +18,19 @@ templ Layout(surface string, content templ.Component) {
 	#nav-bottom { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); }
 </style>
 		</head>
-		<body class="bg-neutral-950 text-neutral-200 min-h-screen">
+		<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">
 			@If(surface == "library") {
-				<div id="viewport" class="min-h-screen flex items-start justify-center">
+				<div id="viewport" class="h-screen overflow-hidden flex items-start justify-center">
 					@Nav(surface)
-					<div id="screen" class="w-full max-w-[1280px] px-8 pt-4 pb-12 md:px-14 md:pt-4 transition-all duration-300 ease-out">
+					<div id="screen" class="h-full w-full max-w-[1280px] overflow-hidden px-8 pt-4 pb-12 md:px-14 md:pt-4 transition-all duration-300 ease-out">
 						@content
 					</div>
 				</div>
 			}
 			@If(surface != "library") {
-				<div id="viewport" class="min-h-screen flex items-start justify-center">
+				<div id="viewport" class="h-screen overflow-hidden flex items-start justify-center">
 					@Nav(surface)
-					<div id="screen" class="max-w-3xl w-full px-8 pt-4 pb-12 md:pt-4 transition-all duration-200 ease-out">
+					<div id="screen" class="h-full max-w-3xl w-full overflow-hidden px-8 pt-4 pb-12 md:pt-4 transition-all duration-200 ease-out">
 						@content
 					</div>
 				</div>

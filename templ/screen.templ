@@ -1,11 +1,11 @@
 package templ
 
 templ Screen(title string, content templ.Component) {
-	<div class="space-y-6" style="padding-top: clamp(7rem, 16vh, 9rem);">
+	<div class="h-full overflow-hidden space-y-6" style="padding-top: clamp(7rem, 16vh, 9rem);">
 		<h1 class="text-2xl font-serif leading-none text-neutral-200">
 			{ title }
 		</h1>
-		<div class="max-w-none">
+		<div class="max-w-none overflow-hidden">
 			@content
 		</div>
 	</div>
