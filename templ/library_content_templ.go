@@ -29,24 +29,11 @@ func LibraryContent(query string, groups []PoemGroup) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<style>\n\t\t#library-results {\n\t\t\tscrollbar-gutter: stable;\n\t\t\tscroll-behavior: smooth;\n\t\t}\n\n\t\t#library-loading.htmx-request {\n\t\t\tdisplay: inline-flex;\n\t\t}\n\t</style><div class=\"not-prose mx-auto max-w-4xl space-y-11 py-10\"><section class=\"space-y-5\"><div class=\"flex items-center justify-between gap-4 border-b border-neutral-900 pb-3\"><input id=\"library-search\" name=\"q\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<style>\n\t\t.verse-library-shell {\n\t\t\tposition: relative;\n\t\t\tdisplay: flex;\n\t\t\tflex-direction: column;\n\t\t\theight: 100%;\n\t\t\tmin-height: 0;\n\t\t}\n\n\t\t.verse-library-shell::before {\n\t\t\tcontent: \"\";\n\t\t\tposition: absolute;\n\t\t\tinset: 0 auto auto 0;\n\t\t\twidth: 100%;\n\t\t\theight: 10rem;\n\t\t\tbackground:\n\t\t\t\tradial-gradient(circle at top left, rgba(168, 85, 247, 0.07) 0%, rgba(10, 10, 10, 0) 45%),\n\t\t\t\tlinear-gradient(180deg, rgba(38, 38, 38, 0.1) 0%, rgba(10, 10, 10, 0) 100%);\n\t\t\tpointer-events: none;\n\t\t}\n\n\t\t#library-results {\n\t\t\tscrollbar-gutter: stable;\n\t\t\tscroll-behavior: smooth;\n\t\t}\n\n\t\t#library-loading.htmx-request {\n\t\t\tdisplay: inline-flex;\n\t\t}\n\n\t\t.verse-library-search-band {\n\t\t\tborder: 1px solid rgb(38 38 38);\n\t\t\tborder-radius: 1.2rem;\n\t\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.78) 0%, rgba(10, 10, 10, 0.32) 100%);\n\t\t\tbox-shadow: inset 0 1px 0 rgba(82, 82, 82, 0.12);\n\t\t\tpadding: 0.95rem 1.05rem 1rem;\n\t\t\ttransition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;\n\t\t}\n\n\t\t.verse-library-search-band:focus-within {\n\t\t\tborder-color: rgb(82 82 82);\n\t\t\tbackground: linear-gradient(180deg, rgba(31, 31, 31, 0.82) 0%, rgba(10, 10, 10, 0.34) 100%);\n\t\t\tbox-shadow: inset 0 1px 0 rgba(163, 163, 163, 0.18);\n\t\t}\n\n\t\t.verse-library-eyebrow {\n\t\t\tdisplay: flex;\n\t\t\talign-items: center;\n\t\t\tgap: 0.85rem;\n\t\t}\n\n\t\t.verse-library-eyebrow::after {\n\t\t\tcontent: \"\";\n\t\t\theight: 1px;\n\t\t\tflex: 1;\n\t\t\tbackground: rgb(23 23 23);\n\t\t}\n\n\t\t.verse-library-search-top {\n\t\t\tdisplay: flex;\n\t\t\talign-items: center;\n\t\t\tjustify-content: space-between;\n\t\t\tgap: 0.75rem;\n\t\t\tmargin-bottom: 0.45rem;\n\t\t}\n\n\t\t.verse-library-search-top a {\n\t\t\tflex-shrink: 0;\n\t\t}\n\n\t\t.verse-library-search-top a {\n\t\t\ttransition: color 150ms ease;\n\t\t}\n\n\t\t.verse-library-search-top a:hover {\n\t\t\tcolor: rgb(229 229 229);\n\t\t}\n\n\t\t.verse-library-search-input {\n\t\t\twidth: 100%;\n\t\t\tmin-width: 0;\n\t\t\tbackground: transparent;\n\t\t\toutline: none;\n\t\t}\n\n\t\t.verse-library-search-meta {\n\t\t\tdisplay: flex;\n\t\t\talign-items: center;\n\t\t\tjustify-content: space-between;\n\t\t\tgap: 1rem;\n\t\t\tmargin-top: 0.7rem;\n\t\t\tpadding-top: 0.7rem;\n\t\t\tborder-top: 1px solid rgba(38, 38, 38, 0.9);\n\t\t}\n\n\t\t.verse-library-status {\n\t\t\tdisplay: flex;\n\t\t\talign-items: center;\n\t\t\tjustify-content: space-between;\n\t\t\tgap: 1rem;\n\t\t\tmin-height: 1rem;\n\t\t}\n\n\t\t.verse-library-results-pane {\n\t\t\tposition: relative;\n\t\t\tflex: 1;\n\t\t\tmin-height: 0;\n\t\t\tpadding-bottom: 2rem;\n\t\t}\n\n\t\t.verse-library-summary {\n\t\t\tpadding-bottom: 0.9rem;\n\t\t\tborder-bottom: 1px solid rgb(23 23 23);\n\t\t}\n\n\t\t.verse-library-entry {\n\t\t\tdisplay: block;\n\t\t\tpadding: 1rem 1rem 1.15rem;\n\t\t\tborder-radius: 1rem;\n\t\t\tbox-shadow: inset 0 -1px 0 rgb(38 38 38);\n\t\t\ttransition: border-color 150ms ease, background-color 150ms ease;\n\t\t}\n\n\t\t.verse-library-entry:hover {\n\t\t\tbackground: rgba(23, 23, 23, 0.18);\n\t\t\tbox-shadow: inset 0 -1px 0 rgb(64 64 64);\n\t\t}\n\n\t\t.verse-library-entry:focus-within {\n\t\t\tbackground: rgba(23, 23, 23, 0.22);\n\t\t\tbox-shadow: inset 0 -1px 0 rgb(82 82 82);\n\t\t}\n\n\t\t@media (max-width: 640px) {\n\t\t\t.verse-library-status {\n\t\t\t\tflex-direction: column;\n\t\t\t\talign-items: flex-start;\n\t\t\t\tgap: 0.5rem;\n\t\t\t}\n\n\t\t\t.verse-library-search-top {\n\t\t\t\tflex-wrap: wrap;\n\t\t\t}\n\n\t\t\t.verse-library-search-meta {\n\t\t\t\tflex-direction: column;\n\t\t\t\talign-items: flex-start;\n\t\t\t\tgap: 0.6rem;\n\t\t\t}\n\t\t}\n\t</style><div class=\"verse-library-shell not-prose space-y-10 overflow-hidden pt-1 pb-4\"><section class=\"relative z-[1] space-y-6\" style=\"flex: none;\"><div class=\"verse-library-eyebrow\"><p class=\"text-[0.62rem] uppercase tracking-[0.24em] text-neutral-500\">Archive</p></div><div class=\"verse-library-search-band\"><div class=\"verse-library-search-top\"><p class=\"text-[0.56rem] uppercase tracking-[0.18em] text-neutral-600\">Search</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(query)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 21, Col: 18}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" placeholder=\"Search\" hx-get=\"/poems\" hx-trigger=\"keyup changed delay:300ms, search\" hx-target=\"#library-results\" hx-swap=\"innerHTML\" hx-indicator=\"#library-loading\" autocomplete=\"off\" class=\"w-full bg-transparent pr-8 text-lg text-neutral-100 placeholder:text-neutral-600 outline-none\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -58,43 +45,30 @@ func LibraryContent(query string, groups []PoemGroup) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<a href=\"/library\" hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"text-[0.65rem] uppercase tracking-[0.22em] text-neutral-500 transition hover:text-neutral-200\">Clear</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<a href=\"/library\" hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"text-[0.58rem] tracking-[0.12em] text-neutral-500\">Clear</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = If(query != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = If(query != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"flex items-center justify-between gap-4 text-[0.65rem] uppercase tracking-[0.24em] text-neutral-500\"><p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><input id=\"library-search\" name=\"q\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(TotalPoems(groups))
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(query)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 42, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 176, Col: 18}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " ")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(PoemWord(TotalPoems(groups)))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 42, Col: 60}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</p><span id=\"library-loading\" class=\"htmx-indicator items-center\">Updating...</span></div></section><div id=\"library-results\" class=\"max-h-[70vh] overflow-y-auto scroll-smooth pt-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" placeholder=\"Search poems\" hx-get=\"/poems\" hx-trigger=\"keyup changed delay:300ms, search\" hx-target=\"#library-results\" hx-swap=\"innerHTML\" hx-indicator=\"#library-loading\" autocomplete=\"off\" class=\"verse-library-search-input text-[1.05rem] leading-8 text-neutral-100 placeholder:text-neutral-600\"><div class=\"verse-library-search-meta\"><p class=\"text-[0.6rem] tracking-[0.12em] text-neutral-500\">Most recent first</p><div class=\"verse-library-status\"><p class=\"text-[0.56rem] tracking-[0.14em] text-neutral-700\">Up to 100 poems</p><span id=\"library-loading\" class=\"htmx-indicator items-center text-[0.56rem] tracking-[0.14em] text-neutral-700\">Updating...</span></div></div></div></section><div id=\"library-results\" class=\"verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -102,7 +76,7 @@ func LibraryContent(query string, groups []PoemGroup) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -126,11 +100,50 @@ func LibraryResults(query string, groups []PoemGroup) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var6 == nil {
-			templ_7745c5c3_Var6 = templ.NopComponent
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"verse-library-summary pb-8 text-[0.62rem] tracking-[0.12em] text-neutral-500\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(LibrarySummary(query, groups))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 203, Col: 33}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"space-y-6 py-24 text-center\"><p class=\"font-serif text-[1.8rem] leading-tight text-neutral-200\">This library is empty.</p><p class=\"mx-auto max-w-lg text-sm leading-7 text-neutral-400\">Begin writing, and your poems will gather here.</p><div class=\"flex justify-center\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"rounded-full border border-neutral-800 px-6 py-2.5 text-[0.6rem] uppercase tracking-[0.18em] text-neutral-200 transition hover:border-purple-400 hover:text-white\">Begin Writing</button></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = If(len(groups) == 0 && query == "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -143,53 +156,31 @@ func LibraryResults(query string, groups []PoemGroup) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"space-y-6 py-16 text-center\"><p class=\"font-serif text-2xl text-neutral-200\">This library is empty.</p><p class=\"mx-auto max-w-lg text-sm leading-7 text-neutral-400\">Begin writing, and your poems will gather here.</p><div class=\"flex justify-center\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"rounded-full border border-neutral-800 px-8 py-3 text-[0.72rem] font-medium uppercase tracking-[0.28em] text-neutral-200 transition hover:border-purple-400 hover:text-white\">Begin Writing</button></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"space-y-4 py-24 text-center\"><p class=\"font-serif text-[1.8rem] leading-tight text-neutral-200\">No poems match this search.</p><p class=\"text-sm text-neutral-500\">Try a line, image, or phrase instead.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = If(len(groups) == 0 && query == "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-			if !templ_7745c5c3_IsBuffer {
-				defer func() {
-					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err == nil {
-						templ_7745c5c3_Err = templ_7745c5c3_BufErr
-					}
-				}()
-			}
-			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"space-y-3 py-16 text-center\"><p class=\"font-serif text-2xl text-neutral-200\">No poems match this search.</p></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			return nil
-		})
-		templ_7745c5c3_Err = If(len(groups) == 0 && query != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = If(len(groups) == 0 && query != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, group := range groups {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<section class=\"space-y-5 pb-14 md:grid md:grid-cols-[5.5rem_minmax(0,1fr)] md:gap-8 md:space-y-0\"><div class=\"pb-1 md:pt-1\"><h3 class=\"text-[0.68rem] uppercase tracking-[0.26em] text-neutral-500\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<section class=\"space-y-4 pb-20 md:grid md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-10 md:space-y-0\"><div class=\"pb-1 md:pt-4\"><h3 class=\"text-[0.56rem] uppercase tracking-[0.18em] text-neutral-500\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 82, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/library_content.templ`, Line: 230, Col: 89}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h3></div><div class=\"space-y-1 border-l border-neutral-900 pl-5 md:pl-7\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h3></div><div class=\"space-y-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

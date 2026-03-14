@@ -19,30 +19,14 @@ func PoemWord(count int) string {
 	return "poems"
 }
 
-// GroupAnimDelay returns a short stagger for each timeline group.
-func GroupAnimDelay(groupIndex int) string {
-	if groupIndex < 0 {
-		groupIndex = 0
+// LibrarySummary returns a compact summary for the archive header.
+func LibrarySummary(query string, groups []PoemGroup) string {
+	count := TotalPoems(groups)
+	if query == "" {
+		return fmt.Sprintf("%d %s", count, PoemWord(count))
 	}
-	ms := groupIndex * 55
-	if ms > 360 {
-		ms = 360
+	if count == 0 {
+		return fmt.Sprintf("No matches for \"%s\"", query)
 	}
-	return fmt.Sprintf("animation-delay:%dms;", ms)
-}
-
-// RowAnimDelay returns a staggered reveal delay for poem list rows.
-func RowAnimDelay(groupIndex int, rowIndex int) string {
-	if groupIndex < 0 {
-		groupIndex = 0
-	}
-	if rowIndex < 0 {
-		rowIndex = 0
-	}
-
-	ms := groupIndex*70 + rowIndex*28
-	if ms > 520 {
-		ms = 520
-	}
-	return fmt.Sprintf("animation-delay:%dms;", ms)
+	return fmt.Sprintf("%d %s for \"%s\"", count, PoemWord(count), query)
 }

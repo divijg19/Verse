@@ -1,50 +1,71 @@
 package templ
 
 templ Editor() {
+	@EditorScreen("Write", "", "", false)
+}
 
-@Screen("Write", EditorContent("", ""))
-
+templ EditorFullscreen() {
+	@EditorScreen("Write", "", "", true)
 }
 
 templ EditorWithPoem(poemID string, content string) {
-
-@Screen("Edit", EditorContent(poemID, content))
-
+	@EditorScreen("Edit", poemID, content, false)
 }
 
-templ EditorContent(poemID string, content string) {
-
-<div class="space-y-6 pt-1">
-<form
-hx-post={ editorAction(poemID) }
-hx-target="#result"
-hx-swap="innerHTML"
-hx-on::after-request="this.querySelector('textarea').focus()"
-class="space-y-4"
->
-
-@If(poemID != "") {
-<input type="hidden" name="id" value={ poemID }>
+templ EditorWithPoemFullscreen(poemID string, content string) {
+	@EditorScreen("Edit", poemID, content, true)
 }
 
-<textarea
-name="content"
-placeholder="Write your poem..."
-class="w-full h-[420px] bg-neutral-900 rounded-md p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
->{ content }</textarea>
+templ EditorScreen(title string, poemID string, content string, fullscreen bool) {
+	<div class="flex flex-col min-h-0 space-y-6" style={ editorScreenStyle(fullscreen) }>
+		<h1 class="text-2xl font-serif leading-none text-neutral-200">
+			{ title }
+		</h1>
+		<div class="min-h-0 flex-1">
+			@EditorContent(poemID, content, fullscreen)
+		</div>
+	</div>
+}
 
-<button
-type="submit"
-class="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition"
->
-Save Bloom
-</button>
-
-</form>
-
-<div id="result" class="text-sm text-neutral-400"></div>
-</div>
-
+templ EditorContent(poemID string, content string, fullscreen bool) {
+	<div class="not-prose flex h-full min-h-0 flex-col">
+		<form
+			hx-post={ editorAction(poemID) }
+			hx-target="#result"
+			hx-swap="innerHTML"
+			hx-on::after-request="this.querySelector('textarea').focus()"
+			class="flex h-full min-h-0 flex-col gap-4"
+		>
+			@If(poemID != "") {
+				<input type="hidden" name="id" value={ poemID }/>
+			}
+			<div class="flex items-center justify-between gap-3">
+				<a
+					href={ editorModePath(poemID, !fullscreen) }
+					hx-get={ editorModePath(poemID, !fullscreen) }
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="text-sm text-neutral-400 transition hover:text-neutral-200"
+				>
+					{ editorModeLabel(fullscreen) }
+				</a>
+				<div class="flex items-center gap-3">
+					<div id="result" class="text-sm text-neutral-400"></div>
+					<button
+						type="submit"
+						class="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition"
+					>
+						Save Bloom
+					</button>
+				</div>
+			</div>
+			<textarea
+				name="content"
+				placeholder="Write your poem..."
+				class={ editorTextareaClass(fullscreen) }
+			>{ content }</textarea>
+		</form>
+	</div>
 }
 
 func editorAction(poemID string) string {
@@ -52,4 +73,36 @@ func editorAction(poemID string) string {
 		return "/poem/update"
 	}
 	return "/poem"
+}
+
+func editorModePath(poemID string, fullscreen bool) string {
+	path := "/editor"
+	if poemID != "" {
+		path = "/editor/" + poemID
+	}
+	if fullscreen {
+		return path + "?fullscreen=1"
+	}
+	return path
+}
+
+func editorModeLabel(fullscreen bool) string {
+	if fullscreen {
+		return "Standard View"
+	}
+	return "Full Screen"
+}
+
+func editorScreenStyle(fullscreen bool) string {
+	if fullscreen {
+		return "height: calc(100svh - 4rem); padding-top: clamp(4.5rem, 10vh, 6rem);"
+	}
+	return "height: calc(100svh - 4rem); padding-top: clamp(7rem, 16vh, 9rem);"
+}
+
+func editorTextareaClass(fullscreen bool) string {
+	if fullscreen {
+		return "w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
+	}
+	return "w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-md bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
 }

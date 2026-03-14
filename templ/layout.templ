@@ -1,20 +1,15 @@
 package templ
 
 templ Layout(surface string, content templ.Component) {
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Verse</title>
-
-<link rel="stylesheet" href="/static/css/output.css">
-
-<script src="https://unpkg.com/htmx.org"></script>
-
-<style>
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>Verse</title>
+			<link rel="stylesheet" href="/static/css/output.css"/>
+			<script src="https://unpkg.com/htmx.org"></script>
+			<style>
 	/* Fixed edge navigation positions */
 	#nav-top, #nav-left, #nav-right, #nav-bottom { z-index: 40; }
 	#nav-top { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); }
@@ -22,32 +17,25 @@ templ Layout(surface string, content templ.Component) {
 	#nav-right { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); }
 	#nav-bottom { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); }
 </style>
-
-</head>
-
-<body class="bg-neutral-950 text-neutral-200 min-h-screen">
-
-<div id="viewport" class="min-h-screen flex items-center justify-center">
-
-	@Nav(surface)
-
-	@If(surface == "library") {
-	<div id="screen" class="w-full max-w-[1400px] px-6 py-12 md:px-12 transition-all duration-300 ease-out">
-	@content
-	</div>
-	}
-
-	@If(surface != "library") {
-	<div id="screen" class="max-w-3xl w-full transition-all duration-200 ease-out p-8">
-	@content
-	</div>
-	}
-
-</div>
-
-<script src="/static/js/navigation.js"></script>
-
-</body>
-
-</html>
+		</head>
+		<body class="bg-neutral-950 text-neutral-200 min-h-screen">
+			@If(surface == "library") {
+				<div id="viewport" class="min-h-screen flex items-start justify-center">
+					@Nav(surface)
+					<div id="screen" class="w-full max-w-[1280px] px-8 pt-4 pb-12 md:px-14 md:pt-4 transition-all duration-300 ease-out">
+						@content
+					</div>
+				</div>
+			}
+			@If(surface != "library") {
+				<div id="viewport" class="min-h-screen flex items-start justify-center">
+					@Nav(surface)
+					<div id="screen" class="max-w-3xl w-full px-8 pt-4 pb-12 md:pt-4 transition-all duration-200 ease-out">
+						@content
+					</div>
+				</div>
+			}
+			<script src="/static/js/navigation.js"></script>
+		</body>
+	</html>
 }

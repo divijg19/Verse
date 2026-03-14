@@ -40,7 +40,7 @@ func PoemsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func fetchGroupedPoems(r *http.Request, query string) ([]templ.PoemGroup, error) {
-	limit := parseIntDefault(r.URL.Query().Get("limit"), 100)
+	limit := parseBoundedInt(r.URL.Query().Get("limit"), 100, 100)
 	offset := parseIntDefault(r.URL.Query().Get("offset"), 0)
 	ctx := r.Context()
 
@@ -65,6 +65,14 @@ func parseIntDefault(raw string, fallback int) int {
 	v, err := strconv.Atoi(raw)
 	if err != nil || v < 0 {
 		return fallback
+	}
+	return v
+}
+
+func parseBoundedInt(raw string, fallback int, max int) int {
+	v := parseIntDefault(raw, fallback)
+	if max > 0 && v > max {
+		return max
 	}
 	return v
 }
