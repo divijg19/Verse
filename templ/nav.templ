@@ -37,21 +37,18 @@ templ navButtonFor(surface string, direction string) {
 	@If(direction == "left" && (surface == "caelum" || surface == "share")) {
 		@navButton("/dashboard", "Dashboard", "◀")
 	}
-
 	@If(direction == "right" && surface == "dashboard") {
 		@navButton("/editor", "Editor", "▶")
 	}
 	@If(direction == "right" && (surface == "editor" || surface == "caelum" || surface == "share")) {
 		@navButton("/library", "Library", "▶")
 	}
-
 	@If(direction == "up" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
 		@navButton("/caelum", "Caelum", "▲")
 	}
 	@If(direction == "up" && surface == "share") {
 		@navButton("/editor", "Editor", "▲")
 	}
-
 	@If(direction == "down" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
 		@navButton("/share", "Share", "▼")
 	}
@@ -61,7 +58,8 @@ templ navButtonFor(surface string, direction string) {
 }
 
 templ navButton(path string, label string, icon string) {
-	<a href={ path }
+	<a
+		href={ path }
 		hx-get={ path }
 		hx-target="#screen"
 		hx-swap="innerHTML"

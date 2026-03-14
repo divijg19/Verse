@@ -36,7 +36,7 @@ func PoemItem(poem PoemView) templ.Component {
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs("/poem/" + poem.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 6, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 5, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -49,20 +49,20 @@ func PoemItem(poem PoemView) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/poem/" + poem.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 7, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 6, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"group block border-b border-neutral-900 py-6 transition-colors hover:border-neutral-700\"><div class=\"flex items-start justify-between gap-6\"><div class=\"min-w-0 space-y-1.5\"><h3 class=\"font-serif text-[1.35rem] leading-snug text-neutral-100 transition group-hover:text-purple-400\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"group block text-left\"><div class=\"verse-library-entry min-w-0\"><div class=\"min-w-0 space-y-4\"><h3 class=\"max-w-[31rem] font-serif text-[1.3rem] leading-[1.36] text-neutral-100 transition group-hover:text-purple-300\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(poem.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 14, Col: 122}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 13, Col: 138}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -84,14 +84,14 @@ func PoemItem(poem PoemView) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p class=\"max-w-2xl text-sm leading-7 text-neutral-400\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p class=\"max-w-[31rem] text-[0.94rem] leading-8 text-neutral-400\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(poem.Snippet)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 16, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 15, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -107,20 +107,20 @@ func PoemItem(poem PoemView) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><p class=\"whitespace-nowrap pt-1 text-[0.65rem] uppercase tracking-[0.22em] text-neutral-500\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><div class=\"flex flex-wrap items-center gap-x-3 gap-y-1 pt-5 text-[0.56rem] tracking-[0.14em] text-neutral-600 transition group-hover:text-neutral-400\"><span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(poem.CreatedAt.UTC().Format("Jan 2"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 19, Col: 134}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_item.templ`, Line: 19, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</p></div></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</span> <span class=\"text-neutral-700\">/</span> <span>Open</span></div></div></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
