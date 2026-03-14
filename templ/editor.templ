@@ -22,6 +22,54 @@ templ EditorScreen(title string, poemID string, content string) {
 templ EditorContent(poemID string, content string) {
 	<div data-editor-root class="not-prose flex h-full min-h-0 flex-col">
 		<style>
+			.verse-editor-root-frame {
+				display: flex;
+				height: 100%;
+				min-height: 0;
+				flex-direction: column;
+				gap: 1rem;
+			}
+
+			.verse-editor-card {
+				display: flex;
+				min-height: 0;
+				flex: 1;
+				flex-direction: column;
+				border: 1px solid rgb(38 38 38);
+				border-radius: 1.35rem;
+				background:
+					linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.42) 100%);
+				box-shadow: inset 0 1px 0 rgba(82, 82, 82, 0.12);
+				padding: 1rem;
+			}
+
+			.verse-editor-card-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				margin-bottom: 0.9rem;
+			}
+
+			.verse-editor-card-body {
+				display: flex;
+				min-height: 0;
+				flex: 1;
+				flex-direction: column;
+				gap: 1rem;
+			}
+
+			.verse-editor-meta {
+				font-size: 0.62rem;
+				letter-spacing: 0.18em;
+				text-transform: uppercase;
+				color: rgb(115 115 115);
+			}
+
+			.verse-editor-textarea {
+				min-height: clamp(22rem, 52vh, 34rem);
+			}
+
 			.verse-editor-overlay[hidden] {
 				display: none;
 			}
@@ -80,6 +128,10 @@ templ EditorContent(poemID string, content string) {
 			}
 
 			@media (min-width: 768px) {
+				.verse-editor-card {
+					padding: 1.15rem;
+				}
+
 				.verse-editor-overlay-panel {
 					padding: 2rem;
 				}
@@ -90,28 +142,33 @@ templ EditorContent(poemID string, content string) {
 			hx-target="#result"
 			hx-swap="innerHTML"
 			hx-on::after-request="this.querySelector('textarea').focus()"
-			class="flex h-full min-h-0 flex-col gap-4"
+			class="verse-editor-root-frame"
 		>
 			@If(poemID != "") {
 				<input type="hidden" name="id" value={ poemID }/>
 			}
-			<div class="flex items-center justify-end">
-				<button
-					type="button"
-					aria-label="Open full screen editor"
-					title="Open full screen editor"
-					class="verse-editor-icon-button"
-					onclick="verseOpenEditorOverlay(this)"
-				>
-					@EditorExpandIcon()
-				</button>
+			<div class="verse-editor-card">
+				<div class="verse-editor-card-header">
+					<p class="verse-editor-meta">Quiet Draft</p>
+					<button
+						type="button"
+						aria-label="Open full screen editor"
+						title="Open full screen editor"
+						class="verse-editor-icon-button"
+						onclick="verseOpenEditorOverlay(this)"
+					>
+						@EditorExpandIcon()
+					</button>
+				</div>
+				<div class="verse-editor-card-body">
+					<textarea
+						name="content"
+						data-editor-base
+						placeholder="Write your poem..."
+						class="verse-editor-textarea w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
+					>{ content }</textarea>
+				</div>
 			</div>
-			<textarea
-				name="content"
-				data-editor-base
-				placeholder="Write your poem..."
-				class="w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-md bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
-			>{ content }</textarea>
 			<div class="flex items-center justify-between gap-3">
 				<div id="result" class="text-sm text-neutral-400"></div>
 				<button
@@ -153,7 +210,7 @@ templ EditorContent(poemID string, content string) {
 							data-editor-overlay-textarea
 							placeholder="Write your poem..."
 							oninput="verseSyncEditorOverlay(this)"
-							class="w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
+							class="verse-editor-textarea w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
 						>{ content }</textarea>
 						<div class="flex items-center justify-between gap-3">
 							<div id="result-fullscreen" class="text-sm text-neutral-400"></div>
@@ -205,6 +262,19 @@ templ EditorContent(poemID string, content string) {
 				const base = root.querySelector("[data-editor-base]");
 				if (!base) return;
 				base.value = node.value;
+			}
+
+			if (!window.verseEditorEscapeBound) {
+				window.verseEditorEscapeBound = true;
+				document.addEventListener("keydown", function(event) {
+					if (event.key !== "Escape") return;
+					const overlay = document.querySelector("[data-editor-overlay]:not([hidden])");
+					if (!overlay) return;
+					const closeButton = overlay.querySelector("[aria-label='Close full screen editor']");
+					if (closeButton) {
+						verseCloseEditorOverlay(closeButton);
+					}
+				});
 			}
 		</script>
 	</div>
