@@ -1,34 +1,90 @@
 package templ
 
 templ Editor() {
-	@EditorScreen("Write", "", "", false)
-}
-
-templ EditorFullscreen() {
-	@EditorScreen("Write", "", "", true)
+	@EditorScreen("Write", "", "")
 }
 
 templ EditorWithPoem(poemID string, content string) {
-	@EditorScreen("Edit", poemID, content, false)
+	@EditorScreen("Edit", poemID, content)
 }
 
-templ EditorWithPoemFullscreen(poemID string, content string) {
-	@EditorScreen("Edit", poemID, content, true)
-}
-
-templ EditorScreen(title string, poemID string, content string, fullscreen bool) {
-	<div class="flex flex-col min-h-0 space-y-6" style={ editorScreenStyle(fullscreen) }>
+templ EditorScreen(title string, poemID string, content string) {
+	<div class="flex flex-col min-h-0 space-y-6" style="height: calc(100svh - 4rem); padding-top: clamp(7rem, 16vh, 9rem);">
 		<h1 class="text-2xl font-serif leading-none text-neutral-200">
 			{ title }
 		</h1>
 		<div class="min-h-0 flex-1">
-			@EditorContent(poemID, content, fullscreen)
+			@EditorContent(poemID, content)
 		</div>
 	</div>
 }
 
-templ EditorContent(poemID string, content string, fullscreen bool) {
-	<div class="not-prose flex h-full min-h-0 flex-col">
+templ EditorContent(poemID string, content string) {
+	<div data-editor-root class="not-prose flex h-full min-h-0 flex-col">
+		<style>
+			.verse-editor-overlay[hidden] {
+				display: none;
+			}
+
+			.verse-editor-overlay {
+				position: fixed;
+				inset: 0;
+				z-index: 70;
+			}
+
+			.verse-editor-overlay-backdrop {
+				position: absolute;
+				inset: 0;
+				background: rgba(10, 10, 10, 0.84);
+				backdrop-filter: blur(6px);
+			}
+
+			.verse-editor-overlay-panel {
+				position: relative;
+				display: flex;
+				height: 100%;
+				align-items: stretch;
+				justify-content: center;
+				padding: 1rem;
+			}
+
+			.verse-editor-overlay-card {
+				display: flex;
+				height: 100%;
+				width: 100%;
+				max-width: 72rem;
+				flex-direction: column;
+				border: 1px solid rgb(38 38 38);
+				border-radius: 1.5rem;
+				background: rgb(10 10 10 / 0.96);
+				box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+			}
+
+			.verse-editor-icon-button {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 2.5rem;
+				height: 2.5rem;
+				border: 1px solid rgb(38 38 38);
+				border-radius: 9999px;
+				color: rgb(163 163 163);
+				background: rgba(23, 23, 23, 0.52);
+				transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+			}
+
+			.verse-editor-icon-button:hover {
+				color: rgb(229 229 229);
+				border-color: rgb(82 82 82);
+				background: rgba(38, 38, 38, 0.72);
+			}
+
+			@media (min-width: 768px) {
+				.verse-editor-overlay-panel {
+					padding: 2rem;
+				}
+			}
+		</style>
 		<form
 			hx-post={ editorAction(poemID) }
 			hx-target="#result"
@@ -39,33 +95,145 @@ templ EditorContent(poemID string, content string, fullscreen bool) {
 			@If(poemID != "") {
 				<input type="hidden" name="id" value={ poemID }/>
 			}
-			<div class="flex items-center justify-between gap-3">
-				<a
-					href={ editorModePath(poemID, !fullscreen) }
-					hx-get={ editorModePath(poemID, !fullscreen) }
-					hx-target="#screen"
-					hx-swap="innerHTML"
-					class="text-sm text-neutral-400 transition hover:text-neutral-200"
+			<div class="flex items-center justify-end">
+				<button
+					type="button"
+					aria-label="Open full screen editor"
+					title="Open full screen editor"
+					class="verse-editor-icon-button"
+					onclick="verseOpenEditorOverlay(this)"
 				>
-					{ editorModeLabel(fullscreen) }
-				</a>
-				<div class="flex items-center gap-3">
-					<div id="result" class="text-sm text-neutral-400"></div>
-					<button
-						type="submit"
-						class="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition"
-					>
-						Save Bloom
-					</button>
-				</div>
+					@EditorExpandIcon()
+				</button>
 			</div>
 			<textarea
 				name="content"
+				data-editor-base
 				placeholder="Write your poem..."
-				class={ editorTextareaClass(fullscreen) }
+				class="w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-md bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
 			>{ content }</textarea>
+			<div class="flex items-center justify-between gap-3">
+				<div id="result" class="text-sm text-neutral-400"></div>
+				<button
+					type="submit"
+					class="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition"
+				>
+					Save Bloom
+				</button>
+			</div>
 		</form>
+		<div data-editor-overlay class="verse-editor-overlay" hidden>
+			<div class="verse-editor-overlay-backdrop" onclick="verseCloseEditorOverlay(this)"></div>
+			<div class="verse-editor-overlay-panel">
+				<div class="verse-editor-overlay-card">
+					<div class="flex items-center justify-between border-b border-neutral-900 px-5 py-4">
+						<p class="text-sm text-neutral-400">Full Screen</p>
+						<button
+							type="button"
+							aria-label="Close full screen editor"
+							title="Close full screen editor"
+							class="verse-editor-icon-button"
+							onclick="verseCloseEditorOverlay(this)"
+						>
+							@EditorCollapseIcon()
+						</button>
+					</div>
+					<form
+						hx-post={ editorAction(poemID) }
+						hx-target="#result-fullscreen"
+						hx-swap="innerHTML"
+						hx-on::after-request="this.querySelector('textarea').focus()"
+						class="flex min-h-0 flex-1 flex-col gap-4 p-5"
+					>
+						@If(poemID != "") {
+							<input type="hidden" name="id" value={ poemID }/>
+						}
+						<textarea
+							name="content"
+							data-editor-overlay-textarea
+							placeholder="Write your poem..."
+							oninput="verseSyncEditorOverlay(this)"
+							class="w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
+						>{ content }</textarea>
+						<div class="flex items-center justify-between gap-3">
+							<div id="result-fullscreen" class="text-sm text-neutral-400"></div>
+							<button
+								type="submit"
+								class="px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition"
+							>
+								Save Bloom
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+		<script>
+			function verseEditorRoot(node) {
+				return node.closest("[data-editor-root]");
+			}
+
+			function verseOpenEditorOverlay(node) {
+				const root = verseEditorRoot(node);
+				if (!root) return;
+				const overlay = root.querySelector("[data-editor-overlay]");
+				const base = root.querySelector("[data-editor-base]");
+				const overlayTextarea = root.querySelector("[data-editor-overlay-textarea]");
+				if (!overlay || !base || !overlayTextarea) return;
+				overlayTextarea.value = base.value;
+				overlay.hidden = false;
+				document.body.style.overflow = "hidden";
+				requestAnimationFrame(() => overlayTextarea.focus());
+			}
+
+			function verseCloseEditorOverlay(node) {
+				const root = verseEditorRoot(node);
+				if (!root) return;
+				const overlay = root.querySelector("[data-editor-overlay]");
+				const base = root.querySelector("[data-editor-base]");
+				const overlayTextarea = root.querySelector("[data-editor-overlay-textarea]");
+				if (!overlay || !base || !overlayTextarea) return;
+				base.value = overlayTextarea.value;
+				overlay.hidden = true;
+				document.body.style.overflow = "";
+				requestAnimationFrame(() => base.focus());
+			}
+
+			function verseSyncEditorOverlay(node) {
+				const root = verseEditorRoot(node);
+				if (!root) return;
+				const base = root.querySelector("[data-editor-base]");
+				if (!base) return;
+				base.value = node.value;
+			}
+		</script>
 	</div>
+}
+
+templ EditorExpandIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4" aria-hidden="true">
+		<path d="M7 3H3v4"></path>
+		<path d="M13 3h4v4"></path>
+		<path d="M17 13v4h-4"></path>
+		<path d="M3 13v4h4"></path>
+		<path d="M8 8 3 3"></path>
+		<path d="m12 8 5-5"></path>
+		<path d="m8 12-5 5"></path>
+		<path d="m12 12 5 5"></path>
+	</svg>
+}
+
+templ EditorCollapseIcon() {
+	<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="h-4 w-4" aria-hidden="true">
+		<path d="M8 8H3V3"></path>
+		<path d="M12 8h5V3"></path>
+		<path d="M12 12h5v5"></path>
+		<path d="M8 12H3v5"></path>
+		<path d="m8 8-5-5"></path>
+		<path d="m12 8 5-5"></path>
+		<path d="m8 12-5 5"></path>
+		<path d="m12 12 5 5"></path>
+	</svg>
 }
 
 func editorAction(poemID string) string {
@@ -73,36 +241,4 @@ func editorAction(poemID string) string {
 		return "/poem/update"
 	}
 	return "/poem"
-}
-
-func editorModePath(poemID string, fullscreen bool) string {
-	path := "/editor"
-	if poemID != "" {
-		path = "/editor/" + poemID
-	}
-	if fullscreen {
-		return path + "?fullscreen=1"
-	}
-	return path
-}
-
-func editorModeLabel(fullscreen bool) string {
-	if fullscreen {
-		return "Standard View"
-	}
-	return "Full Screen"
-}
-
-func editorScreenStyle(fullscreen bool) string {
-	if fullscreen {
-		return "height: calc(100svh - 4rem); padding-top: clamp(4.5rem, 10vh, 6rem);"
-	}
-	return "height: calc(100svh - 4rem); padding-top: clamp(7rem, 16vh, 9rem);"
-}
-
-func editorTextareaClass(fullscreen bool) string {
-	if fullscreen {
-		return "w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
-	}
-	return "w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-md bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
 }

@@ -29,36 +29,7 @@ func Editor() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = EditorScreen("Write", "", "", false).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func EditorFullscreen() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = EditorScreen("Write", "", "", true).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = EditorScreen("Write", "", "").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -82,12 +53,12 @@ func EditorWithPoem(poemID string, content string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var3 == nil {
-			templ_7745c5c3_Var3 = templ.NopComponent
+		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var2 == nil {
+			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = EditorScreen("Edit", poemID, content, false).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = EditorScreen("Edit", poemID, content).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -95,7 +66,7 @@ func EditorWithPoem(poemID string, content string) templ.Component {
 	})
 }
 
-func EditorWithPoemFullscreen(poemID string, content string) templ.Component {
+func EditorScreen(title string, poemID string, content string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -111,12 +82,33 @@ func EditorWithPoemFullscreen(poemID string, content string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var3 == nil {
+			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = EditorScreen("Edit", poemID, content, true).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col min-h-0 space-y-6\" style=\"height: calc(100svh - 4rem); padding-top: clamp(7rem, 16vh, 9rem);\"><h1 class=\"text-2xl font-serif leading-none text-neutral-200\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 14, Col: 10}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</h1><div class=\"min-h-0 flex-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = EditorContent(poemID, content).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -124,7 +116,7 @@ func EditorWithPoemFullscreen(poemID string, content string) templ.Component {
 	})
 }
 
-func EditorScreen(title string, poemID string, content string, fullscreen bool) templ.Component {
+func EditorContent(poemID string, content string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -145,41 +137,153 @@ func EditorScreen(title string, poemID string, content string, fullscreen bool) 
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col min-h-0 space-y-6\" style=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div data-editor-root class=\"not-prose flex h-full min-h-0 flex-col\"><style>\n\t\t\t.verse-editor-overlay[hidden] {\n\t\t\t\tdisplay: none;\n\t\t\t}\n\n\t\t\t.verse-editor-overlay {\n\t\t\t\tposition: fixed;\n\t\t\t\tinset: 0;\n\t\t\t\tz-index: 70;\n\t\t\t}\n\n\t\t\t.verse-editor-overlay-backdrop {\n\t\t\t\tposition: absolute;\n\t\t\t\tinset: 0;\n\t\t\t\tbackground: rgba(10, 10, 10, 0.84);\n\t\t\t\tbackdrop-filter: blur(6px);\n\t\t\t}\n\n\t\t\t.verse-editor-overlay-panel {\n\t\t\t\tposition: relative;\n\t\t\t\tdisplay: flex;\n\t\t\t\theight: 100%;\n\t\t\t\talign-items: stretch;\n\t\t\t\tjustify-content: center;\n\t\t\t\tpadding: 1rem;\n\t\t\t}\n\n\t\t\t.verse-editor-overlay-card {\n\t\t\t\tdisplay: flex;\n\t\t\t\theight: 100%;\n\t\t\t\twidth: 100%;\n\t\t\t\tmax-width: 72rem;\n\t\t\t\tflex-direction: column;\n\t\t\t\tborder: 1px solid rgb(38 38 38);\n\t\t\t\tborder-radius: 1.5rem;\n\t\t\t\tbackground: rgb(10 10 10 / 0.96);\n\t\t\t\tbox-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);\n\t\t\t}\n\n\t\t\t.verse-editor-icon-button {\n\t\t\t\tdisplay: inline-flex;\n\t\t\t\talign-items: center;\n\t\t\t\tjustify-content: center;\n\t\t\t\twidth: 2.5rem;\n\t\t\t\theight: 2.5rem;\n\t\t\t\tborder: 1px solid rgb(38 38 38);\n\t\t\t\tborder-radius: 9999px;\n\t\t\t\tcolor: rgb(163 163 163);\n\t\t\t\tbackground: rgba(23, 23, 23, 0.52);\n\t\t\t\ttransition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;\n\t\t\t}\n\n\t\t\t.verse-editor-icon-button:hover {\n\t\t\t\tcolor: rgb(229 229 229);\n\t\t\t\tborder-color: rgb(82 82 82);\n\t\t\t\tbackground: rgba(38, 38, 38, 0.72);\n\t\t\t}\n\n\t\t\t@media (min-width: 768px) {\n\t\t\t\t.verse-editor-overlay-panel {\n\t\t\t\t\tpadding: 2rem;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><form hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(editorScreenStyle(fullscreen))
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(editorAction(poemID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 20, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 89, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><h1 class=\"text-2xl font-serif leading-none text-neutral-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-target=\"#result\" hx-swap=\"innerHTML\" hx-on::after-request=\"this.querySelector('textarea').focus()\" class=\"flex h-full min-h-0 flex-col gap-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(title)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 22, Col: 10}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<input type=\"hidden\" name=\"id\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(poemID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 96, Col: 49}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = If(poemID != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</h1><div class=\"min-h-0 flex-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"flex items-center justify-end\"><button type=\"button\" aria-label=\"Open full screen editor\" title=\"Open full screen editor\" class=\"verse-editor-icon-button\" onclick=\"verseOpenEditorOverlay(this)\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = EditorContent(poemID, content, fullscreen).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = EditorExpandIcon().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</button></div><textarea name=\"content\" data-editor-base placeholder=\"Write your poem...\" class=\"w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-md bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(content)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 114, Col: 13}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</textarea><div class=\"flex items-center justify-between gap-3\"><div id=\"result\" class=\"text-sm text-neutral-400\"></div><button type=\"submit\" class=\"px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\">Save Bloom</button></div></form><div data-editor-overlay class=\"verse-editor-overlay\" hidden><div class=\"verse-editor-overlay-backdrop\" onclick=\"verseCloseEditorOverlay(this)\"></div><div class=\"verse-editor-overlay-panel\"><div class=\"verse-editor-overlay-card\"><div class=\"flex items-center justify-between border-b border-neutral-900 px-5 py-4\"><p class=\"text-sm text-neutral-400\">Full Screen</p><button type=\"button\" aria-label=\"Close full screen editor\" title=\"Close full screen editor\" class=\"verse-editor-icon-button\" onclick=\"verseCloseEditorOverlay(this)\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = EditorCollapseIcon().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</button></div><form hx-post=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(editorAction(poemID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 142, Col: 36}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" hx-target=\"#result-fullscreen\" hx-swap=\"innerHTML\" hx-on::after-request=\"this.querySelector('textarea').focus()\" class=\"flex min-h-0 flex-1 flex-col gap-4 p-5\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var11 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<input type=\"hidden\" name=\"id\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var12 string
+			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(poemID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 149, Col: 52}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = If(poemID != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<textarea name=\"content\" data-editor-overlay-textarea placeholder=\"Write your poem...\" oninput=\"verseSyncEditorOverlay(this)\" class=\"w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var13 string
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(content)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 157, Col: 16}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</textarea><div class=\"flex items-center justify-between gap-3\"><div id=\"result-fullscreen\" class=\"text-sm text-neutral-400\"></div><button type=\"submit\" class=\"px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\">Save Bloom</button></div></form></div></div></div><script>\n\t\t\tfunction verseEditorRoot(node) {\n\t\t\t\treturn node.closest(\"[data-editor-root]\");\n\t\t\t}\n\n\t\t\tfunction verseOpenEditorOverlay(node) {\n\t\t\t\tconst root = verseEditorRoot(node);\n\t\t\t\tif (!root) return;\n\t\t\t\tconst overlay = root.querySelector(\"[data-editor-overlay]\");\n\t\t\t\tconst base = root.querySelector(\"[data-editor-base]\");\n\t\t\t\tconst overlayTextarea = root.querySelector(\"[data-editor-overlay-textarea]\");\n\t\t\t\tif (!overlay || !base || !overlayTextarea) return;\n\t\t\t\toverlayTextarea.value = base.value;\n\t\t\t\toverlay.hidden = false;\n\t\t\t\tdocument.body.style.overflow = \"hidden\";\n\t\t\t\trequestAnimationFrame(() => overlayTextarea.focus());\n\t\t\t}\n\n\t\t\tfunction verseCloseEditorOverlay(node) {\n\t\t\t\tconst root = verseEditorRoot(node);\n\t\t\t\tif (!root) return;\n\t\t\t\tconst overlay = root.querySelector(\"[data-editor-overlay]\");\n\t\t\t\tconst base = root.querySelector(\"[data-editor-base]\");\n\t\t\t\tconst overlayTextarea = root.querySelector(\"[data-editor-overlay-textarea]\");\n\t\t\t\tif (!overlay || !base || !overlayTextarea) return;\n\t\t\t\tbase.value = overlayTextarea.value;\n\t\t\t\toverlay.hidden = true;\n\t\t\t\tdocument.body.style.overflow = \"\";\n\t\t\t\trequestAnimationFrame(() => base.focus());\n\t\t\t}\n\n\t\t\tfunction verseSyncEditorOverlay(node) {\n\t\t\t\tconst root = verseEditorRoot(node);\n\t\t\t\tif (!root) return;\n\t\t\t\tconst base = root.querySelector(\"[data-editor-base]\");\n\t\t\t\tif (!base) return;\n\t\t\t\tbase.value = node.value;\n\t\t\t}\n\t\t</script></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -187,7 +291,7 @@ func EditorScreen(title string, poemID string, content string, fullscreen bool) 
 	})
 }
 
-func EditorContent(poemID string, content string, fullscreen bool) templ.Component {
+func EditorExpandIcon() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -203,138 +307,41 @@ func EditorContent(poemID string, content string, fullscreen bool) templ.Compone
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var8 == nil {
-			templ_7745c5c3_Var8 = templ.NopComponent
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"not-prose flex h-full min-h-0 flex-col\"><form hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" class=\"h-4 w-4\" aria-hidden=\"true\"><path d=\"M7 3H3v4\"></path> <path d=\"M13 3h4v4\"></path> <path d=\"M17 13v4h-4\"></path> <path d=\"M3 13v4h4\"></path> <path d=\"M8 8 3 3\"></path> <path d=\"m12 8 5-5\"></path> <path d=\"m8 12-5 5\"></path> <path d=\"m12 12 5 5\"></path></svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(editorAction(poemID))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 33, Col: 33}
+		return nil
+	})
+}
+
+func EditorCollapseIcon() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" hx-target=\"#result\" hx-swap=\"innerHTML\" hx-on::after-request=\"this.querySelector('textarea').focus()\" class=\"flex h-full min-h-0 flex-col gap-4\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
 		}
-		templ_7745c5c3_Var10 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-			if !templ_7745c5c3_IsBuffer {
-				defer func() {
-					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err == nil {
-						templ_7745c5c3_Err = templ_7745c5c3_BufErr
-					}
-				}()
-			}
-			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<input type=\"hidden\" name=\"id\" value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var11 string
-			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(poemID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 40, Col: 49}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			return nil
-		})
-		templ_7745c5c3_Err = If(poemID != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"flex items-center justify-between gap-3\"><a href=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var12 templ.SafeURL
-		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(editorModePath(poemID, !fullscreen))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 44, Col: 47}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" hx-get=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var13 string
-		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(editorModePath(poemID, !fullscreen))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 45, Col: 49}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"text-sm text-neutral-400 transition hover:text-neutral-200\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(editorModeLabel(fullscreen))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 50, Col: 34}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</a><div class=\"flex items-center gap-3\"><div id=\"result\" class=\"text-sm text-neutral-400\"></div><button type=\"submit\" class=\"px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\">Save Bloom</button></div></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var15 = []any{editorTextareaClass(fullscreen)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<textarea name=\"content\" placeholder=\"Write your poem...\" class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var15).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(content)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 66, Col: 13}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</textarea></form></div>")
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" class=\"h-4 w-4\" aria-hidden=\"true\"><path d=\"M8 8H3V3\"></path> <path d=\"M12 8h5V3\"></path> <path d=\"M12 12h5v5\"></path> <path d=\"M8 12H3v5\"></path> <path d=\"m8 8-5-5\"></path> <path d=\"m12 8 5-5\"></path> <path d=\"m8 12-5 5\"></path> <path d=\"m12 12 5 5\"></path></svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -347,38 +354,6 @@ func editorAction(poemID string) string {
 		return "/poem/update"
 	}
 	return "/poem"
-}
-
-func editorModePath(poemID string, fullscreen bool) string {
-	path := "/editor"
-	if poemID != "" {
-		path = "/editor/" + poemID
-	}
-	if fullscreen {
-		return path + "?fullscreen=1"
-	}
-	return path
-}
-
-func editorModeLabel(fullscreen bool) string {
-	if fullscreen {
-		return "Standard View"
-	}
-	return "Full Screen"
-}
-
-func editorScreenStyle(fullscreen bool) string {
-	if fullscreen {
-		return "height: calc(100svh - 4rem); padding-top: clamp(4.5rem, 10vh, 6rem);"
-	}
-	return "height: calc(100svh - 4rem); padding-top: clamp(7rem, 16vh, 9rem);"
-}
-
-func editorTextareaClass(fullscreen bool) string {
-	if fullscreen {
-		return "w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-xl bg-neutral-900 p-5 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
-	}
-	return "w-full flex-1 min-h-0 resize-none overflow-y-auto rounded-md bg-neutral-900 p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
 }
 
 var _ = templruntime.GeneratedTemplate
