@@ -1,41 +1,131 @@
 package templ
 
-templ DashboardContent(total int, currentStreak int, longestStreak int, days []DayActivity) {
+import "fmt"
+import "time"
+
+templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, month time.Time, days []HeatmapDay) {
 
 <div class="space-y-6">
+<style>
+	.verse-dashboard-columns {
+		display: grid;
+		grid-template-columns: 14rem minmax(0, 1fr);
+		align-items: start;
+		column-gap: 10rem;
+		row-gap: 1rem;
+	}
 
-<div class="space-y-2">
-<p class="text-sm">Total Poems: <strong class="text-purple-400">{ total }</strong></p>
-<p class="text-sm">Current Streak: <strong class="text-purple-400">{ currentStreak } days</strong></p>
-<p class="text-sm">Longest Streak: <strong class="text-purple-400">{ longestStreak } days</strong></p>
+	.verse-dashboard-stats,
+	.verse-dashboard-activity {
+		min-width: 0;
+	}
+
+	.verse-dashboard-stats {
+		width: 20rem;
+		margin-left: -3rem;
+	}
+
+	.verse-dashboard-activity {
+		padding-left: 0.75rem;
+		padding-bottom: 2.5rem;
+	}
+
+	.verse-dashboard-activity h2 {
+		padding-left: 0.5rem;
+	}
+
+	.verse-dashboard-actions {
+		position: relative;
+		z-index: 1;
+		margin-top: -6rem;
+	}
+
+	.verse-last-poem {
+		position: relative;
+		display: block;
+		padding: 1rem 1rem 0.95rem 1.1rem;
+		border-left: 1px solid rgb(64 64 64);
+		background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.2) 100%);
+		transition: border-color 150ms ease, background-color 150ms ease;
+	}
+
+	.verse-last-poem:hover {
+		border-left-color: rgb(168 85 247);
+		background: linear-gradient(180deg, rgba(31, 31, 31, 0.82) 0%, rgba(10, 10, 10, 0.28) 100%);
+	}
+
+	.verse-last-poem-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-top: 0.85rem;
+		font-size: 0.65rem;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		color: rgb(115 115 115);
+	}
+</style>
+
+<div class="verse-dashboard-columns">
+	<div class="verse-dashboard-stats space-y-6">
+		<div class="space-y-2">
+			<p class="text-sm">Total Poems: <strong class="text-purple-400">{ fmt.Sprint(total) }</strong></p>
+			<p class="text-sm">Current Streak: <strong class="text-purple-400">{ fmt.Sprint(currentStreak) } days</strong></p>
+		</div>
+		@If(lastPoem != nil) {
+			<div class="space-y-3 pt-8">
+				<p class="text-[0.65rem] uppercase tracking-[0.24em] text-neutral-500">Recent</p>
+				<a
+					href={ "/poem/" + lastPoem.ID }
+					hx-get={ "/poem/" + lastPoem.ID }
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-last-poem group"
+				>
+					<p class="font-serif text-[1.05rem] leading-snug text-neutral-100 transition group-hover:text-purple-400">{ lastPoem.Title }</p>
+					@If(lastPoem.Snippet != "" && lastPoem.Snippet != lastPoem.Title) {
+						<p class="pt-1 text-sm leading-relaxed text-neutral-400">{ lastPoem.Snippet }</p>
+					}
+					<div class="verse-last-poem-meta">
+						<span>{ lastPoem.CreatedAt.UTC().Format("Jan 2") }</span>
+						<span class="transition group-hover:text-purple-400">Open</span>
+					</div>
+				</a>
+			</div>
+		}
+	</div>
+
+	<div class="verse-dashboard-activity space-y-4">
+		<h2 class="text-lg">Activity</h2>
+		<div class="pt-1">
+			@Heatmap(month, days)
+		</div>
+	</div>
 </div>
 
-<h2 class="text-lg">Activity</h2>
+<div class="verse-dashboard-actions flex gap-2 pt-6">
+	<button
+		hx-get="/editor"
+		hx-target="#screen"
+		hx-swap="innerHTML"
+		aria-label="Write"
+		title="Write"
+		class="px-4 py-2 bg-purple-600 rounded transition hover:bg-purple-500"
+	>
+		Write
+	</button>
 
-@ActivityGrid(days)
-
-<div class="flex gap-2 mt-4">
-  <button
-    hx-get="/editor"
-    hx-target="#screen"
-    hx-swap="innerHTML"
-    aria-label="Write"
-    title="Write"
-    class="px-4 py-2 bg-purple-600 rounded"
-  >
-    Write
-  </button>
-
-  <button
-    hx-get="/caelum"
-    hx-target="#screen"
-    hx-swap="innerHTML"
-    aria-label="Look to Caelum"
-    title="Look to Caelum"
-    class="px-4 py-2 bg-neutral-800 rounded"
-  >
-    Look to Caelum
-  </button>
+	<button
+		hx-get="/caelum"
+		hx-target="#screen"
+		hx-swap="innerHTML"
+		aria-label="Look to Caelum"
+		title="Look to Caelum"
+		class="px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700"
+	>
+		Look to Caelum
+	</button>
 </div>
 
 </div>

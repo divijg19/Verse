@@ -38,3 +38,6 @@ static/css/output.css
 
 # tools
 tools/
+
+# tmp
+tmp/

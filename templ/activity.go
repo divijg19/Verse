@@ -22,17 +22,17 @@ func ActivityGrid(days []DayActivity) templ.Component {
 			}()
 		}
 
-		if _, e := buf.WriteString("<div class=\"grid grid-cols-7 gap-1\">"); e != nil {
+		if _, e := buf.WriteString("<div class=\"grid grid-rows-7 grid-flow-col gap-1.5 w-max\">"); e != nil {
 			return e
 		}
 
 		for _, d := range days {
 			if d.Active {
-				if _, e := buf.WriteString("<div class=\"w-6 h-6 bg-purple-600 rounded\"></div>"); e != nil {
+				if _, e := buf.WriteString("<div class=\"w-3.5 h-3.5 bg-purple-500/80 rounded-[2px] shadow-sm shadow-purple-900/20 transition-all hover:bg-purple-400\"></div>"); e != nil {
 					return e
 				}
 			} else {
-				if _, e := buf.WriteString("<div class=\"w-6 h-6 bg-neutral-800 rounded\"></div>"); e != nil {
+				if _, e := buf.WriteString("<div class=\"w-3.5 h-3.5 bg-neutral-800/50 rounded-[2px] transition-colors hover:bg-neutral-700/60\"></div>"); e != nil {
 					return e
 				}
 			}

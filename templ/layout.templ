@@ -31,9 +31,17 @@ templ Layout(surface string, content templ.Component) {
 
 	@Nav(surface)
 
+	@If(surface == "library") {
+	<div id="screen" class="w-full max-w-[1400px] px-6 py-12 md:px-12 transition-all duration-300 ease-out">
+	@content
+	</div>
+	}
+
+	@If(surface != "library") {
 	<div id="screen" class="max-w-3xl w-full transition-all duration-200 ease-out p-8">
 	@content
 	</div>
+	}
 
 </div>
 

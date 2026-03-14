@@ -1,7 +1,9 @@
 package templ
 
-templ Dashboard(total int, currentStreak int, longestStreak int, days []DayActivity) {
+import "time"
 
-@Screen("Dashboard", DashboardContent(total, currentStreak, longestStreak, days))
+templ Dashboard(total int, currentStreak int, lastPoem *LastPoemSummary, month time.Time, days []HeatmapDay) {
+
+@Screen("Dashboard", DashboardContent(total, currentStreak, lastPoem, month, days))
 
 }

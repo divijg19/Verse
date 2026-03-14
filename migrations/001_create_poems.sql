@@ -4,8 +4,3 @@ CREATE TABLE IF NOT EXISTS poems (
   content TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT now()
 );
-CREATE TABLE poems (
-  id UUID PRIMARY KEY,
-  content TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT now()
-);

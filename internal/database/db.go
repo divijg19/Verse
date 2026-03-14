@@ -73,6 +73,12 @@ func Connect() error {
 		if err == nil {
 			// Ping to verify connectivity
 			if perr := pool.Ping(ctx); perr == nil {
+				if serr := ensurePoemsSchema(ctx, pool); serr != nil {
+					pool.Close()
+					cancel()
+					return fmt.Errorf("failed to ensure poems schema: %w", serr)
+				}
+
 				cancel()
 				Pool = pool
 				return nil
@@ -93,4 +99,21 @@ func Connect() error {
 	}
 
 	return fmt.Errorf("failed to connect to database after %d attempts: %w", attempts, lastErr)
+}
+
+func ensurePoemsSchema(ctx context.Context, pool *pgxpool.Pool) error {
+	if _, err := pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS poems (
+			id UUID PRIMARY KEY,
+			content TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT now()
+		)`); err != nil {
+		return err
+	}
+
+	if _, err := pool.Exec(ctx, `ALTER TABLE poems ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL`); err != nil {
+		return err
+	}
+
+	return nil
 }
