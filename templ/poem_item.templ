@@ -1,0 +1,23 @@
+package templ
+
+templ PoemItem(poem PoemView) {
+
+<a
+href={ "/poem/" + poem.ID }
+hx-get={ "/poem/" + poem.ID }
+hx-target="#screen"
+hx-swap="innerHTML"
+class="group block border-b border-neutral-900 py-6 transition-colors hover:border-neutral-700"
+>
+	<div class="flex items-start justify-between gap-6">
+		<div class="min-w-0 space-y-1.5">
+			<h3 class="font-serif text-[1.35rem] leading-snug text-neutral-100 transition group-hover:text-purple-400">{ poem.Title }</h3>
+			@If(poem.Snippet != "" && poem.Snippet != poem.Title) {
+				<p class="max-w-2xl text-sm leading-7 text-neutral-400">{ poem.Snippet }</p>
+			}
+		</div>
+		<p class="whitespace-nowrap pt-1 text-[0.65rem] uppercase tracking-[0.22em] text-neutral-500">{ poem.CreatedAt.UTC().Format("Jan 2") }</p>
+	</div>
+</a>
+
+}

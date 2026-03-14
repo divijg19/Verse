@@ -1,0 +1,51 @@
+package templ
+
+templ PoemViewScreen(poem PoemView) {
+
+@Screen("Poem", PoemViewContent(poem))
+
+}
+
+templ PoemViewContent(poem PoemView) {
+
+<div class="space-y-5">
+<div class="flex items-center justify-between gap-3">
+<a
+href="/library"
+hx-get="/library"
+hx-target="#screen"
+hx-swap="innerHTML"
+class="text-sm text-neutral-300 hover:text-neutral-100"
+>◀ Library</a>
+
+<a
+href={ "/editor/" + poem.ID }
+hx-get={ "/editor/" + poem.ID }
+hx-target="#screen"
+hx-swap="innerHTML"
+class="text-sm text-neutral-300 hover:text-neutral-100"
+>Editor ▶</a>
+</div>
+
+<p class="text-xs text-neutral-500">{ poem.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }</p>
+
+<article class="whitespace-pre-wrap text-lg leading-relaxed text-neutral-100">{ poem.Content }</article>
+
+<form
+hx-post="/poem/delete"
+hx-target="#screen"
+hx-swap="innerHTML"
+hx-confirm="Delete this poem from your library?"
+class="pt-2"
+>
+<input type="hidden" name="id" value={ poem.ID }/>
+<button
+ type="submit"
+ class="rounded-md border border-red-900/60 bg-red-950/30 px-3 py-1.5 text-sm text-red-300 transition hover:bg-red-950/50"
+>
+Delete
+</button>
+</form>
+</div>
+
+}

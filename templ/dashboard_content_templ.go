@@ -8,7 +8,10 @@ package templ
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func DashboardContent(total int, currentStreak int, longestStreak int, days []DayActivity) templ.Component {
+import "fmt"
+import "time"
+
+func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, month time.Time, days []HeatmapDay) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,14 +32,14 @@ func DashboardContent(total int, currentStreak int, longestStreak int, days []Da
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><div class=\"space-y-2\"><p class=\"text-sm\">Total Poems: <strong class=\"text-purple-400\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><style>\n\t.verse-dashboard-columns {\n\t\tdisplay: grid;\n\t\tgrid-template-columns: 14rem minmax(0, 1fr);\n\t\talign-items: start;\n\t\tcolumn-gap: 10rem;\n\t\trow-gap: 1rem;\n\t}\n\n\t.verse-dashboard-stats,\n\t.verse-dashboard-activity {\n\t\tmin-width: 0;\n\t}\n\n\t.verse-dashboard-stats {\n\t\twidth: 20rem;\n\t\tmargin-left: -3rem;\n\t}\n\n\t.verse-dashboard-activity {\n\t\tpadding-left: 0.75rem;\n\t\tpadding-bottom: 2.5rem;\n\t}\n\n\t.verse-dashboard-activity h2 {\n\t\tpadding-left: 0.5rem;\n\t}\n\n\t.verse-dashboard-actions {\n\t\tposition: relative;\n\t\tz-index: 1;\n\t\tmargin-top: -6rem;\n\t}\n\n\t.verse-last-poem {\n\t\tposition: relative;\n\t\tdisplay: block;\n\t\tpadding: 1rem 1rem 0.95rem 1.1rem;\n\t\tborder-left: 1px solid rgb(64 64 64);\n\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.2) 100%);\n\t\ttransition: border-color 150ms ease, background-color 150ms ease;\n\t}\n\n\t.verse-last-poem:hover {\n\t\tborder-left-color: rgb(168 85 247);\n\t\tbackground: linear-gradient(180deg, rgba(31, 31, 31, 0.82) 0%, rgba(10, 10, 10, 0.28) 100%);\n\t}\n\n\t.verse-last-poem-meta {\n\t\tdisplay: flex;\n\t\talign-items: center;\n\t\tjustify-content: space-between;\n\t\tgap: 0.75rem;\n\t\tmargin-top: 0.85rem;\n\t\tfont-size: 0.65rem;\n\t\tletter-spacing: 0.22em;\n\t\ttext-transform: uppercase;\n\t\tcolor: rgb(115 115 115);\n\t}\n</style><div class=\"verse-dashboard-columns\"><div class=\"verse-dashboard-stats space-y-6\"><div class=\"space-y-2\"><p class=\"text-sm\">Total Poems: <strong class=\"text-purple-400\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(total)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(total))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 8, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 73, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -47,36 +50,140 @@ func DashboardContent(total int, currentStreak int, longestStreak int, days []Da
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(currentStreak)
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(currentStreak))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 9, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 74, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " days</strong></p><p class=\"text-sm\">Longest Streak: <strong class=\"text-purple-400\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " days</strong></p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(longestStreak)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 10, Col: 82}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"space-y-3 pt-8\"><p class=\"text-[0.65rem] uppercase tracking-[0.24em] text-neutral-500\">Recent</p><a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var5 templ.SafeURL
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs("/poem/" + lastPoem.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 80, Col: 34}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-get=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/poem/" + lastPoem.ID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 81, Col: 36}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-last-poem group\"><p class=\"font-serif text-[1.05rem] leading-snug text-neutral-100 transition group-hover:text-purple-400\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(lastPoem.Title)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 86, Col: 127}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p class=\"pt-1 text-sm leading-relaxed text-neutral-400\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var9 string
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(lastPoem.Snippet)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 88, Col: 81}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</p>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = If(lastPoem.Snippet != "" && lastPoem.Snippet != lastPoem.Title).Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"verse-last-poem-meta\"><span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(lastPoem.CreatedAt.UTC().Format("Jan 2"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 91, Col: 54}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</span> <span class=\"transition group-hover:text-purple-400\">Open</span></div></a></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = If(lastPoem != nil).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " days</strong></p></div><h2 class=\"text-lg\">Activity</h2>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div><div class=\"verse-dashboard-activity space-y-4\"><h2 class=\"text-lg\">Activity</h2><div class=\"pt-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ActivityGrid(days).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Heatmap(month, days).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"flex gap-2 mt-4\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Write\" title=\"Write\" class=\"px-4 py-2 bg-purple-600 rounded\">Write</button> <button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Look to Caelum\" title=\"Look to Caelum\" class=\"px-4 py-2 bg-neutral-800 rounded\">Look to Caelum</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div></div></div><div class=\"verse-dashboard-actions flex gap-2 pt-6\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Write\" title=\"Write\" class=\"px-4 py-2 bg-purple-600 rounded transition hover:bg-purple-500\">Write</button> <button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Look to Caelum\" title=\"Look to Caelum\" class=\"px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700\">Look to Caelum</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

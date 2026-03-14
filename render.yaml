@@ -1,22 +1,6 @@
 services:
   - type: web
     name: verse
-    env: release
-    plan: free
-    repo: .
-    buildCommand: |
-      bun install && \
-      bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify && \
-      go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
-    startCommand: ./verse
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase: null
-
-# Note: Ensure DATABASE_URL is set in the Render dashboard or service settings.
-services:
-  - type: web
-    name: verse
     runtime: go
     buildCommand: |
       bun install

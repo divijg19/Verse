@@ -61,15 +61,16 @@ templ navButtonFor(surface string, direction string) {
 }
 
 templ navButton(path string, label string, icon string) {
-	<button
+	<a href={ path }
 		hx-get={ path }
 		hx-target="#screen"
 		hx-swap="innerHTML"
+		role="button"
 		aria-label={ "Navigate to " + label }
 		title={ label }
 		class="inline-flex min-w-28 flex-col items-center gap-1 rounded-full border border-neutral-800 bg-neutral-950/90 px-4 py-3 text-center text-[0.7rem] uppercase tracking-[0.28em] text-neutral-100 shadow-lg shadow-black/20 transition hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-400"
 	>
 		<span aria-hidden="true" class="text-base leading-none">{ icon }</span>
 		<span>{ label }</span>
-	</button>
+	</a>
 }

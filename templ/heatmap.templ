@@ -1,0 +1,141 @@
+package templ
+
+import "time"
+
+templ Heatmap(month time.Time, days []HeatmapDay) {
+	<div id="heatmap" class="not-prose space-y-5">
+		<style>
+			.verse-heatmap-shell {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				width: 100%;
+				padding: 0.75rem 0 1.5rem;
+			}
+
+			.verse-heatmap-content {
+				display: inline-flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 1.5rem;
+				min-width: max-content;
+			}
+
+			.verse-heatmap-nav {
+				display: grid;
+				grid-template-columns: 2.5rem auto 2.5rem;
+				align-items: center;
+				width: 100%;
+				gap: 1.5rem;
+			}
+
+			.verse-heatmap-frame {
+				display: flex;
+				justify-content: center;
+				width: 100%;
+				overflow-x: auto;
+				padding-bottom: 0.25rem;
+			}
+
+			.verse-heatmap-inner {
+				display: inline-flex;
+				flex-direction: column;
+				gap: 1.125rem;
+				min-width: max-content;
+			}
+
+			.verse-heatmap-days {
+				display: grid;
+				grid-template-columns: repeat(7, 2.25rem);
+				gap: 1rem;
+				font-size: 0.65rem;
+				letter-spacing: 0.22em;
+				text-transform: uppercase;
+				color: rgb(82 82 91);
+				text-align: center;
+			}
+
+			.verse-heatmap-grid {
+				display: grid;
+				grid-template-columns: repeat(7, 2.25rem);
+				gap: 1rem;
+				place-items: center;
+			}
+
+			.verse-heatmap-empty {
+				width: 2rem;
+				height: 2rem;
+				border-radius: 0.25rem;
+				background: transparent;
+			}
+
+			.verse-heatmap-cell {
+				width: 2rem;
+				height: 2rem;
+				border-radius: 0.25rem;
+			}
+
+			.verse-heatmap-cell-idle {
+				background: rgb(38 38 38);
+			}
+
+			.verse-heatmap-cell-active {
+				background: rgb(147 51 234);
+			}
+
+			.verse-heatmap-stable {
+				min-height: calc(1.5rem + 2rem + 1.125rem + (2rem * 6) + (1rem * 5));
+			}
+		</style>
+		<div class="verse-heatmap-shell verse-heatmap-stable">
+			<div class="verse-heatmap-content">
+				<div class="verse-heatmap-nav">
+					<a
+						href={ "/dashboard?month=" + heatmapMonthParam(heatmapPrevMonth(month)) }
+						hx-get={ "/dashboard?month=" + heatmapMonthParam(heatmapPrevMonth(month)) }
+						hx-target="#heatmap"
+						hx-swap="outerHTML"
+						aria-label="Previous month"
+						class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm text-neutral-500 transition hover:text-neutral-200"
+					>←</a>
+					<h2 class="text-center font-serif text-[1.7rem] leading-none text-neutral-100">{ heatmapMonthLabel(month) }</h2>
+					<a
+						href={ "/dashboard?month=" + heatmapMonthParam(heatmapNextMonth(month)) }
+						hx-get={ "/dashboard?month=" + heatmapMonthParam(heatmapNextMonth(month)) }
+						hx-target="#heatmap"
+						hx-swap="outerHTML"
+						aria-label="Next month"
+						class="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm text-neutral-500 transition hover:text-neutral-200"
+					>→</a>
+				</div>
+				<div class="verse-heatmap-frame">
+					<div class="verse-heatmap-inner">
+						<div class="verse-heatmap-days">
+							<span class="text-center">Mon</span>
+							<span class="text-center">Tue</span>
+							<span class="text-center">Wed</span>
+							<span class="text-center">Thu</span>
+							<span class="text-center">Fri</span>
+							<span class="text-center">Sat</span>
+							<span class="text-center">Sun</span>
+						</div>
+						<div class="verse-heatmap-grid">
+							for i := 0; i < heatmapLeadingBlankDays(month); i++ {
+								<div class="verse-heatmap-empty"></div>
+							}
+							for _, day := range days {
+								<div
+									title={ day.Date.Format("Jan 2, 2006") }
+									class={ heatmapCellClass(day.Active) }
+								></div>
+							}
+							for i := 0; i < heatmapTrailingBlankDays(month, len(days)); i++ {
+								<div class="verse-heatmap-empty"></div>
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}

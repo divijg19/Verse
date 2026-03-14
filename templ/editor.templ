@@ -2,22 +2,36 @@ package templ
 
 templ Editor() {
 
-<div class="space-y-6">
-<h1 class="text-3xl font-serif">Write</h1>
+@Screen("Write", EditorContent("", ""))
 
-<form 
-hx-post="/poem"
+}
+
+templ EditorWithPoem(poemID string, content string) {
+
+@Screen("Edit", EditorContent(poemID, content))
+
+}
+
+templ EditorContent(poemID string, content string) {
+
+<div class="space-y-6 pt-1">
+<form
+hx-post={ editorAction(poemID) }
 hx-target="#result"
 hx-swap="innerHTML"
 hx-on::after-request="this.querySelector('textarea').focus()"
 class="space-y-4"
 >
 
+@If(poemID != "") {
+<input type="hidden" name="id" value={ poemID }>
+}
+
 <textarea
 name="content"
 placeholder="Write your poem..."
 class="w-full h-[420px] bg-neutral-900 rounded-md p-4 text-lg leading-relaxed outline-none focus:ring-2 focus:ring-purple-600"
-></textarea>
+>{ content }</textarea>
 
 <button
 type="submit"
@@ -29,7 +43,13 @@ Save Bloom
 </form>
 
 <div id="result" class="text-sm text-neutral-400"></div>
-
 </div>
 
+}
+
+func editorAction(poemID string) string {
+	if poemID != "" {
+		return "/poem/update"
+	}
+	return "/poem"
 }
