@@ -40,10 +40,5 @@ func EditorEditHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if editorFullscreen(r) {
-		renderSurface(w, r, "editor", templ.EditorWithPoemFullscreen(p.ID, p.Content))
-		return
-	}
-
 	renderSurface(w, r, "editor", templ.EditorWithPoem(p.ID, p.Content))
 }
