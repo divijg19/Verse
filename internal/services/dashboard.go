@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/divijg19/Verse/internal/clock"
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/models"
 )
@@ -50,7 +51,7 @@ func CurrentStreak(ctx context.Context) (int, error) {
 	}
 
 	streak := 0
-	day := time.Now().UTC().Truncate(24 * time.Hour)
+	day := clock.TodayUTC()
 	for {
 		key := day.Format("2006-01-02")
 		if _, ok := present[key]; !ok {

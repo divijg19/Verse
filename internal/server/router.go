@@ -7,15 +7,21 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+
+	if r.Method == http.MethodGet {
+		_, _ = w.Write([]byte("ok"))
+	}
+}
+
 // NewRouter builds the HTTP route map used by the Verse server.
 func NewRouter() *chi.Mux {
 	r := chi.NewRouter()
 
 	// Health endpoint (fast, no DB, no templates)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
-	})
+	r.MethodFunc(http.MethodGet, "/health", healthHandler)
+	r.MethodFunc(http.MethodHead, "/health", healthHandler)
 
 	// Serve static files from ./static with caching headers.
 	fs := http.FileServer(http.Dir("static"))

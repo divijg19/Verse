@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -22,6 +23,9 @@ func TestDatabasePoolDefaults(t *testing.T) {
 
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect failed: %v", err)
+	}
+	if err := database.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("database ensure schema failed: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {

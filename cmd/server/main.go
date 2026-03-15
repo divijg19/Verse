@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +13,9 @@ func main() {
 	// Initialize database (fail fast if not available)
 	if err := database.Connect(); err != nil {
 		log.Fatalf("database connection failed: %v", err)
+	}
+	if err := database.EnsureSchema(context.Background()); err != nil {
+		log.Fatalf("database schema initialization failed: %v", err)
 	}
 	defer func() {
 		if database.Pool != nil {
