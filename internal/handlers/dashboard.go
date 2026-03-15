@@ -3,9 +3,10 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/divijg19/Verse/internal/clock"
+	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
 	"github.com/jackc/pgx/v5"
@@ -36,12 +37,12 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 func parseDashboardMonth(raw string) time.Time {
 	if raw == "" {
-		return services.NormalizeMonth(time.Now().UTC())
+		return services.NormalizeMonth(clock.NowUTC())
 	}
 
 	month, err := time.Parse("2006-01", raw)
 	if err != nil {
-		return services.NormalizeMonth(time.Now().UTC())
+		return services.NormalizeMonth(clock.NowUTC())
 	}
 
 	return services.NormalizeMonth(month)
@@ -88,42 +89,17 @@ func loadLastPoem(ctx context.Context) *templ.LastPoemSummary {
 		return nil
 	}
 
-	title := dashboardFirstNonEmptyLine(poem.Content)
+	title := presenters.FirstNonEmptyLine(poem.Content)
 	if title == "" {
 		title = "Untitled"
 	}
 
-	flat := strings.Join(strings.Fields(strings.ReplaceAll(poem.Content, "\n", " ")), " ")
+	flat := presenters.FlattenContent(poem.Content)
 
 	return &templ.LastPoemSummary{
 		ID:        poem.ID,
-		Title:     dashboardTruncateRunes(title, 72),
-		Snippet:   dashboardTruncateRunes(flat, 120),
+		Title:     presenters.TruncateRunes(title, 72),
+		Snippet:   presenters.TruncateRunes(flat, 120),
 		CreatedAt: poem.CreatedAt,
 	}
-}
-
-func dashboardFirstNonEmptyLine(content string) string {
-	normalized := strings.ReplaceAll(content, "\r\n", "\n")
-	for _, line := range strings.Split(normalized, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			return line
-		}
-	}
-	return ""
-}
-
-func dashboardTruncateRunes(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) <= max {
-		return s
-	}
-	if max <= 3 {
-		return string(runes[:max])
-	}
-	return string(runes[:max-3]) + "..."
 }

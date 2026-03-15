@@ -6,7 +6,22 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/models"
+	"github.com/google/uuid"
 )
+
+// CreatePoem inserts a new poem and returns its id.
+func CreatePoem(ctx context.Context, content string) (string, error) {
+	if database.Pool == nil {
+		return "", fmt.Errorf("database not initialized")
+	}
+
+	id := uuid.NewString()
+	if _, err := database.Pool.Exec(ctx, `INSERT INTO poems (id, content) VALUES ($1, $2)`, id, content); err != nil {
+		return "", err
+	}
+
+	return id, nil
+}
 
 // ListPoems returns the most recent poems (non-deleted) with limit/offset.
 func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {

@@ -3,12 +3,14 @@ package handlers
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/divijg19/Verse/internal/clock"
 	"github.com/divijg19/Verse/internal/models"
+	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
+	"strings"
 )
 
 // LibraryHandler renders the Library surface and supports HTMX partial responses.
@@ -109,7 +111,7 @@ func groupPoems(poems []models.Poem) []templ.PoemGroup {
 }
 
 func timelineLabel(t time.Time) string {
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	today := clock.TodayUTC()
 	day := t.UTC().Truncate(24 * time.Hour)
 
 	if day.Equal(today) {
@@ -125,43 +127,18 @@ func timelineLabel(t time.Time) string {
 }
 
 func toPoemView(poem models.Poem) templ.PoemView {
-	title := firstLine(poem.Content)
+	title := presenters.FirstNonEmptyLine(poem.Content)
 	if title == "" {
 		title = "Untitled"
 	}
 
-	flat := strings.Join(strings.Fields(strings.ReplaceAll(poem.Content, "\n", " ")), " ")
+	flat := presenters.FlattenContent(poem.Content)
 
 	return templ.PoemView{
 		ID:        poem.ID,
 		Content:   poem.Content,
 		CreatedAt: poem.CreatedAt,
-		Title:     truncateRunes(title, 80),
-		Snippet:   truncateRunes(flat, 120),
+		Title:     presenters.TruncateRunes(title, 80),
+		Snippet:   presenters.TruncateRunes(flat, 120),
 	}
-}
-
-func firstLine(content string) string {
-	normalized := strings.ReplaceAll(content, "\r\n", "\n")
-	for _, line := range strings.Split(normalized, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			return line
-		}
-	}
-	return ""
-}
-
-func truncateRunes(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	runes := []rune(s)
-	if len(runes) <= max {
-		return s
-	}
-	if max <= 3 {
-		return string(runes[:max])
-	}
-	return string(runes[:max-3]) + "..."
 }

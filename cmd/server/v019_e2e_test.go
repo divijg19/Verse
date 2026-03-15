@@ -30,6 +30,9 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
 	}
+	if err := database.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("database ensure schema: %v", err)
+	}
 	t.Cleanup(func() {
 		if database.Pool != nil {
 			database.Pool.Close()
@@ -149,6 +152,9 @@ func TestV019RouteMapExists(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
 	}
+	if err := database.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("database ensure schema: %v", err)
+	}
 	t.Cleanup(func() {
 		if database.Pool != nil {
 			database.Pool.Close()
@@ -184,6 +190,9 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
+	}
+	if err := database.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("database ensure schema: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {
