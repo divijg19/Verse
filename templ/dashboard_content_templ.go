@@ -32,14 +32,14 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><style>\n\t.verse-dashboard-columns {\n\t\tdisplay: grid;\n\t\tgrid-template-columns: 14rem minmax(0, 1fr);\n\t\talign-items: start;\n\t\tcolumn-gap: 10rem;\n\t\trow-gap: 1rem;\n\t}\n\n\t.verse-dashboard-stats,\n\t.verse-dashboard-activity {\n\t\tmin-width: 0;\n\t}\n\n\t.verse-dashboard-stats {\n\t\twidth: 20rem;\n\t\tmargin-left: -3rem;\n\t}\n\n\t.verse-dashboard-activity {\n\t\tpadding-left: 0.75rem;\n\t\tpadding-bottom: 2.5rem;\n\t}\n\n\t.verse-dashboard-activity h2 {\n\t\tpadding-left: 0.5rem;\n\t}\n\n\t.verse-dashboard-actions {\n\t\tposition: relative;\n\t\tz-index: 1;\n\t\tmargin-top: -6rem;\n\t}\n\n\t.verse-last-poem {\n\t\tposition: relative;\n\t\tdisplay: block;\n\t\tpadding: 1rem 1rem 0.95rem 1.1rem;\n\t\tborder-left: 1px solid rgb(64 64 64);\n\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.2) 100%);\n\t\ttransition: border-color 150ms ease, background-color 150ms ease;\n\t}\n\n\t.verse-last-poem:hover {\n\t\tborder-left-color: rgb(168 85 247);\n\t\tbackground: linear-gradient(180deg, rgba(31, 31, 31, 0.82) 0%, rgba(10, 10, 10, 0.28) 100%);\n\t}\n\n\t.verse-last-poem-meta {\n\t\tdisplay: flex;\n\t\talign-items: center;\n\t\tjustify-content: space-between;\n\t\tgap: 0.75rem;\n\t\tmargin-top: 0.85rem;\n\t\tfont-size: 0.65rem;\n\t\tletter-spacing: 0.22em;\n\t\ttext-transform: uppercase;\n\t\tcolor: rgb(115 115 115);\n\t}\n</style><div class=\"verse-dashboard-columns\"><div class=\"verse-dashboard-stats space-y-6\"><div class=\"space-y-2\"><p class=\"text-sm\">Total Poems: <strong class=\"text-purple-400\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-6\"><style>\n\t.verse-dashboard-columns {\n\t\tdisplay: grid;\n\t\tgrid-template-columns: minmax(0, 20rem) minmax(0, 1fr);\n\t\talign-items: start;\n\t\tcolumn-gap: 0rem;\n\t\trow-gap: 1rem;\n\t}\n\n\t.verse-dashboard-stats,\n\t.verse-dashboard-activity {\n\t\tmin-width: 0;\n\t}\n\n\t.verse-dashboard-stats {\n\t\tmax-width: 20rem;\n\t\tmargin-left: 0;\n\t}\n\n\t.verse-dashboard-activity {\n\t\tpadding-left: 0.75rem;\n\t\tpadding-bottom: 2.5rem;\n\t}\n\n\t.verse-dashboard-activity h2 {\n\t\tpadding-left: 0.75rem;\n\t\tdisplay: block;\n\t\ttext-align: left;\n\t\tmargin: 0 0 -0.75rem 0;\n\t\tz-index: 30;\n\t}\n\n\t@media (max-width: 768px) {\n\t\t.verse-dashboard-activity h2 {\n\t\t\tmargin: 0 0 0.5rem 0;\n\t\t\ttext-align: left;\n\t\t}\n\t}\n\n\t.verse-dashboard-actions {\n\t\tposition: relative;\n\t\tz-index: 1;\n\t\tmargin-top: calc(-6rem - 60px);\n\t}\n\n\t/* Responsive adjustments: reduce gap and stack columns on small viewports */\n\t@media (max-width: 1024px) {\n\t\t.verse-dashboard-columns {\n\t\t\tcolumn-gap: 4rem;\n\t\t}\n\t}\n\n\t@media (max-width: 768px) {\n\t\t.verse-dashboard-columns {\n\t\t\tgrid-template-columns: 1fr;\n\t\t\tcolumn-gap: 1rem;\n\t\t}\n\n\t\t.verse-dashboard-stats {\n\t\t\twidth: 100%;\n\t\t\tmax-width: none;\n\t\t\tmargin-left: 0;\n\t\t\tjustify-self: stretch;\n\t\t}\n\n\t\t.verse-dashboard-activity {\n\t\t\tpadding-left: 0;\n\t\t\tpadding-bottom: 1rem;\n\t\t}\n\n\t\t.verse-dashboard-actions {\n\t\t\tmargin-top: 0;\n\t\t}\n\t}\n\n\t.verse-last-poem {\n\t\tposition: relative;\n\t\tdisplay: block;\n\t\tpadding: 1rem 1rem 0.95rem 1.1rem;\n\t\tborder-left: 1px solid rgb(64 64 64);\n\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.2) 100%);\n\t\ttransition: border-color 150ms ease, background-color 150ms ease;\n\t}\n\n\t.verse-last-poem:hover {\n\t\tborder-left-color: rgb(168 85 247);\n\t\tbackground: linear-gradient(180deg, rgba(31, 31, 31, 0.82) 0%, rgba(10, 10, 10, 0.28) 100%);\n\t}\n\n\t.verse-last-poem-meta {\n\t\tdisplay: flex;\n\t\talign-items: center;\n\t\tjustify-content: space-between;\n\t\tgap: 0.75rem;\n\t\tmargin-top: 0.85rem;\n\t\tfont-size: 0.65rem;\n\t\tletter-spacing: 0.22em;\n\t\ttext-transform: uppercase;\n\t\tcolor: rgb(115 115 115);\n\t}\n</style><div class=\"verse-dashboard-columns\"><div class=\"verse-dashboard-stats space-y-6\"><div class=\"space-y-2\"><p class=\"text-sm\">Total Poems: <strong class=\"text-purple-400\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(total))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 71, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 112, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -52,7 +52,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(currentStreak))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 72, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 113, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -81,7 +81,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 			var templ_7745c5c3_Var5 templ.SafeURL
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs("/poem/" + lastPoem.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 78, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 119, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -94,7 +94,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/poem/" + lastPoem.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 79, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 120, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -107,7 +107,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(lastPoem.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 84, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 125, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -136,7 +136,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(lastPoem.Snippet)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 86, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 127, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -159,7 +159,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(lastPoem.CreatedAt.UTC().Format("Jan 2"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 89, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/dashboard_content.templ`, Line: 130, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -205,7 +205,7 @@ func DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, m
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div></div><div class=\"verse-dashboard-actions flex gap-2 pt-6\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Write\" title=\"Write\" class=\"px-4 py-2 bg-purple-600 rounded transition hover:bg-purple-500\">Write</button> <button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Look to Caelum\" title=\"Look to Caelum\" class=\"px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700\">Look to Caelum</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div></div><div class=\"verse-dashboard-actions flex gap-2 pt-6\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Write\" title=\"Write\" class=\"px-4 py-2 bg-purple-600 rounded transition hover:bg-purple-500\">Write</button> <button hx-get=\"/caelum\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Look to Caelum\" title=\"Look to Caelum\" class=\"px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700\">Look to Caelum</button> <button hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" aria-label=\"Library\" title=\"Library\" class=\"px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700\">Library</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
