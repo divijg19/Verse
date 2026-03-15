@@ -68,8 +68,8 @@ func TestDashboardShowsLastPoemSummary(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("GET /dashboard status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Last Poem") {
-		t.Fatalf("dashboard missing last poem label: %q", body)
+	if !strings.Contains(body, "Recent") {
+		t.Fatalf("dashboard missing recent label: %q", body)
 	}
 	if !strings.Contains(body, "First lantern line") {
 		t.Fatalf("dashboard missing last poem title: %q", body)

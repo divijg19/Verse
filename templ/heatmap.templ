@@ -14,34 +14,59 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 			}
 
 			.verse-heatmap-content {
-				display: inline-flex;
+				display: flex;
 				flex-direction: column;
-				align-items: center;
+				align-items: stretch;
 				gap: 1.5rem;
-				min-width: max-content;
+				min-width: 0;
 			}
 
 			.verse-heatmap-nav {
 				display: grid;
-				grid-template-columns: 2.5rem auto 2.5rem;
+				grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
 				align-items: center;
 				width: 100%;
 				gap: 1.5rem;
+				padding-inline: 0.5rem;
+				box-sizing: border-box;
+			}
+
+			.verse-heatmap-nav h2 {
+				margin: 0;
+				overflow: hidden;
+				white-space: nowrap;
+				text-overflow: ellipsis;
+				display: block;
+				max-width: 100%;
+			}
+
+			.verse-heatmap-nav > a:first-child {
+				justify-self: start;
+			}
+
+			.verse-heatmap-nav > a:last-child {
+				justify-self: end;
+			}
+
+			.verse-heatmap-nav a {
+				z-index: 1;
 			}
 
 			.verse-heatmap-frame {
 				display: flex;
-				justify-content: center;
+				justify-content: flex-start;
 				width: 100%;
 				overflow-x: auto;
 				padding-bottom: 0.25rem;
+				padding-inline: 0.75rem;
+				box-sizing: border-box;
 			}
 
 			.verse-heatmap-inner {
 				display: inline-flex;
 				flex-direction: column;
 				gap: 1.125rem;
-				min-width: max-content;
+				min-width: 0;
 			}
 
 			.verse-heatmap-days {

@@ -8,9 +8,9 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 		<style>
 	.verse-dashboard-columns {
 		display: grid;
-		grid-template-columns: 14rem minmax(0, 1fr);
+		grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
 		align-items: start;
-		column-gap: 10rem;
+		column-gap: 0rem;
 		row-gap: 1rem;
 	}
 
@@ -20,8 +20,8 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 	}
 
 	.verse-dashboard-stats {
-		width: 20rem;
-		margin-left: -3rem;
+		max-width: 20rem;
+		margin-left: 0;
 	}
 
 	.verse-dashboard-activity {
@@ -30,13 +30,54 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 	}
 
 	.verse-dashboard-activity h2 {
-		padding-left: 0.5rem;
+		padding-left: 0.75rem;
+		display: block;
+		text-align: left;
+		margin: 0 0 -0.75rem 0;
+		z-index: 30;
+	}
+
+	@media (max-width: 768px) {
+		.verse-dashboard-activity h2 {
+			margin: 0 0 0.5rem 0;
+			text-align: left;
+		}
 	}
 
 	.verse-dashboard-actions {
 		position: relative;
 		z-index: 1;
-		margin-top: -6rem;
+		margin-top: calc(-6rem - 60px);
+	}
+
+	/* Responsive adjustments: reduce gap and stack columns on small viewports */
+	@media (max-width: 1024px) {
+		.verse-dashboard-columns {
+			column-gap: 4rem;
+		}
+	}
+
+	@media (max-width: 768px) {
+		.verse-dashboard-columns {
+			grid-template-columns: 1fr;
+			column-gap: 1rem;
+		}
+
+		.verse-dashboard-stats {
+			width: 100%;
+			max-width: none;
+			margin-left: 0;
+			justify-self: stretch;
+		}
+
+		.verse-dashboard-activity {
+			padding-left: 0;
+			padding-bottom: 1rem;
+		}
+
+		.verse-dashboard-actions {
+			margin-top: 0;
+		}
 	}
 
 	.verse-last-poem {
@@ -125,6 +166,16 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 				class="px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700"
 			>
 				Look to Caelum
+			</button>
+			<button
+				hx-get="/library"
+				hx-target="#screen"
+				hx-swap="innerHTML"
+				aria-label="Library"
+				title="Library"
+				class="px-4 py-2 bg-neutral-800 rounded transition hover:bg-neutral-700"
+			>
+				Library
 			</button>
 		</div>
 	</div>
