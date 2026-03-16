@@ -10,21 +10,26 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			min-height: 0;
 		}
 
-		/* Gradient moved to results pane so eyebrow row can be removed */
+		/* Reworked gradient: narrower, softer, masked and angled so it sits
+		   neatly above results without visually chopping into cards. Kept the
+		   same purple palette but reduced intensity and extended fade length. */
 		.verse-library-results-pane::before {
-			/* smaller, subtler gradient positioned just above the top edge
-			   so it doesn't visually chop into result cards */
 			content: "";
 			position: absolute;
-			top: -1.5rem;
+			top: 0;
 			left: 0;
-			width: 100%;
-			height: 6rem;
-			background:
-				radial-gradient(circle at top left, rgba(168, 85, 247, 0.05) 0%, rgba(10, 10, 10, 0) 55%),
-				linear-gradient(180deg, rgba(38, 38, 38, 0.06) 0%, rgba(10, 10, 10, 0) 100%);
+			width: 48%;
+			height: 140px;
 			pointer-events: none;
 			z-index: 0;
+			background-image:
+				radial-gradient(closest-side at 6% 12%, rgba(168,85,247,0.08) 0%, rgba(168,85,247,0.04) 12%, rgba(10,10,10,0) 45%),
+				linear-gradient(180deg, rgba(38,38,38,0.06) 0%, rgba(10,10,10,0) 60%);
+			background-repeat: no-repeat;
+			background-position: top left;
+			background-size: 100% 140px;
+			-webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
+			mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
 		}
 
 		.verse-library-results-pane > * {

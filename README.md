@@ -154,20 +154,6 @@ Jaspr compiles to lightweight web components embedded in Templ layouts.
 
 ---
 
-## Minimal Next.js Usage
-
-Next.js is only used where strictly necessary:
-
-* AI proxy endpoints (if required)
-* Experimental AI playground
-* Potential future auth expansion
-
-It is not the core framework.
-
-`Verse` remains Go-first.
-
----
-
 # 📁 Project Structure
 
 ```id="zkq92v"
