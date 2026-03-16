@@ -89,8 +89,8 @@ func TestLibraryUsesInternalResultsScrollRegion(t *testing.T) {
 		`.verse-library-shell {`,
 		`height: 100%;`,
 		`min-height: 0;`,
-		`class="verse-library-shell not-prose space-y-10 overflow-hidden pt-1 pb-4"`,
-		`id="library-results" class="verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-1"`,
+		`class="verse-library-shell not-prose space-y-6 overflow-hidden pt-1 pb-4"`,
+		`id="library-results" class="verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-0 relative"`,
 		`This library is empty.`,
 	)
 }
