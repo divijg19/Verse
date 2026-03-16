@@ -10,17 +10,44 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			min-height: 0;
 		}
 
-		.verse-library-shell::before {
+		/* Gradient moved to results pane so eyebrow row can be removed */
+		.verse-library-results-pane::before {
+			/* smaller, subtler gradient positioned just above the top edge
+			   so it doesn't visually chop into result cards */
 			content: "";
 			position: absolute;
-			inset: 0 auto auto 0;
+			top: -1.5rem;
+			left: 0;
 			width: 100%;
-			height: 10rem;
+			height: 6rem;
 			background:
-				radial-gradient(circle at top left, rgba(168, 85, 247, 0.07) 0%, rgba(10, 10, 10, 0) 45%),
-				linear-gradient(180deg, rgba(38, 38, 38, 0.1) 0%, rgba(10, 10, 10, 0) 100%);
+				radial-gradient(circle at top left, rgba(168, 85, 247, 0.05) 0%, rgba(10, 10, 10, 0) 55%),
+				linear-gradient(180deg, rgba(38, 38, 38, 0.06) 0%, rgba(10, 10, 10, 0) 100%);
 			pointer-events: none;
+			z-index: 0;
 		}
+
+		.verse-library-results-pane > * {
+			position: relative;
+			z-index: 1;
+		}
+
+		.verse-library-group-list {
+			max-height: 40vh;
+			overflow-y: auto;
+			scrollbar-gutter: stable;
+			padding-right: 0.25rem;
+		}
+
+		.verse-library-group summary {
+			list-style: none;
+			display: block;
+			cursor: pointer;
+			margin: 0;
+			padding: 0.25rem 0;
+		}
+
+		.verse-library-group summary::-webkit-details-marker { display: none; }
 
 		#library-results {
 			scrollbar-gutter: stable;
@@ -36,7 +63,7 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			border-radius: 1.2rem;
 			background: linear-gradient(180deg, rgba(23, 23, 23, 0.78) 0%, rgba(10, 10, 10, 0.32) 100%);
 			box-shadow: inset 0 1px 0 rgba(82, 82, 82, 0.12);
-			padding: 0.95rem 1.05rem 1rem;
+			padding: 0.75rem 1.05rem 0.6rem;
 			transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 		}
 
@@ -64,7 +91,7 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			align-items: center;
 			justify-content: space-between;
 			gap: 0.75rem;
-			margin-bottom: 0.45rem;
+			margin-bottom: 0.25rem;
 		}
 
 		.verse-library-search-top a {
@@ -152,11 +179,8 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			}
 		}
 	</style>
-	<div class="verse-library-shell not-prose space-y-10 overflow-hidden pt-1 pb-4">
+	<div class="verse-library-shell not-prose space-y-6 overflow-hidden pt-1 pb-4">
 		<section class="relative z-[1] space-y-6" style="flex: none;">
-			<div class="verse-library-eyebrow">
-				<p class="text-[0.62rem] uppercase tracking-[0.24em] text-neutral-500">Archive</p>
-			</div>
 			<div class="verse-library-search-band">
 				<div class="verse-library-search-top">
 					<p class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-600">Search</p>
@@ -192,14 +216,14 @@ templ LibraryContent(query string, groups []PoemGroup) {
 				</div>
 			</div>
 		</section>
-		<div id="library-results" class="verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-1">
+		<div id="library-results" class="verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-0 relative">
 			@LibraryResults(query, groups)
 		</div>
 	</div>
 }
 
 templ LibraryResults(query string, groups []PoemGroup) {
-	<div class="verse-library-summary pb-8 text-[0.62rem] tracking-[0.12em] text-neutral-500">
+	<div class="verse-library-summary pb-4 text-[0.62rem] tracking-[0.12em] text-neutral-500">
 		{ LibrarySummary(query, groups) }
 	</div>
 	@If(len(groups) == 0 && query == "") {
@@ -225,15 +249,17 @@ templ LibraryResults(query string, groups []PoemGroup) {
 		</div>
 	}
 	for _, group := range groups {
-		<section class="space-y-4 pb-20 md:grid md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-10 md:space-y-0">
-			<div class="pb-1 md:pt-4">
-				<h3 class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-500">{ group.Label }</h3>
-			</div>
-			<div class="space-y-1">
+		<details class="space-y-4 pb-20 md:grid md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-10 md:space-y-0 verse-library-group">
+			<summary>
+				<div class="pb-1 md:pt-4">
+					<h3 class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-500">{ group.Label }</h3>
+				</div>
+			</summary>
+			<div class="space-y-1 verse-library-group-list">
 				for _, poem := range group.Poems {
 					@PoemItem(poem)
 				}
 			</div>
-		</section>
+		</details>
 	}
 }
