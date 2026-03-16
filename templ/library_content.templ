@@ -35,19 +35,37 @@ templ LibraryContent(query string, groups []PoemGroup) {
 		.verse-library-group-list {
 			max-height: 40vh;
 			overflow-y: auto;
+			overscroll-behavior: contain;
 			scrollbar-gutter: stable;
 			padding-right: 0.25rem;
 		}
 
 		.verse-library-group summary {
 			list-style: none;
-			display: block;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
 			cursor: pointer;
 			margin: 0;
 			padding: 0.25rem 0;
 		}
 
 		.verse-library-group summary::-webkit-details-marker { display: none; }
+
+		.verse-group-toggle {
+			display: inline-block;
+			transition: transform 120ms ease, color 120ms ease;
+			transform: rotate(0deg);
+			font-size: 0.9rem;
+			color: rgb(115 115 115);
+			line-height: 1;
+			padding-left: 0.5rem;
+		}
+
+		details.verse-library-group[open] .verse-group-toggle {
+			transform: rotate(90deg);
+			color: rgb(168 85 247);
+		}
 
 		#library-results {
 			scrollbar-gutter: stable;
@@ -250,9 +268,10 @@ templ LibraryResults(query string, groups []PoemGroup) {
 	}
 	for _, group := range groups {
 		<details class="space-y-4 pb-20 md:grid md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-10 md:space-y-0 verse-library-group">
-			<summary>
-				<div class="pb-1 md:pt-4">
+			<summary class="md:contents">
+				<div class="pb-1 md:pt-4 flex items-center justify-between">
 					<h3 class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-500">{ group.Label }</h3>
+					<span class="verse-group-toggle">▸</span>
 				</div>
 			</summary>
 			<div class="space-y-1 verse-library-group-list">
