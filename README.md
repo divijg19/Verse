@@ -1,17 +1,13 @@
 # `Verse`
+#### Internal Codename: Hyacinth
+> Hyacinth represents rebirth through reflection — the internal architecture behind `Verse`.
+
 
 > A daily poetic ritual engine.
 > Write. Reflect. Return.
 
 ---
 
-### Internal Codename: Hyacinth
-
-Hyacinth represents rebirth through reflection — the internal architecture behind `Verse`.
-
----
-
-## 🌌 What is `Verse`?
 
 `Verse` is a private, daily web application built for disciplined poetic practice.
 
