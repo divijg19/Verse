@@ -34,10 +34,33 @@ templ LibraryContent(query string, groups []PoemGroup) {
 
 		.verse-library-group-list {
 			max-height: 40vh;
-			overflow-y: auto;
+			overflow: auto;
+			-webkit-overflow-scrolling: touch;
 			overscroll-behavior: contain;
 			scrollbar-gutter: stable;
 			padding-right: 0.25rem;
+			scrollbar-width: thin;
+			scrollbar-color: rgba(82,82,82,0.28) transparent;
+		}
+
+		/* Custom thin scrollbar for WebKit browsers to make the internal scroll visible */
+		.verse-library-group-list::-webkit-scrollbar {
+			width: 10px;
+		}
+
+		.verse-library-group-list::-webkit-scrollbar-thumb {
+			background: rgba(82,82,82,0.28);
+			border-radius: 999px;
+		}
+
+		.verse-library-group-list::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		@media (max-width: 640px) {
+			.verse-library-group-list {
+				max-height: 30vh;
+			}
 		}
 
 		.verse-library-group summary {
