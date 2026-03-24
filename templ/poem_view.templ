@@ -6,37 +6,90 @@ templ PoemViewScreen(poem PoemView) {
 
 templ PoemViewContent(poem PoemView) {
 	<div class="space-y-5">
-		<div class="flex items-center justify-between gap-3">
-			<a
-				href="/library"
-				hx-get="/library"
-				hx-target="#screen"
-				hx-swap="innerHTML"
-				class="text-sm text-neutral-300 hover:text-neutral-100"
-			>◀ Library</a>
-			<a
-				href={ "/editor/" + poem.ID }
-				hx-get={ "/editor/" + poem.ID }
-				hx-target="#screen"
-				hx-swap="innerHTML"
-				class="text-sm text-neutral-300 hover:text-neutral-100"
-			>Editor ▶</a>
+		<style>
+				.verse-poem-view-card {
+					min-width: 0;
+					padding: 1.25rem 1.25rem 1.1rem;
+				}
+
+				.verse-poem-view-actions {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					min-width: 0;
+					gap: 0.9rem;
+					flex-wrap: wrap;
+				}
+
+				.verse-poem-view-nav {
+					display: inline-flex;
+					align-items: center;
+					flex-wrap: wrap;
+					gap: 0.55rem;
+					font-size: 0.68rem;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				color: rgb(163 163 163);
+				text-decoration: none;
+				transition: color 150ms ease;
+			}
+
+			.verse-poem-view-nav:hover {
+				color: rgb(229 229 229);
+			}
+
+				.verse-poem-view-article {
+					padding-top: 1.1rem;
+					font-size: 1.08rem;
+					line-height: 1.95;
+					color: rgb(245 245 245);
+					overflow-wrap: anywhere;
+				}
+
+			@media (max-width: 639px) {
+				.verse-poem-view-card {
+					padding: 1rem;
+				}
+
+				.verse-poem-view-actions {
+					flex-direction: column;
+					align-items: flex-start;
+				}
+			}
+		</style>
+		<div class="verse-poem-view-card verse-panel">
+			<div class="verse-poem-view-actions">
+				<a
+					href="/library"
+					hx-get="/library"
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-poem-view-nav"
+				>◀ Library</a>
+				<a
+					href={ "/editor/" + poem.ID }
+					hx-get={ "/editor/" + poem.ID }
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-poem-view-nav"
+				>Editor ▶</a>
+			</div>
+			<p class="pt-5 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">{ poem.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }</p>
+			<article class="verse-poem-view-article whitespace-pre-wrap">{ poem.Content }</article>
 		</div>
-		<p class="text-xs text-neutral-500">{ poem.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }</p>
-		<article class="whitespace-pre-wrap text-lg leading-relaxed text-neutral-100">{ poem.Content }</article>
 		<form
 			hx-post="/poem/delete"
 			hx-target="#screen"
 			hx-swap="innerHTML"
 			hx-confirm="Delete this poem from your library?"
-			class="pt-2"
+			class="pt-1"
 		>
 			<input type="hidden" name="id" value={ poem.ID }/>
 			<button
 				type="submit"
-				class="rounded-md border border-red-900/60 bg-red-950/30 px-3 py-1.5 text-sm text-red-300 transition hover:bg-red-950/50"
+				class="verse-button-danger"
 			>
-				Delete
+				Delete Bloom
 			</button>
 		</form>
 	</div>

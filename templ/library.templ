@@ -1,11 +1,30 @@
 package templ
 
 templ Library(query string, groups []PoemGroup) {
-	<div class="space-y-6" style="height: calc(100svh - 4rem); padding-top: clamp(7rem, 16vh, 9rem);">
-		<h1 class="text-2xl font-serif leading-none text-neutral-200">
+	<div class="verse-library-screen">
+		<style>
+			.verse-library-screen {
+				display: flex;
+				height: calc(100svh - (var(--verse-desktop-nav-rail-block, 2rem) * 2));
+				min-height: 0;
+				flex-direction: column;
+				gap: 1.5rem;
+				padding-top: var(--verse-surface-top-space, clamp(7rem, 16vh, 9rem));
+			}
+
+			@media (max-width: 1023px) {
+				.verse-library-screen {
+					height: auto;
+					min-height: 0;
+					gap: 1rem;
+					padding-top: 0.35rem;
+				}
+			}
+		</style>
+		<h1 class="verse-surface-heading">
 			Library
 		</h1>
-		<div class="max-w-none min-h-0 flex-1">
+		<div class="verse-surface-body max-w-none min-h-0 flex-1">
 			@LibraryContent(query, groups)
 		</div>
 	</div>

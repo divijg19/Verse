@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,5 +44,44 @@ func TestDatabasePoolDefaults(t *testing.T) {
 	}
 	if cfg.MaxConnIdleTime != 5*time.Minute {
 		t.Fatalf("MaxConnIdleTime = %s, want 5m", cfg.MaxConnIdleTime)
+	}
+}
+
+func TestEnsureSchemaCreatesActivePoemTimelineIndex(t *testing.T) {
+	dsn := requireTestDSN(t)
+
+	t.Setenv("DATABASE_URL", dsn)
+
+	if database.Pool != nil {
+		database.Pool.Close()
+		database.Pool = nil
+	}
+
+	if err := database.Connect(); err != nil {
+		t.Fatalf("database connect failed: %v", err)
+	}
+	if err := database.EnsureSchema(context.Background()); err != nil {
+		t.Fatalf("database ensure schema failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if database.Pool != nil {
+			database.Pool.Close()
+			database.Pool = nil
+		}
+	})
+
+	var indexDef string
+	err := database.Pool.QueryRow(context.Background(), `
+		SELECT indexdef
+		FROM pg_indexes
+		WHERE schemaname = 'public'
+		AND tablename = 'poems'
+		AND indexname = 'idx_poems_active_created_at'`).Scan(&indexDef)
+	if err != nil {
+		t.Fatalf("lookup index definition failed: %v", err)
+	}
+
+	if !strings.Contains(indexDef, "created_at DESC") || !strings.Contains(indexDef, "deleted_at IS NULL") {
+		t.Fatalf("unexpected index definition: %q", indexDef)
 	}
 }

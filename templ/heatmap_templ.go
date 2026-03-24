@@ -31,14 +31,14 @@ func Heatmap(month time.Time, days []HeatmapDay) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"heatmap\" class=\"not-prose space-y-5\"><style>\n\t\t\t.verse-heatmap-shell {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\talign-items: center;\n\t\t\t\twidth: 100%;\n\t\t\t\tpadding: 0.75rem 0 1.5rem;\n\t\t\t}\n\n\t\t\t.verse-heatmap-content {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\talign-items: stretch;\n\t\t\t\tgap: 1.5rem;\n\t\t\t\tmin-width: 0;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;\n\t\t\t\talign-items: center;\n\t\t\t\twidth: 100%;\n\t\t\t\tgap: 1.5rem;\n\t\t\t\tpadding-inline: 0.5rem;\n\t\t\t\tbox-sizing: border-box;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav h2 {\n\t\t\t\tmargin: 0;\n\t\t\t\toverflow: hidden;\n\t\t\t\twhite-space: nowrap;\n\t\t\t\ttext-overflow: ellipsis;\n\t\t\t\tdisplay: block;\n\t\t\t\tmax-width: 100%;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav > a:first-child {\n\t\t\t\tjustify-self: start;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav > a:last-child {\n\t\t\t\tjustify-self: end;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav a {\n\t\t\t\tz-index: 1;\n\t\t\t}\n\n\t\t\t.verse-heatmap-frame {\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: flex-start;\n\t\t\t\twidth: 100%;\n\t\t\t\toverflow-x: auto;\n\t\t\t\tpadding-bottom: 0.25rem;\n\t\t\t\tpadding-inline: 0.75rem;\n\t\t\t\tbox-sizing: border-box;\n\t\t\t}\n\n\t\t\t.verse-heatmap-inner {\n\t\t\t\tdisplay: inline-flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\tgap: 1.125rem;\n\t\t\t\tmin-width: 0;\n\t\t\t}\n\n\t\t\t.verse-heatmap-days {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(7, 2.25rem);\n\t\t\t\tgap: 1rem;\n\t\t\t\tfont-size: 0.65rem;\n\t\t\t\tletter-spacing: 0.22em;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t\tcolor: rgb(82 82 91);\n\t\t\t\ttext-align: center;\n\t\t\t}\n\n\t\t\t.verse-heatmap-grid {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(7, 2.25rem);\n\t\t\t\tgap: 1rem;\n\t\t\t\tplace-items: center;\n\t\t\t}\n\n\t\t\t.verse-heatmap-empty {\n\t\t\t\twidth: 2rem;\n\t\t\t\theight: 2rem;\n\t\t\t\tborder-radius: 0.25rem;\n\t\t\t\tbackground: transparent;\n\t\t\t}\n\n\t\t\t.verse-heatmap-cell {\n\t\t\t\twidth: 2rem;\n\t\t\t\theight: 2rem;\n\t\t\t\tborder-radius: 0.25rem;\n\t\t\t}\n\n\t\t\t.verse-heatmap-cell-idle {\n\t\t\t\tbackground: rgb(38 38 38);\n\t\t\t}\n\n\t\t\t.verse-heatmap-cell-active {\n\t\t\t\tbackground: rgb(147 51 234);\n\t\t\t}\n\n\t\t\t.verse-heatmap-stable {\n\t\t\t\tmin-height: calc(1.5rem + 2rem + 1.125rem + (2rem * 6) + (1rem * 5));\n\t\t\t}\n\t\t</style><div class=\"verse-heatmap-shell verse-heatmap-stable\"><div class=\"verse-heatmap-content\"><div class=\"verse-heatmap-nav\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"heatmap\" class=\"not-prose space-y-5\"><style>\n\t\t\t.verse-heatmap-shell {\n\t\t\t\t--verse-heatmap-cell: 2rem;\n\t\t\t\t--verse-heatmap-gap: 1rem;\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\talign-items: center;\n\t\t\t\twidth: 100%;\n\t\t\t\tpadding: 0.75rem 0 1.5rem;\n\t\t\t}\n\n\t\t\t.verse-heatmap-content {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\talign-items: stretch;\n\t\t\t\tgap: 1.5rem;\n\t\t\t\tmin-width: 0;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;\n\t\t\t\talign-items: center;\n\t\t\t\twidth: 100%;\n\t\t\t\tgap: 1.5rem;\n\t\t\t\tpadding-inline: 0.5rem;\n\t\t\t\tbox-sizing: border-box;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav h2 {\n\t\t\t\tmargin: 0;\n\t\t\t\toverflow: hidden;\n\t\t\t\twhite-space: nowrap;\n\t\t\t\ttext-overflow: ellipsis;\n\t\t\t\tdisplay: block;\n\t\t\t\tmax-width: 100%;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav > a:first-child {\n\t\t\t\tjustify-self: start;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav > a:last-child {\n\t\t\t\tjustify-self: end;\n\t\t\t}\n\n\t\t\t.verse-heatmap-nav a {\n\t\t\t\tz-index: 1;\n\t\t\t}\n\n\t\t\t.verse-heatmap-frame {\n\t\t\t\tdisplay: flex;\n\t\t\t\tjustify-content: flex-start;\n\t\t\t\twidth: 100%;\n\t\t\t\toverflow-x: auto;\n\t\t\t\tpadding-bottom: 0.25rem;\n\t\t\t\tpadding-inline: 0.75rem;\n\t\t\t\tbox-sizing: border-box;\n\t\t\t}\n\n\t\t\t.verse-heatmap-inner {\n\t\t\t\tdisplay: inline-flex;\n\t\t\t\tflex-direction: column;\n\t\t\t\tgap: 1.125rem;\n\t\t\t\tmin-width: 0;\n\t\t\t}\n\n\t\t\t.verse-heatmap-days {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(7, var(--verse-heatmap-cell));\n\t\t\t\tgap: var(--verse-heatmap-gap);\n\t\t\t\tfont-size: 0.65rem;\n\t\t\t\tletter-spacing: 0.22em;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t\tcolor: rgb(82 82 91);\n\t\t\t\ttext-align: center;\n\t\t\t}\n\n\t\t\t.verse-heatmap-grid {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(7, var(--verse-heatmap-cell));\n\t\t\t\tgap: var(--verse-heatmap-gap);\n\t\t\t\tplace-items: center;\n\t\t\t}\n\n\t\t\t.verse-heatmap-empty {\n\t\t\t\twidth: var(--verse-heatmap-cell);\n\t\t\t\theight: var(--verse-heatmap-cell);\n\t\t\t\tborder-radius: 0.25rem;\n\t\t\t\tbackground: transparent;\n\t\t\t}\n\n\t\t\t.verse-heatmap-cell {\n\t\t\t\twidth: var(--verse-heatmap-cell);\n\t\t\t\theight: var(--verse-heatmap-cell);\n\t\t\t\tborder-radius: 0.25rem;\n\t\t\t}\n\n\t\t\t.verse-heatmap-cell-idle {\n\t\t\t\tbackground: rgb(38 38 38);\n\t\t\t}\n\n\t\t\t.verse-heatmap-cell-active {\n\t\t\t\tbackground: rgb(147 51 234);\n\t\t\t}\n\n\t\t\t.verse-heatmap-stable {\n\t\t\t\tmin-height: calc(1.5rem + var(--verse-heatmap-cell) + 1.125rem + (var(--verse-heatmap-cell) * 6) + (var(--verse-heatmap-gap) * 5));\n\t\t\t}\n\n\t\t\t@media (max-width: 767px) {\n\t\t\t\t.verse-heatmap-shell {\n\t\t\t\t\t--verse-heatmap-cell: 1.6rem;\n\t\t\t\t\t--verse-heatmap-gap: 0.55rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-content {\n\t\t\t\t\tgap: 1rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-nav {\n\t\t\t\t\tgrid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;\n\t\t\t\t\tgap: 0.75rem;\n\t\t\t\t\tpadding-inline: 0;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-nav h2 {\n\t\t\t\t\tfont-size: 1.35rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-days {\n\t\t\t\t\tfont-size: 0.53rem;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-frame {\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\tpadding-inline: 0.1rem;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\t@media (max-width: 479px) {\n\t\t\t\t.verse-heatmap-shell {\n\t\t\t\t\t--verse-heatmap-cell: 1.35rem;\n\t\t\t\t\t--verse-heatmap-gap: 0.35rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-nav {\n\t\t\t\t\tgrid-template-columns: 2rem minmax(0, 1fr) 2rem;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-heatmap-nav h2 {\n\t\t\t\t\tfont-size: 1.1rem;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><div class=\"verse-heatmap-shell verse-heatmap-stable\"><div class=\"verse-heatmap-content\"><div class=\"verse-heatmap-nav\"><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs("/dashboard?month=" + heatmapMonthParam(heatmapPrevMonth(month)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 119, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 168, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -51,7 +51,7 @@ func Heatmap(month time.Time, days []HeatmapDay) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/dashboard?month=" + heatmapMonthParam(heatmapPrevMonth(month)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 120, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 169, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -64,7 +64,7 @@ func Heatmap(month time.Time, days []HeatmapDay) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(heatmapMonthLabel(month))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 126, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 175, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -77,7 +77,7 @@ func Heatmap(month time.Time, days []HeatmapDay) templ.Component {
 		var templ_7745c5c3_Var5 templ.SafeURL
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs("/dashboard?month=" + heatmapMonthParam(heatmapNextMonth(month)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 128, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 177, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -90,7 +90,7 @@ func Heatmap(month time.Time, days []HeatmapDay) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/dashboard?month=" + heatmapMonthParam(heatmapNextMonth(month)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 129, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 178, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -119,7 +119,7 @@ func Heatmap(month time.Time, days []HeatmapDay) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(day.Date.Format("Jan 2, 2006"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 153, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/heatmap.templ`, Line: 202, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {

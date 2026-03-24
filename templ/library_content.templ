@@ -2,13 +2,15 @@ package templ
 
 templ LibraryContent(query string, groups []PoemGroup) {
 	<style>
-		.verse-library-shell {
-			position: relative;
-			display: flex;
-			flex-direction: column;
-			height: 100%;
-			min-height: 0;
-		}
+			.verse-library-shell {
+				position: relative;
+				display: flex;
+				flex-direction: column;
+				height: 100%;
+				min-width: 0;
+				min-height: 0;
+				gap: 1rem;
+			}
 
 		/* Reworked gradient: narrower, softer, masked and angled so it sits
 		   neatly above results without visually chopping into cards. Kept the
@@ -37,9 +39,10 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			z-index: 1;
 		}
 
-		.verse-library-group-list {
-			max-height: 40vh;
-			overflow: auto;
+			.verse-library-group-list {
+				max-height: 40vh;
+				min-width: 0;
+				overflow: auto;
 			-webkit-overflow-scrolling: touch;
 			overscroll-behavior: contain;
 			scrollbar-gutter: stable;
@@ -104,10 +107,11 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			display: inline-flex;
 		}
 
-		.verse-library-search-band {
-			border: 1px solid rgb(38 38 38);
-			border-radius: 1.2rem;
-			background: linear-gradient(180deg, rgba(23, 23, 23, 0.78) 0%, rgba(10, 10, 10, 0.32) 100%);
+			.verse-library-search-band {
+				border: 1px solid rgb(38 38 38);
+				border-radius: 1.2rem;
+				min-width: 0;
+				background: linear-gradient(180deg, rgba(23, 23, 23, 0.78) 0%, rgba(10, 10, 10, 0.32) 100%);
 			box-shadow: inset 0 1px 0 rgba(82, 82, 82, 0.12);
 			padding: 0.75rem 1.05rem 0.6rem;
 			transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
@@ -159,43 +163,56 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			outline: none;
 		}
 
-		.verse-library-search-meta {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			gap: 1rem;
-			margin-top: 0.7rem;
+			.verse-library-search-meta {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				flex-wrap: wrap;
+				min-width: 0;
+				gap: 1rem;
+				margin-top: 0.7rem;
 			padding-top: 0.7rem;
 			border-top: 1px solid rgba(38, 38, 38, 0.9);
 		}
 
-		.verse-library-status {
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			gap: 1rem;
-			min-height: 1rem;
+			.verse-library-status {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				flex-wrap: wrap;
+				min-width: 0;
+				gap: 1rem;
+				min-height: 1rem;
+			}
+
+			.verse-library-results-pane {
+				position: relative;
+				flex: 1;
+				min-width: 0;
+				min-height: 0;
+				padding: 1.1rem 1rem 2rem;
+			border: 1px solid rgb(38 38 38);
+			border-radius: 1.5rem;
+			background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.32) 100%);
+			box-shadow:
+				0 24px 80px rgba(0, 0, 0, 0.2),
+				inset 0 1px 0 rgba(82, 82, 82, 0.1);
 		}
 
-		.verse-library-results-pane {
-			position: relative;
-			flex: 1;
-			min-height: 0;
-			padding-bottom: 2rem;
-		}
+			.verse-library-summary {
+				padding-bottom: 0.9rem;
+				border-bottom: 1px solid rgb(23 23 23);
+				overflow-wrap: anywhere;
+			}
 
-		.verse-library-summary {
-			padding-bottom: 0.9rem;
-			border-bottom: 1px solid rgb(23 23 23);
-		}
-
-		.verse-library-entry {
-			display: block;
-			padding: 1rem 1rem 1.15rem;
-			border-radius: 1rem;
-			box-shadow: inset 0 -1px 0 rgb(38 38 38);
-			transition: border-color 150ms ease, background-color 150ms ease;
-		}
+			.verse-library-entry {
+				display: block;
+				padding: 1rem 1rem 1.15rem;
+				border-radius: 1rem;
+				overflow-wrap: anywhere;
+				box-shadow: inset 0 -1px 0 rgb(38 38 38);
+				transition: border-color 150ms ease, background-color 150ms ease;
+			}
 
 		.verse-library-entry:hover {
 			background: rgba(23, 23, 23, 0.18);
@@ -208,6 +225,10 @@ templ LibraryContent(query string, groups []PoemGroup) {
 		}
 
 		@media (max-width: 640px) {
+			.verse-library-shell {
+				gap: 0.85rem;
+			}
+
 			.verse-library-status {
 				flex-direction: column;
 				align-items: flex-start;
@@ -223,10 +244,15 @@ templ LibraryContent(query string, groups []PoemGroup) {
 				align-items: flex-start;
 				gap: 0.6rem;
 			}
+
+			.verse-library-results-pane {
+				padding: 0.95rem 0.8rem 1.35rem;
+				border-radius: 1.2rem;
+			}
 		}
 	</style>
-	<div class="verse-library-shell not-prose space-y-6 overflow-hidden pt-1 pb-4">
-		<section class="relative z-[1] space-y-6" style="flex: none;">
+	<div class="verse-library-shell not-prose overflow-hidden pt-1 pb-4">
+		<section class="relative z-[1]" style="flex: none;">
 			<div class="verse-library-search-band">
 				<div class="verse-library-search-top">
 					<p class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-600">Search</p>
@@ -273,7 +299,7 @@ templ LibraryResults(query string, groups []PoemGroup) {
 		{ LibrarySummary(query, groups) }
 	</div>
 	@If(len(groups) == 0 && query == "") {
-		<div class="space-y-6 py-24 text-center">
+		<div class="space-y-6 py-20 text-center">
 			<p class="font-serif text-[1.8rem] leading-tight text-neutral-200">This library is empty.</p>
 			<p class="mx-auto max-w-lg text-sm leading-7 text-neutral-400">Begin writing, and your poems will gather here.</p>
 			<div class="flex justify-center">
@@ -281,7 +307,7 @@ templ LibraryResults(query string, groups []PoemGroup) {
 					hx-get="/editor"
 					hx-target="#screen"
 					hx-swap="innerHTML"
-					class="rounded-full border border-neutral-800 px-6 py-2.5 text-[0.6rem] uppercase tracking-[0.18em] text-neutral-200 transition hover:border-purple-400 hover:text-white"
+					class="verse-button-secondary"
 				>
 					Begin Writing
 				</button>

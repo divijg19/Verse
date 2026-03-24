@@ -118,5 +118,12 @@ func ensurePoemsSchema(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
+	if _, err := pool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_poems_active_created_at
+		ON poems (created_at DESC)
+		WHERE deleted_at IS NULL`); err != nil {
+		return err
+	}
+
 	return nil
 }

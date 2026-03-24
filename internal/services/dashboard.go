@@ -49,6 +49,9 @@ func CurrentStreak(ctx context.Context) (int, error) {
 		}
 		present[d.UTC().Format("2006-01-02")] = struct{}{}
 	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
 
 	streak := 0
 	day := clock.TodayUTC()
@@ -92,6 +95,9 @@ func MonthActivity(ctx context.Context, month time.Time) ([]time.Time, error) {
 			return nil, err
 		}
 		dates = append(dates, d.UTC().Truncate(24*time.Hour))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return dates, nil
