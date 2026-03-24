@@ -28,4 +28,7 @@ func TestPoemViewRouteRendersPoem(t *testing.T) {
 	if !strings.Contains(body, `hx-get="/editor/`+id+`"`) {
 		t.Fatalf("poem view missing link to /editor/{id}")
 	}
+	if !strings.Contains(body, `class="verse-button-danger"`) {
+		t.Fatalf("poem view missing shared danger button styling: %q", body)
+	}
 }

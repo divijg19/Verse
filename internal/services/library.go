@@ -50,6 +50,9 @@ func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
 		}
 		out = append(out, p)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -83,6 +86,9 @@ func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models
 			return nil, err
 		}
 		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

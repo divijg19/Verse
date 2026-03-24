@@ -10,6 +10,7 @@ import (
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
 )
 
 // DashboardHandler renders the dashboard surface. If the request is an HTMX request,
@@ -18,13 +19,14 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	month := parseDashboardMonth(r.URL.Query().Get("month"))
 
-	total, _ := services.TotalPoems(ctx)
-	current, _ := services.CurrentStreak(ctx)
-	activeDates, _ := services.MonthActivity(ctx, month)
-	days := buildHeatmapDays(month, activeDates)
-	lastPoem := loadLastPoem(ctx)
-
 	if isHeatmapRequest(r) {
+		activeDates, err := services.MonthActivity(ctx, month)
+		if err != nil {
+			http.Error(w, "failed to load heatmap", http.StatusInternalServerError)
+			return
+		}
+
+		days := buildHeatmapDays(month, activeDates)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := templ.Heatmap(month, days).Render(ctx, w); err != nil {
 			http.Error(w, "failed to render heatmap", http.StatusInternalServerError)
@@ -32,7 +34,13 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderSurface(w, r, "dashboard", templ.Dashboard(total, current, lastPoem, month, days))
+	data, err := loadDashboardData(ctx, month)
+	if err != nil {
+		http.Error(w, "failed to load dashboard", http.StatusInternalServerError)
+		return
+	}
+
+	renderSurface(w, r, "dashboard", templ.Dashboard(data.total, data.currentStreak, data.lastPoem, month, data.days))
 }
 
 func parseDashboardMonth(raw string) time.Time {
@@ -80,13 +88,75 @@ func isHeatmapRequest(r *http.Request) bool {
 	return target == "heatmap" || target == "#heatmap"
 }
 
-func loadLastPoem(ctx context.Context) *templ.LastPoemSummary {
+type dashboardData struct {
+	total         int
+	currentStreak int
+	lastPoem      *templ.LastPoemSummary
+	days          []templ.HeatmapDay
+}
+
+func loadDashboardData(ctx context.Context, month time.Time) (dashboardData, error) {
+	group, groupCtx := errgroup.WithContext(ctx)
+	var total int
+	var currentStreak int
+	var days []templ.HeatmapDay
+	var lastPoem *templ.LastPoemSummary
+
+	group.Go(func() error {
+		value, err := services.TotalPoems(groupCtx)
+		if err != nil {
+			return err
+		}
+		total = value
+		return nil
+	})
+
+	group.Go(func() error {
+		value, err := services.CurrentStreak(groupCtx)
+		if err != nil {
+			return err
+		}
+		currentStreak = value
+		return nil
+	})
+
+	group.Go(func() error {
+		activeDates, err := services.MonthActivity(groupCtx, month)
+		if err != nil {
+			return err
+		}
+		days = buildHeatmapDays(month, activeDates)
+		return nil
+	})
+
+	group.Go(func() error {
+		value, err := loadLastPoem(groupCtx)
+		if err != nil {
+			return err
+		}
+		lastPoem = value
+		return nil
+	})
+
+	if err := group.Wait(); err != nil {
+		return dashboardData{}, err
+	}
+
+	return dashboardData{
+		total:         total,
+		currentStreak: currentStreak,
+		lastPoem:      lastPoem,
+		days:          days,
+	}, nil
+}
+
+func loadLastPoem(ctx context.Context) (*templ.LastPoemSummary, error) {
 	poem, err := services.LatestPoem(ctx)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return nil
+			return nil, nil
 		}
-		return nil
+		return nil, err
 	}
 
 	title := presenters.FirstNonEmptyLine(poem.Content)
@@ -101,5 +171,5 @@ func loadLastPoem(ctx context.Context) *templ.LastPoemSummary {
 		Title:     presenters.TruncateRunes(title, 72),
 		Snippet:   presenters.TruncateRunes(flat, 120),
 		CreatedAt: poem.CreatedAt,
-	}
+	}, nil
 }

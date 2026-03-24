@@ -3,5 +3,7 @@ package templ
 import "time"
 
 templ Dashboard(total int, currentStreak int, lastPoem *LastPoemSummary, month time.Time, days []HeatmapDay) {
-	@Screen("Dashboard", DashboardContent(total, currentStreak, lastPoem, month, days))
+	<div class="verse-surface-shell">
+		@DashboardContent(total, currentStreak, lastPoem, month, days)
+	</div>
 }

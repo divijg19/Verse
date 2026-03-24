@@ -1,7 +1,133 @@
 package templ
 
 templ ShareContent() {
-	<div class="space-y-4 pt-1">
-		<p class="text-sm text-neutral-400">Share is a placeholder surface for v0.2.x</p>
+	<div class="space-y-5">
+		<style>
+				.verse-share-grid {
+					display: grid;
+					grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+					gap: 1.2rem;
+				}
+
+				.verse-share-panel {
+					min-width: 0;
+					padding: 1.2rem 1.25rem;
+				}
+
+			.verse-share-modes {
+				display: grid;
+				gap: 0.85rem;
+				padding-top: 1rem;
+			}
+
+				.verse-share-mode {
+					display: flex;
+					align-items: flex-start;
+					justify-content: space-between;
+					gap: 1rem;
+					padding: 0.95rem 1rem;
+				}
+
+				.verse-share-mode > :first-child {
+					min-width: 0;
+				}
+
+				.verse-share-mode p {
+					overflow-wrap: anywhere;
+				}
+
+				.verse-share-badge {
+					display: inline-flex;
+					align-items: center;
+					flex-shrink: 0;
+					align-self: flex-start;
+					border-radius: 999px;
+					padding: 0.28rem 0.6rem;
+				background: rgba(64, 64, 64, 0.65);
+				font-size: 0.54rem;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				color: rgb(163 163 163);
+			}
+
+			.verse-share-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.75rem;
+				padding-top: 1.1rem;
+			}
+
+			@media (max-width: 1023px) {
+				.verse-share-grid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			@media (max-width: 639px) {
+				.verse-share-panel {
+					padding: 1rem;
+				}
+
+				.verse-share-mode {
+					flex-direction: column;
+					align-items: flex-start;
+				}
+
+				.verse-share-actions > * {
+					width: 100%;
+				}
+			}
+		</style>
+		<div class="verse-share-grid">
+			<section class="verse-share-panel verse-panel">
+				<p class="verse-eyebrow">Share Studio</p>
+				<p class="pt-3 text-base leading-8 text-neutral-300">This surface now reads as a complete destination even before the next sharing features land. It frames the intended export workflow and keeps the current product mood intact.</p>
+				<div class="verse-share-modes">
+					<div class="verse-share-mode verse-panel-soft">
+						<div class="space-y-2">
+							<p class="font-serif text-[1.05rem] leading-snug text-neutral-100">Quiet Copy</p>
+							<p class="text-sm leading-7 text-neutral-400">Prepare a simple text-first version of a bloom for messages, notes, or email.</p>
+						</div>
+						<span class="verse-share-badge">Soon</span>
+					</div>
+					<div class="verse-share-mode verse-panel-soft">
+						<div class="space-y-2">
+							<p class="font-serif text-[1.05rem] leading-snug text-neutral-100">Card Export</p>
+							<p class="text-sm leading-7 text-neutral-400">Compose a visual card treatment that keeps Verse’s restrained atmosphere.</p>
+						</div>
+						<span class="verse-share-badge">Soon</span>
+					</div>
+					<div class="verse-share-mode verse-panel-soft">
+						<div class="space-y-2">
+							<p class="font-serif text-[1.05rem] leading-snug text-neutral-100">Private Link</p>
+							<p class="text-sm leading-7 text-neutral-400">Package a bloom into a lightweight share page without changing its voice.</p>
+						</div>
+						<span class="verse-share-badge">Soon</span>
+					</div>
+				</div>
+			</section>
+			<section class="verse-share-panel verse-panel-soft">
+				<p class="verse-eyebrow">Until Then</p>
+				<p class="pt-3 text-sm leading-7 text-neutral-400">Keep writing and refining. The archive and editor already preserve the tone this future share layer will build on.</p>
+				<div class="verse-share-actions">
+					<button
+						hx-get="/library"
+						hx-target="#screen"
+						hx-swap="innerHTML"
+						class="verse-button-secondary"
+					>
+						Open Library
+					</button>
+					<button
+						hx-get="/editor"
+						hx-target="#screen"
+						hx-swap="innerHTML"
+						class="verse-button-ghost"
+					>
+						Write Again
+					</button>
+				</div>
+			</section>
+		</div>
 	</div>
 }

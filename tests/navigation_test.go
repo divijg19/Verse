@@ -38,6 +38,23 @@ func TestNavigationMatrix(t *testing.T) {
 	}
 }
 
+func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
+	body := renderNavOOB(t, "editor")
+
+	if !strings.Contains(body, `id="mobile-nav" hx-swap-oob="outerHTML"`) {
+		t.Fatalf("mobile nav oob shell missing from nav render: %q", body)
+	}
+	if !strings.Contains(body, `data-mobile-nav-sheet`) {
+		t.Fatalf("mobile nav sheet markup missing from nav render: %q", body)
+	}
+	if !strings.Contains(body, `>Editor</span>`) {
+		t.Fatalf("mobile nav current surface label missing from nav render: %q", body)
+	}
+	if !strings.Contains(body, `class="verse-desktop-nav-button inline-flex`) {
+		t.Fatalf("desktop nav button class missing from nav render: %q", body)
+	}
+}
+
 func renderNavOOB(t *testing.T, surface string) string {
 	t.Helper()
 

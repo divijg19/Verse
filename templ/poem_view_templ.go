@@ -58,14 +58,14 @@ func PoemViewContent(poem PoemView) templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-5\"><div class=\"flex items-center justify-between gap-3\"><a href=\"/library\" hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"text-sm text-neutral-300 hover:text-neutral-100\">◀ Library</a> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-5\"><style>\n\t\t\t\t.verse-poem-view-card {\n\t\t\t\t\tmin-width: 0;\n\t\t\t\t\tpadding: 1.25rem 1.25rem 1.1rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-poem-view-actions {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\tmin-width: 0;\n\t\t\t\t\tgap: 0.9rem;\n\t\t\t\t\tflex-wrap: wrap;\n\t\t\t\t}\n\n\t\t\t\t.verse-poem-view-nav {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tflex-wrap: wrap;\n\t\t\t\t\tgap: 0.55rem;\n\t\t\t\t\tfont-size: 0.68rem;\n\t\t\t\tletter-spacing: 0.16em;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t\tcolor: rgb(163 163 163);\n\t\t\t\ttext-decoration: none;\n\t\t\t\ttransition: color 150ms ease;\n\t\t\t}\n\n\t\t\t.verse-poem-view-nav:hover {\n\t\t\t\tcolor: rgb(229 229 229);\n\t\t\t}\n\n\t\t\t\t.verse-poem-view-article {\n\t\t\t\t\tpadding-top: 1.1rem;\n\t\t\t\t\tfont-size: 1.08rem;\n\t\t\t\t\tline-height: 1.95;\n\t\t\t\t\tcolor: rgb(245 245 245);\n\t\t\t\t\toverflow-wrap: anywhere;\n\t\t\t\t}\n\n\t\t\t@media (max-width: 639px) {\n\t\t\t\t.verse-poem-view-card {\n\t\t\t\t\tpadding: 1rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-poem-view-actions {\n\t\t\t\t\tflex-direction: column;\n\t\t\t\t\talign-items: flex-start;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><div class=\"verse-poem-view-card verse-panel\"><div class=\"verse-poem-view-actions\"><a href=\"/library\" hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-poem-view-nav\">◀ Library</a> <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 templ.SafeURL
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs("/editor/" + poem.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 18, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 70, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -78,52 +78,52 @@ func PoemViewContent(poem PoemView) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs("/editor/" + poem.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 19, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 71, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"text-sm text-neutral-300 hover:text-neutral-100\">Editor ▶</a></div><p class=\"text-xs text-neutral-500\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-poem-view-nav\">Editor ▶</a></div><p class=\"pt-5 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(poem.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 25, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 77, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><article class=\"whitespace-pre-wrap text-lg leading-relaxed text-neutral-100\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><article class=\"verse-poem-view-article whitespace-pre-wrap\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(poem.Content)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 26, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 78, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</article><form hx-post=\"/poem/delete\" hx-target=\"#screen\" hx-swap=\"innerHTML\" hx-confirm=\"Delete this poem from your library?\" class=\"pt-2\"><input type=\"hidden\" name=\"id\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</article></div><form hx-post=\"/poem/delete\" hx-target=\"#screen\" hx-swap=\"innerHTML\" hx-confirm=\"Delete this poem from your library?\" class=\"pt-1\"><input type=\"hidden\" name=\"id\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(poem.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 34, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/poem_view.templ`, Line: 87, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"> <button type=\"submit\" class=\"rounded-md border border-red-900/60 bg-red-950/30 px-3 py-1.5 text-sm text-red-300 transition hover:bg-red-950/50\">Delete</button></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"> <button type=\"submit\" class=\"verse-button-danger\">Delete Bloom</button></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

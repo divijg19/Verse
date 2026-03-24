@@ -6,6 +6,8 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 	<div id="heatmap" class="not-prose space-y-5">
 		<style>
 			.verse-heatmap-shell {
+				--verse-heatmap-cell: 2rem;
+				--verse-heatmap-gap: 1rem;
 				display: flex;
 				flex-direction: column;
 				align-items: center;
@@ -71,8 +73,8 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 
 			.verse-heatmap-days {
 				display: grid;
-				grid-template-columns: repeat(7, 2.25rem);
-				gap: 1rem;
+				grid-template-columns: repeat(7, var(--verse-heatmap-cell));
+				gap: var(--verse-heatmap-gap);
 				font-size: 0.65rem;
 				letter-spacing: 0.22em;
 				text-transform: uppercase;
@@ -82,21 +84,21 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 
 			.verse-heatmap-grid {
 				display: grid;
-				grid-template-columns: repeat(7, 2.25rem);
-				gap: 1rem;
+				grid-template-columns: repeat(7, var(--verse-heatmap-cell));
+				gap: var(--verse-heatmap-gap);
 				place-items: center;
 			}
 
 			.verse-heatmap-empty {
-				width: 2rem;
-				height: 2rem;
+				width: var(--verse-heatmap-cell);
+				height: var(--verse-heatmap-cell);
 				border-radius: 0.25rem;
 				background: transparent;
 			}
 
 			.verse-heatmap-cell {
-				width: 2rem;
-				height: 2rem;
+				width: var(--verse-heatmap-cell);
+				height: var(--verse-heatmap-cell);
 				border-radius: 0.25rem;
 			}
 
@@ -109,7 +111,54 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 			}
 
 			.verse-heatmap-stable {
-				min-height: calc(1.5rem + 2rem + 1.125rem + (2rem * 6) + (1rem * 5));
+				min-height: calc(1.5rem + var(--verse-heatmap-cell) + 1.125rem + (var(--verse-heatmap-cell) * 6) + (var(--verse-heatmap-gap) * 5));
+			}
+
+			@media (max-width: 767px) {
+				.verse-heatmap-shell {
+					--verse-heatmap-cell: 1.6rem;
+					--verse-heatmap-gap: 0.55rem;
+				}
+
+				.verse-heatmap-content {
+					gap: 1rem;
+				}
+
+				.verse-heatmap-nav {
+					grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+					gap: 0.75rem;
+					padding-inline: 0;
+				}
+
+				.verse-heatmap-nav h2 {
+					font-size: 1.35rem;
+				}
+
+				.verse-heatmap-days {
+					font-size: 0.53rem;
+					letter-spacing: 0.14em;
+				}
+
+				.verse-heatmap-frame {
+					justify-content: center;
+					padding-inline: 0.1rem;
+				}
+			}
+
+			@media (max-width: 479px) {
+				.verse-heatmap-shell {
+					--verse-heatmap-cell: 1.35rem;
+					--verse-heatmap-gap: 0.35rem;
+				}
+
+				.verse-heatmap-nav {
+					grid-template-columns: 2rem minmax(0, 1fr) 2rem;
+					gap: 0.35rem;
+				}
+
+				.verse-heatmap-nav h2 {
+					font-size: 1.1rem;
+				}
 			}
 		</style>
 		<div class="verse-heatmap-shell verse-heatmap-stable">
