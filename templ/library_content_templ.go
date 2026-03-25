@@ -68,7 +68,7 @@ func LibraryContent(query string, groups []PoemGroup) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" placeholder=\"Search poems\" hx-get=\"/poems\" hx-trigger=\"keyup changed delay:300ms, search\" hx-target=\"#library-results\" hx-swap=\"innerHTML\" hx-indicator=\"#library-loading\" autocomplete=\"off\" class=\"verse-library-search-input text-[1.05rem] leading-8 text-neutral-100 placeholder:text-neutral-600\"><div class=\"verse-library-search-meta\"><p class=\"text-[0.6rem] tracking-[0.12em] text-neutral-500\">Most recent first</p><div class=\"verse-library-status\"><p class=\"text-[0.56rem] tracking-[0.14em] text-neutral-700\">Up to 100 poems</p><span id=\"library-loading\" class=\"htmx-indicator items-center text-[0.56rem] tracking-[0.14em] text-neutral-700\">Updating...</span></div></div></div></section><div id=\"library-results\" class=\"verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-0 relative\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" placeholder=\"Search poems\" hx-get=\"/poems\" hx-trigger=\"keyup changed delay:300ms, search\" hx-target=\"#library-results\" hx-swap=\"innerHTML\" hx-indicator=\"#library-loading\" autocomplete=\"off\" class=\"verse-library-search-input text-[1.05rem] leading-8 text-neutral-100 placeholder:text-neutral-600\"><div class=\"verse-library-search-meta\"><p class=\"verse-mobile-copy-trim text-[0.6rem] tracking-[0.12em] text-neutral-500\">Most recent first</p><div class=\"verse-library-status\"><p class=\"verse-mobile-copy-trim text-[0.56rem] tracking-[0.14em] text-neutral-700\">Up to 100 poems</p><span id=\"library-loading\" class=\"htmx-indicator items-center text-[0.56rem] tracking-[0.14em] text-neutral-700\">Updating...</span></div></div></div></section><div id=\"library-results\" class=\"verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-0 relative\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -134,7 +134,7 @@ func LibraryResults(query string, groups []PoemGroup) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"space-y-6 py-20 text-center\"><p class=\"font-serif text-[1.8rem] leading-tight text-neutral-200\">This library is empty.</p><p class=\"mx-auto max-w-lg text-sm leading-7 text-neutral-400\">Begin writing, and your poems will gather here.</p><div class=\"flex justify-center\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-button-secondary\">Begin Writing</button></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"space-y-6 py-20 text-center\"><p class=\"font-serif text-[1.8rem] leading-tight text-neutral-200\">This library is empty.</p><p class=\"verse-mobile-copy-trim mx-auto max-w-lg text-sm leading-7 text-neutral-400\">Begin writing, and your poems will gather here.</p><div class=\"flex justify-center\"><button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-button-secondary\">Begin Writing</button></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -156,7 +156,7 @@ func LibraryResults(query string, groups []PoemGroup) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"space-y-4 py-24 text-center\"><p class=\"font-serif text-[1.8rem] leading-tight text-neutral-200\">No poems match this search.</p><p class=\"text-sm text-neutral-500\">Try a line, image, or phrase instead.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"space-y-4 py-24 text-center\"><p class=\"font-serif text-[1.8rem] leading-tight text-neutral-200\">No poems match this search.</p><p class=\"verse-mobile-copy-trim text-sm text-neutral-500\">Try a line, image, or phrase instead.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

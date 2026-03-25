@@ -47,4 +47,7 @@ func TestNavigationScriptOnlyAnimatesScreenSwaps(t *testing.T) {
 	if !strings.Contains(script, "verseOpenMobileNav") || !strings.Contains(script, "verseCloseMobileNav") {
 		t.Fatalf("navigation.js missing mobile navigation helpers: %q", script)
 	}
+	if !strings.Contains(script, "data-mobile-nav-link") || !strings.Contains(script, "verseMobileNavFocusTarget") {
+		t.Fatalf("navigation.js missing compact mobile navigation focus handling: %q", script)
+	}
 }

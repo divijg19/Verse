@@ -19,6 +19,9 @@ func TestSharedScreenLayoutLocksViewport(t *testing.T) {
 		`id="viewport" class="verse-app-shell h-screen overflow-hidden flex items-start justify-center"`,
 		`[data-editor-overlay-open="true"] #screen {`,
 		`z-index: 120;`,
+		`.verse-mobile-screen-title,`,
+		`.verse-mobile-copy-trim {`,
+		`class="verse-mobile-current-surface">Share</span>`,
 		`.verse-button,`,
 		`.verse-button-danger {`,
 		`min-width: 8.5rem;`,
@@ -31,9 +34,11 @@ func TestSharedScreenLayoutLocksViewport(t *testing.T) {
 		`grid-area: screen;`,
 		`id="mobile-nav"`,
 		`class="verse-mobile-nav-toggle"`,
+		`data-mobile-nav-link`,
 		`id="screen" class="verse-screen-frame verse-screen-frame--standard`,
 		`class="verse-desktop-nav-button inline-flex`,
 		`<div class="verse-surface-shell">`,
+		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`>Share</h1>`,
 	)
 }
@@ -59,6 +64,7 @@ func TestEditorDefaultViewUsesFixedPanelAndPinnedActions(t *testing.T) {
 		`min-height: 2.625rem;`,
 		`font-size: 1rem;`,
 		`.verse-editor-fullscreen-button {`,
+		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`<span class="verse-editor-submit-text">Save Bloom</span>`,
 		`<span class="verse-editor-saving">Saving</span>`,
 		`@media (max-width: 1023px) {`,
@@ -134,7 +140,7 @@ func TestDashboardPlacesOverviewAboveRecentAndKeepsSidebarQuickActions(t *testin
 
 	assertContainsAll(t, body,
 		`class="verse-dashboard-shell verse-surface-body"`,
-		`class="verse-dashboard-topline"`,
+		`class="verse-dashboard-topline verse-mobile-screen-title-wrap"`,
 		`class="verse-dashboard-overview-strip verse-panel-soft"`,
 		`class="verse-dashboard-sidebar"`,
 		`class="verse-dashboard-recent verse-panel"`,
@@ -192,6 +198,7 @@ func TestCaelumUsesCompactPromptSurface(t *testing.T) {
 
 	assertContainsAll(t, body,
 		`>Caelum</h1>`,
+		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`class="verse-caelum-panel verse-panel"`,
 		`>Prompt</p>`,
 		`id="prompt" class="verse-caelum-prompt-output italic"`,
@@ -216,6 +223,7 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 
 	assertContainsAll(t, body,
 		`>Share</h1>`,
+		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`class="verse-share-panel verse-panel"`,
 		`>Quiet Copy</p>`,
 		`>Card Export</p>`,
@@ -241,12 +249,14 @@ func TestLibraryUsesInternalResultsScrollRegion(t *testing.T) {
 
 	assertContainsAll(t, body,
 		`<div class="verse-library-screen">`,
+		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`>Library</h1>`,
 		`.verse-library-shell {`,
 		`height: 100%;`,
 		`min-height: 0;`,
 		`class="verse-library-shell not-prose overflow-hidden pt-1 pb-4"`,
 		`id="library-results" class="verse-library-results-pane overflow-y-auto scroll-smooth pr-2 pt-0 relative"`,
+		`class="verse-mobile-copy-trim mx-auto max-w-lg text-sm leading-7 text-neutral-400"`,
 		`This library is empty.`,
 	)
 }
