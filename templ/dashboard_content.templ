@@ -319,9 +319,9 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 						<p class="verse-dashboard-stat-value">{ fmt.Sprint(currentStreak) }</p>
 					</div>
 				</div>
-					<div class="verse-dashboard-recent verse-panel">
-						<p class="verse-eyebrow">Recent</p>
-						<div class="verse-dashboard-recent-body">
+				<div class="verse-dashboard-recent verse-panel">
+					<p class="verse-eyebrow">Recent</p>
+					<div class="verse-dashboard-recent-body">
 						@If(lastPoem != nil) {
 							<a
 								href={ "/poem/" + lastPoem.ID }
@@ -344,50 +344,50 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 							<div class="verse-panel-soft px-4 py-4 text-sm text-neutral-500">
 								No poems yet.
 							</div>
-							}
-						</div>
-					</div>
-					<div class="verse-dashboard-sidebar-actions">
-						<div class="verse-dashboard-quick-actions">
-							<button
-								hx-get="/editor"
-								hx-target="#screen"
-								hx-swap="innerHTML"
-								aria-label="Write"
-								title="Write"
-								class="verse-dashboard-quick-action verse-dashboard-quick-action--primary"
-							>
-								Write
-							</button>
-							<button
-								hx-get="/caelum"
-								hx-target="#screen"
-								hx-swap="innerHTML"
-								aria-label="Look to Caelum"
-								title="Look to Caelum"
-								class="verse-dashboard-quick-action verse-dashboard-quick-action--secondary"
-							>
-								Look to Caelum
-							</button>
-							<button
-								hx-get="/library"
-								hx-target="#screen"
-								hx-swap="innerHTML"
-								aria-label="Library"
-								title="Library"
-								class="verse-dashboard-quick-action verse-dashboard-quick-action--secondary"
-							>
-								Library
-							</button>
-						</div>
+						}
 					</div>
 				</div>
-				<div class="verse-dashboard-activity-card verse-panel">
-					<h2>Activity</h2>
-					<div class="verse-dashboard-activity-body">
-						@Heatmap(month, days)
+				<div class="verse-dashboard-sidebar-actions">
+					<div class="verse-dashboard-quick-actions">
+						<button
+							hx-get="/editor"
+							hx-target="#screen"
+							hx-swap="innerHTML"
+							aria-label="Write"
+							title="Write"
+							class="verse-dashboard-quick-action verse-dashboard-quick-action--primary"
+						>
+							Write
+						</button>
+						<button
+							hx-get="/caelum"
+							hx-target="#screen"
+							hx-swap="innerHTML"
+							aria-label="Look to Caelum"
+							title="Look to Caelum"
+							class="verse-dashboard-quick-action verse-dashboard-quick-action--secondary"
+						>
+							Look to Caelum
+						</button>
+						<button
+							hx-get="/library"
+							hx-target="#screen"
+							hx-swap="innerHTML"
+							aria-label="Library"
+							title="Library"
+							class="verse-dashboard-quick-action verse-dashboard-quick-action--secondary"
+						>
+							Library
+						</button>
 					</div>
 				</div>
 			</div>
+			<div class="verse-dashboard-activity-card verse-panel">
+				<h2>Activity</h2>
+				<div class="verse-dashboard-activity-body">
+					@Heatmap(month, days)
+				</div>
+			</div>
 		</div>
-	}
+	</div>
+}
