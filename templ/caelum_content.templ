@@ -1,59 +1,36 @@
 package templ
 
 templ CaelumContent() {
-	<div class="space-y-5">
+	<div class="space-y-4">
 		<style>
-			.verse-caelum-grid {
-				display: grid;
-				grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-				gap: 1.2rem;
+			.verse-caelum-panel {
+				min-width: 0;
+				padding: 1rem 1.1rem;
 			}
-
-				.verse-caelum-panel {
-					min-width: 0;
-					padding: 1.2rem 1.25rem;
-				}
 
 			.verse-caelum-prompt {
 				display: flex;
-				min-height: 16rem;
+				min-height: 12.5rem;
 				align-items: center;
-				padding: 1.2rem;
+				padding: 1.05rem 1.1rem;
 				border: 1px solid rgb(23 23 23);
 				border-radius: 1.2rem;
 				background: linear-gradient(180deg, rgba(18, 18, 18, 0.92) 0%, rgba(10, 10, 10, 0.98) 100%);
 			}
 
-				.verse-caelum-prompt-output {
-					font-family: Georgia, Cambria, "Times New Roman", Times, serif;
-					font-size: 1.45rem;
-					line-height: 1.45;
-					color: rgb(216 180 254);
-					overflow-wrap: anywhere;
-				}
+			.verse-caelum-prompt-output {
+				font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+				font-size: 1.35rem;
+				line-height: 1.42;
+				color: rgb(216 180 254);
+				overflow-wrap: anywhere;
+			}
 
 			.verse-caelum-actions {
 				display: flex;
 				flex-wrap: wrap;
 				gap: 0.75rem;
-				padding-top: 1rem;
-			}
-
-			.verse-caelum-list {
-				display: grid;
-				gap: 0.8rem;
-				padding-top: 1rem;
-			}
-
-				.verse-caelum-list-item {
-					min-width: 0;
-					padding: 0.9rem 1rem;
-				}
-
-			@media (max-width: 1023px) {
-				.verse-caelum-grid {
-					grid-template-columns: 1fr;
-				}
+				padding-top: 0.85rem;
 			}
 
 			@media (max-width: 639px) {
@@ -62,12 +39,12 @@ templ CaelumContent() {
 				}
 
 				.verse-caelum-prompt {
-					min-height: 13rem;
+					min-height: 10.75rem;
 					padding: 1rem;
 				}
 
 				.verse-caelum-prompt-output {
-					font-size: 1.18rem;
+					font-size: 1.16rem;
 				}
 
 				.verse-caelum-actions > * {
@@ -75,46 +52,29 @@ templ CaelumContent() {
 				}
 			}
 		</style>
-		<div class="verse-caelum-grid">
-			<section class="verse-caelum-panel verse-panel">
-				<p class="verse-eyebrow">Prompt Field</p>
-				<p class="pt-3 text-base leading-8 text-neutral-300">Caelum offers a fresh poetic direction whenever the page needs a new horizon. The prompt lives inside the same calm visual language as the rest of Verse.</p>
-				<div class="verse-caelum-prompt mt-5">
-					<div id="prompt" class="verse-caelum-prompt-output italic">Generate a prompt when you want a new thread to pull on.</div>
-				</div>
-				<div class="verse-caelum-actions">
-					<button
-						hx-get="/prompt"
-						hx-target="#prompt"
-						hx-swap="innerHTML"
-						class="verse-button"
-					>
-						Generate Prompt
-					</button>
-					<button
-						hx-get="/editor"
-						hx-target="#screen"
-						hx-swap="innerHTML"
-						class="verse-button-secondary"
-					>
-						Open Editor
-					</button>
-				</div>
-			</section>
-			<section class="verse-caelum-panel verse-panel-soft">
-				<p class="verse-eyebrow">Use It Well</p>
-				<div class="verse-caelum-list">
-					<div class="verse-caelum-list-item verse-panel-soft">
-						<p class="text-sm leading-7 text-neutral-300">Generate a line, image, or atmosphere when your draft needs a new opening.</p>
-					</div>
-					<div class="verse-caelum-list-item verse-panel-soft">
-						<p class="text-sm leading-7 text-neutral-300">Move from prompt to editor without changing context, so momentum stays intact.</p>
-					</div>
-					<div class="verse-caelum-list-item verse-panel-soft">
-						<p class="text-sm leading-7 text-neutral-300">Use prompts as suggestions, not instructions. Verse should still feel like your voice.</p>
-					</div>
-				</div>
-			</section>
-		</div>
+		<section class="verse-caelum-panel verse-panel">
+			<p class="verse-eyebrow">Prompt</p>
+			<div class="verse-caelum-prompt mt-4">
+				<div id="prompt" class="verse-caelum-prompt-output italic">Generate a prompt.</div>
+			</div>
+			<div class="verse-caelum-actions">
+				<button
+					hx-get="/prompt"
+					hx-target="#prompt"
+					hx-swap="innerHTML"
+					class="verse-button"
+				>
+					Generate Prompt
+				</button>
+				<button
+					hx-get="/editor"
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-button-secondary"
+				>
+					Open Editor
+				</button>
+			</div>
+		</section>
 	</div>
 }

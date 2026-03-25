@@ -187,6 +187,55 @@ func TestDashboardPlacesOverviewAboveRecentAndKeepsSidebarQuickActions(t *testin
 	}
 }
 
+func TestCaelumUsesCompactPromptSurface(t *testing.T) {
+	body := renderComponent(t, views.Caelum())
+
+	assertContainsAll(t, body,
+		`>Caelum</h1>`,
+		`class="verse-caelum-panel verse-panel"`,
+		`>Prompt</p>`,
+		`id="prompt" class="verse-caelum-prompt-output italic"`,
+		`>Generate Prompt</button>`,
+		`>Open Editor</button>`,
+	)
+
+	for _, removed := range []string{
+		`>Prompt Field</p>`,
+		`>Use It Well</p>`,
+		`Caelum offers a fresh poetic direction`,
+		`Move from prompt to editor without changing context`,
+	} {
+		if strings.Contains(body, removed) {
+			t.Fatalf("caelum should stay compact without redundant copy, found %q in %q", removed, body)
+		}
+	}
+}
+
+func TestShareUsesCompactModeSurface(t *testing.T) {
+	body := renderComponent(t, views.Share())
+
+	assertContainsAll(t, body,
+		`>Share</h1>`,
+		`class="verse-share-panel verse-panel"`,
+		`>Quiet Copy</p>`,
+		`>Card Export</p>`,
+		`>Private Link</p>`,
+		`>Open Library</button>`,
+		`>Write Again</button>`,
+	)
+
+	for _, removed := range []string{
+		`>Share Studio</p>`,
+		`>Until Then</p>`,
+		`This surface now reads as a complete destination`,
+		`Keep writing and refining.`,
+	} {
+		if strings.Contains(body, removed) {
+			t.Fatalf("share should stay compact without redundant copy, found %q in %q", removed, body)
+		}
+	}
+}
+
 func TestLibraryUsesInternalResultsScrollRegion(t *testing.T) {
 	body := renderComponent(t, views.Library("", nil))
 
