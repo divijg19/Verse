@@ -280,9 +280,9 @@ templ LibraryContent(query string, groups []PoemGroup) {
 					class="verse-library-search-input text-[1.05rem] leading-8 text-neutral-100 placeholder:text-neutral-600"
 				/>
 				<div class="verse-library-search-meta">
-					<p class="text-[0.6rem] tracking-[0.12em] text-neutral-500">Most recent first</p>
+					<p class="verse-mobile-copy-trim text-[0.6rem] tracking-[0.12em] text-neutral-500">Most recent first</p>
 					<div class="verse-library-status">
-						<p class="text-[0.56rem] tracking-[0.14em] text-neutral-700">Up to 100 poems</p>
+						<p class="verse-mobile-copy-trim text-[0.56rem] tracking-[0.14em] text-neutral-700">Up to 100 poems</p>
 						<span id="library-loading" class="htmx-indicator items-center text-[0.56rem] tracking-[0.14em] text-neutral-700">Updating...</span>
 					</div>
 				</div>
@@ -301,7 +301,7 @@ templ LibraryResults(query string, groups []PoemGroup) {
 	@If(len(groups) == 0 && query == "") {
 		<div class="space-y-6 py-20 text-center">
 			<p class="font-serif text-[1.8rem] leading-tight text-neutral-200">This library is empty.</p>
-			<p class="mx-auto max-w-lg text-sm leading-7 text-neutral-400">Begin writing, and your poems will gather here.</p>
+			<p class="verse-mobile-copy-trim mx-auto max-w-lg text-sm leading-7 text-neutral-400">Begin writing, and your poems will gather here.</p>
 			<div class="flex justify-center">
 				<button
 					hx-get="/editor"
@@ -317,7 +317,7 @@ templ LibraryResults(query string, groups []PoemGroup) {
 	@If(len(groups) == 0 && query != "") {
 		<div class="space-y-4 py-24 text-center">
 			<p class="font-serif text-[1.8rem] leading-tight text-neutral-200">No poems match this search.</p>
-			<p class="text-sm text-neutral-500">Try a line, image, or phrase instead.</p>
+			<p class="verse-mobile-copy-trim text-sm text-neutral-500">Try a line, image, or phrase instead.</p>
 		</div>
 	}
 	for _, group := range groups {

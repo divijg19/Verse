@@ -32,19 +32,7 @@ templ mobileNav(surface string, oob bool) {
 templ mobileNavContent(surface string) {
 	<div class="verse-mobile-nav-bar">
 		<div class="verse-mobile-nav-bar-inner">
-			<a
-				href="/dashboard"
-				hx-get="/dashboard"
-				hx-target="#screen"
-				hx-swap="innerHTML"
-				class="verse-mobile-brand"
-			>
-				<span class="verse-mobile-brand-title">Verse</span>
-				<div class="verse-mobile-brand-meta">
-					<span class="verse-mobile-brand-chip">Now</span>
-					<span>{ navSurfaceLabel(surface) }</span>
-				</div>
-			</a>
+			<span class="verse-mobile-current-surface">{ navSurfaceLabel(surface) }</span>
 			<button
 				type="button"
 				data-mobile-nav-toggle
@@ -63,47 +51,31 @@ templ mobileNavContent(surface string) {
 	<div id="mobile-nav-sheet" data-mobile-nav-sheet class="verse-mobile-nav-sheet" hidden>
 		<div class="verse-mobile-nav-backdrop" onclick="verseCloseMobileNav(this)"></div>
 		<div class="verse-mobile-nav-panel">
-			<div class="verse-mobile-nav-panel-header">
-				<div class="space-y-2">
-					<p class="verse-eyebrow">Navigate</p>
-					<p class="verse-mobile-nav-panel-title">{ navSurfaceLabel(surface) }</p>
-					<p class="text-sm leading-7 text-neutral-400">A responsive map of every Verse surface, tuned for touch and smaller screens.</p>
-				</div>
-				<button
-					type="button"
-					aria-label="Close navigation menu"
-					class="verse-mobile-nav-close"
-					onclick="verseCloseMobileNav(this)"
-				>
-					×
-				</button>
-			</div>
 			<div class="verse-mobile-nav-list">
-				@mobileNavLink(surface, "/dashboard", "Dashboard", "Overview and activity")
-				@mobileNavLink(surface, "/editor", "Editor", "Write or revise a bloom")
-				@mobileNavLink(surface, "/library", "Library", "Browse your archive")
-				@mobileNavLink(surface, "/caelum", "Caelum", "Draw a fresh prompt")
-				@mobileNavLink(surface, "/share", "Share", "Prepare work for export")
+				@mobileNavLink(surface, "/dashboard", "Dashboard")
+				@mobileNavLink(surface, "/editor", "Editor")
+				@mobileNavLink(surface, "/library", "Library")
+				@mobileNavLink(surface, "/caelum", "Caelum")
+				@mobileNavLink(surface, "/share", "Share")
 			</div>
 		</div>
 	</div>
 }
 
-templ mobileNavLink(surface string, path string, label string, detail string) {
+templ mobileNavLink(surface string, path string, label string) {
 	<a
 		href={ path }
 		hx-get={ path }
 		hx-target="#screen"
 		hx-swap="innerHTML"
+		data-mobile-nav-link
 		data-active={ navActiveValue(surface, path) }
 		aria-label={ "Navigate to " + label }
 		class="verse-mobile-nav-link"
 	>
 		<div class="verse-mobile-nav-link-copy">
 			<strong>{ label }</strong>
-			<span>{ detail }</span>
 		</div>
-		<span class="verse-mobile-nav-link-mark">→</span>
 	</a>
 }
 

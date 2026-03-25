@@ -29,7 +29,7 @@ func Library(query string, groups []PoemGroup) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"verse-library-screen\"><style>\n\t\t\t.verse-library-screen {\n\t\t\t\tdisplay: flex;\n\t\t\t\theight: calc(100svh - (var(--verse-desktop-nav-rail-block, 2rem) * 2));\n\t\t\t\tmin-height: 0;\n\t\t\t\tflex-direction: column;\n\t\t\t\tgap: 1.5rem;\n\t\t\t\tpadding-top: var(--verse-surface-top-space, clamp(7rem, 16vh, 9rem));\n\t\t\t}\n\n\t\t\t@media (max-width: 1023px) {\n\t\t\t\t.verse-library-screen {\n\t\t\t\t\theight: auto;\n\t\t\t\t\tmin-height: 0;\n\t\t\t\t\tgap: 1rem;\n\t\t\t\t\tpadding-top: 0.35rem;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><h1 class=\"verse-surface-heading\">Library</h1><div class=\"verse-surface-body max-w-none min-h-0 flex-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"verse-library-screen\"><style>\n\t\t\t.verse-library-screen {\n\t\t\t\tdisplay: flex;\n\t\t\t\theight: calc(100svh - (var(--verse-desktop-nav-rail-block, 2rem) * 2));\n\t\t\t\tmin-height: 0;\n\t\t\t\tflex-direction: column;\n\t\t\t\tgap: 1.5rem;\n\t\t\t\tpadding-top: var(--verse-surface-top-space, clamp(7rem, 16vh, 9rem));\n\t\t\t}\n\n\t\t\t@media (max-width: 1023px) {\n\t\t\t\t.verse-library-screen {\n\t\t\t\t\theight: auto;\n\t\t\t\t\tmin-height: 0;\n\t\t\t\t\tgap: 0.85rem;\n\t\t\t\t\tpadding-top: 0.15rem;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><h1 class=\"verse-surface-heading verse-mobile-screen-title\">Library</h1><div class=\"verse-surface-body max-w-none min-h-0 flex-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

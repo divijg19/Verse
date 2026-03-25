@@ -62,6 +62,16 @@ function verseMobileNavToggle() {
     return root ? root.querySelector("[data-mobile-nav-toggle]") : null;
 }
 
+function verseMobileNavFocusTarget() {
+    const sheet = verseMobileNavSheet();
+    if (!sheet) {
+        return null;
+    }
+
+    return sheet.querySelector("[data-mobile-nav-link][data-active='true']") ||
+        sheet.querySelector("[data-mobile-nav-link]");
+}
+
 function verseSyncMobileNavButton(expanded) {
     const toggle = verseMobileNavToggle();
     if (!toggle) {
@@ -83,9 +93,9 @@ function verseOpenMobileNav(node) {
     verseSyncMobileNavButton(true);
     verseLockBodyScroll();
 
-    const closeButton = sheet.querySelector("[aria-label='Close navigation menu']");
-    if (closeButton) {
-        requestAnimationFrame(() => closeButton.focus());
+    const focusTarget = verseMobileNavFocusTarget();
+    if (focusTarget) {
+        requestAnimationFrame(() => focusTarget.focus());
     }
 }
 

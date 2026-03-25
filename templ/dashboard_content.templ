@@ -227,6 +227,10 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 		}
 
 		@media (max-width: 1023px) {
+			.verse-dashboard-shell {
+				gap: 0.95rem;
+			}
+
 			.verse-dashboard-topline {
 				align-items: flex-start;
 			}
@@ -302,7 +306,7 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 				}
 			}
 		</style>
-		<div class="verse-dashboard-topline">
+		<div class="verse-dashboard-topline verse-mobile-screen-title-wrap">
 			<h1 class="verse-surface-heading">
 				Dashboard
 			</h1>

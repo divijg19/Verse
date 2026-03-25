@@ -47,8 +47,23 @@ func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
 	if !strings.Contains(body, `data-mobile-nav-sheet`) {
 		t.Fatalf("mobile nav sheet markup missing from nav render: %q", body)
 	}
-	if !strings.Contains(body, `>Editor</span>`) {
+	if !strings.Contains(body, `class="verse-mobile-current-surface">Editor</span>`) {
 		t.Fatalf("mobile nav current surface label missing from nav render: %q", body)
+	}
+	if !strings.Contains(body, `data-mobile-nav-link`) {
+		t.Fatalf("mobile nav link hooks missing from nav render: %q", body)
+	}
+	for _, removed := range []string{
+		`>Navigate</p>`,
+		`>Overview and activity</span>`,
+		`>Write or revise a bloom</span>`,
+		`>Browse your archive</span>`,
+		`>Draw a fresh prompt</span>`,
+		`>Prepare work for export</span>`,
+	} {
+		if strings.Contains(body, removed) {
+			t.Fatalf("mobile nav should no longer render redundant copy %q in %q", removed, body)
+		}
 	}
 	if !strings.Contains(body, `class="verse-desktop-nav-button inline-flex`) {
 		t.Fatalf("desktop nav button class missing from nav render: %q", body)
