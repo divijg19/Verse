@@ -1,6 +1,5 @@
 # `Verse`
-#### Internal Codename: Hyacinth
-> Hyacinth represents rebirth through reflection — the internal architecture behind `Verse`.
+
 
 
 > A daily poetic ritual engine.
@@ -39,7 +38,7 @@ No algorithmic interference.
 
 ---
 
-## ✨ MVP Features (Hyacinth v0.1)
+## ✨ MVP Features (v0.1)
 
 * Daily poem editor
 * Mood tagging
@@ -239,7 +238,7 @@ Default:
 * Dark mode
 * Serif typography for poems
 * Minimal UI chrome
-* Subtle hyacinth-purple accent
+* Subtle violet accent
 
 Focus:
 
@@ -270,13 +269,13 @@ bunx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch
 
 # 🔮 Future Roadmap
 
-Hyacinth v1.0.0+:
+v1.0.0+:
 
 * AI sentiment analysis
 * Theme detection
 * Writing evolution tracking
 
-Hyacinth v2.0.0+:
+v2.0.0+:
 
 * Local-first mode
 * Offline support
