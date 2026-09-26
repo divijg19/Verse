@@ -1,12 +1,36 @@
+# Verse — private authoring service.
+#
+# Responsibilities: authoring only. The public reading site is a static artifact served separately
+# (see docs/RUNNING.md), and this service must never hold a Cloudflare credential.
+#
+# Note the health check. Without an explicit path, Render probes "/", which is the dashboard: a full
+# private page render issuing four database queries on every probe. /health touches no database, so
+# uptime no longer depends on Neon being reachable.
+
 services:
   - type: web
     name: verse
     runtime: go
     buildCommand: |
-      bun install
+      bun install --frozen-lockfile
       bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
       go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
     startCommand: ./verse
+    healthCheckPath: /health
+
+    # Fail closed. The application refuses to start without these, by design: serving the authoring
+    # surface unauthenticated is never correct. There is no bypass flag. Recovery from a forgotten
+    # passphrase is to rotate VERSE_AUTHORIZATION and redeploy.
+    #
+    # Set these in the Render dashboard BEFORE the first deploy of v0.3.7, or the service will not
+    # start. See docs/RUNNING.md.
     envVars:
       - key: DATABASE_URL
         sync: false
+
+      - key: VERSE_AUTHORIZATION
+        sync: false # the authoring passphrase; compared in constant time
+
+      - key: VERSE_AUTH_SECRET
+        sync: false # HMAC key for session and CSRF tokens; minimum 32 characters
+        generateValue: false

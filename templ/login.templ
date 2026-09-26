@@ -1,0 +1,149 @@
+package templ
+
+import "context"
+
+// Login is the unauthenticated entry surface. It is deliberately the only screen in the
+// application that does not depend on the authoring shell: a visitor who is not yet authenticated
+// has no session, no dashboard, and no library, so the spatial navigation, the library scroll
+// regions, and the editor overlay would all be non-functional decoration.
+templ Login(ctx context.Context, csrf string, errMessage string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>Verse</title>
+			<meta name="robots" content="noindex, nofollow"/>
+			<link rel="stylesheet" href="/static/css/output.css"/>
+			<style>
+				:root { color-scheme: dark; }
+				html, body { height: 100%; }
+				body {
+					margin: 0;
+					background:
+						radial-gradient(circle at top, rgba(168, 85, 247, 0.12) 0%, rgba(10, 10, 10, 0) 34%),
+						linear-gradient(180deg, rgba(23, 23, 23, 0.88) 0%, rgba(10, 10, 10, 0.98) 72%);
+					color: rgb(229, 229, 229);
+					font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					padding: 1.5rem;
+					box-sizing: border-box;
+				}
+				.verse-login-shell {
+					width: 100%;
+					max-width: 25rem;
+					border: 1px solid rgb(38, 38, 38);
+					border-radius: 1.5rem;
+					background: linear-gradient(180deg, rgba(23, 23, 23, 0.82) 0%, rgba(10, 10, 10, 0.5) 100%);
+					box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(115, 115, 115, 0.1);
+					padding: 1.75rem 1.5rem 1.5rem;
+				}
+				.verse-login-heading {
+					font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+					font-size: 2rem;
+					line-height: 1;
+					margin: 0;
+					color: rgb(245, 245, 245);
+				}
+				.verse-login-eyebrow {
+					font-size: 0.62rem;
+					letter-spacing: 0.22em;
+					text-transform: uppercase;
+					color: rgb(115, 115, 115);
+					margin: 0 0 0.6rem;
+				}
+				.verse-login-copy {
+					font-size: 0.9rem;
+					line-height: 1.7;
+					color: rgb(163, 163, 163);
+					margin: 0.75rem 0 1.5rem;
+				}
+				.verse-login-field {
+					display: block;
+					width: 100%;
+					box-sizing: border-box;
+					background: rgba(10, 10, 10, 0.6);
+					border: 1px solid rgb(38, 38, 38);
+					border-radius: 0.6rem;
+					padding: 0.7rem 0.85rem;
+					color: rgb(245, 245, 245);
+					font-size: 1rem;
+					outline: none;
+					transition: border-color 150ms ease, box-shadow 150ms ease;
+				}
+				.verse-login-field:focus {
+					border-color: rgb(115, 115, 115);
+					box-shadow: inset 0 1px 0 rgba(163, 163, 163, 0.18);
+				}
+				.verse-login-submit {
+					width: 100%;
+					margin-top: 1rem;
+					min-height: 2.625rem;
+					border: none;
+					border-radius: 0.375rem;
+					background: rgb(147, 51, 234);
+					color: rgb(250, 245, 255);
+					font-size: 1rem;
+					cursor: pointer;
+					transition: background-color 150ms ease;
+				}
+				.verse-login-submit:hover { background: rgb(168, 85, 247); }
+				.verse-login-error {
+					margin: 0 0 1rem;
+					padding: 0.7rem 0.85rem;
+					border: 1px solid rgba(127, 29, 29, 0.72);
+					border-radius: 0.6rem;
+					background: rgba(69, 10, 10, 0.32);
+					color: rgb(252, 165, 165);
+					font-size: 0.9rem;
+				}
+				.verse-login-footnote {
+					margin: 1.25rem 0 0;
+					font-size: 0.68rem;
+					line-height: 1.6;
+					color: rgb(82, 82, 82);
+				}
+			</style>
+		</head>
+		<body>
+			<main class="verse-login-shell">
+				<p class="verse-login-eyebrow">Private</p>
+				<h1 class="verse-login-heading">Verse</h1>
+				<p class="verse-login-copy">This is the authoring room. It holds unfinished work.</p>
+				@If(hasError(errMessage)) {
+					<p class="verse-login-error" role="alert">{ errMessage }</p>
+				}
+				<form method="post" action="/login">
+					<input type="hidden" name="csrf" value={ csrf }/>
+					<label class="sr-only" for="passphrase">Passphrase</label>
+					<input
+						id="passphrase"
+						class="verse-login-field"
+						type="password"
+						name="passphrase"
+						autocomplete="current-password"
+						autofocus
+						required
+						placeholder="Passphrase"
+					/>
+					<button type="submit" class="verse-login-submit">Enter</button>
+				</form>
+				<p class="verse-login-footnote">
+					Published work is served separately, as static pages. This room is not indexed.
+				</p>
+			</main>
+		</body>
+	</html>
+}
+
+// CSRFField renders the hidden synchroniser token input required by every mutating form.
+//
+// The token is read from the request context by the HTTP layer, not from a cookie, so a cross-site
+// form cannot supply a matching value. It is rendered as a form field rather than a header so no
+// client-side script is required: htmx submits form values for hx-post forms, and a plain HTML form
+// works identically.
+templ CSRFField(ctx context.Context) {
+	<input type="hidden" name="csrf" value={ CSRFToken(ctx) }/>
+}

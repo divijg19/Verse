@@ -24,12 +24,12 @@ func TestHealthEndpointHead(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	req, err := http.NewRequest(http.MethodHead, srv.URL+"/health", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodHead, srv.URL+"/health", nil)
 	if err != nil {
 		t.Fatalf("create HEAD /health request failed: %v", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := authClient.Do(req)
 	if err != nil {
 		t.Fatalf("execute HEAD /health request failed: %v", err)
 	}

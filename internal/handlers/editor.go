@@ -8,5 +8,5 @@ import (
 
 // EditorHandler renders the editor surface and supports HTMX partial responses.
 func EditorHandler(w http.ResponseWriter, r *http.Request) {
-	renderSurface(w, r, "editor", templ.Editor())
+	renderSurface(w, r, "editor", templ.Editor(r.Context()))
 }

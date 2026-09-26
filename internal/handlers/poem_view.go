@@ -23,7 +23,7 @@ func PoemViewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderSurface(w, r, "library", templ.PoemViewScreen(toPoemView(p)))
+	renderSurface(w, r, "library", templ.PoemViewScreen(r.Context(), toPoemView(p)))
 }
 
 // EditorEditHandler loads a poem into the editor for editing (GET /editor/{id}).
@@ -40,5 +40,5 @@ func EditorEditHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderSurface(w, r, "editor", templ.EditorWithPoem(p.ID, p.Content))
+	renderSurface(w, r, "editor", templ.EditorWithPoem(r.Context(), p.ID, p.Content))
 }

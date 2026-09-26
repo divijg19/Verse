@@ -44,7 +44,7 @@ func TestSharedScreenLayoutLocksViewport(t *testing.T) {
 }
 
 func TestEditorDefaultViewUsesFixedPanelAndPinnedActions(t *testing.T) {
-	body := renderComponent(t, views.Editor())
+	body := renderComponent(t, views.Editor(renderContext()))
 
 	assertContainsAll(t, body,
 		`<div class="verse-editor-screen">`,
@@ -82,7 +82,7 @@ func TestEditorDefaultViewUsesFixedPanelAndPinnedActions(t *testing.T) {
 }
 
 func TestEditorEditViewCarriesPoemIDIntoBothForms(t *testing.T) {
-	body := renderComponent(t, views.EditorWithPoem("poem-123", "A bell in snow"))
+	body := renderComponent(t, views.EditorWithPoem(renderContext(), "poem-123", "A bell in snow"))
 
 	needle := `<input type="hidden" name="id" value="poem-123">`
 	if count := strings.Count(body, needle); count != 2 {
@@ -99,7 +99,7 @@ func TestEditorEditViewCarriesPoemIDIntoBothForms(t *testing.T) {
 }
 
 func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
-	body := renderComponent(t, views.Editor())
+	body := renderComponent(t, views.Editor(renderContext()))
 
 	assertContainsAll(t, body,
 		`data-editor-overlay class="verse-editor-overlay" hidden`,
@@ -282,11 +282,18 @@ func TestSurfaceRoutesStillReturnLockedScreenShell(t *testing.T) {
 	}
 }
 
+// renderContext returns a context carrying a CSRF token, mirroring an authenticated request.
+// Components that render a mutating form now emit the token field, so a bare context would produce
+// markup that differs from anything the application actually serves.
+func renderContext() context.Context {
+	return views.WithCSRFToken(context.Background(), "test-csrf-token")
+}
+
 func renderComponent(t *testing.T, component page.Component) string {
 	t.Helper()
 
 	var buf bytes.Buffer
-	if err := component.Render(context.Background(), &buf); err != nil {
+	if err := component.Render(renderContext(), &buf); err != nil {
 		t.Fatalf("render component failed: %v", err)
 	}
 

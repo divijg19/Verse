@@ -1,10 +1,12 @@
 package templ
 
-templ PoemViewScreen(poem PoemView) {
-	@Screen("Poem", PoemViewContent(poem))
+import "context"
+
+templ PoemViewScreen(ctx context.Context, poem PoemView) {
+	@Screen("Poem", PoemViewContent(ctx, poem))
 }
 
-templ PoemViewContent(poem PoemView) {
+templ PoemViewContent(ctx context.Context, poem PoemView) {
 	<div class="space-y-5">
 		<style>
 				.verse-poem-view-card {
@@ -85,6 +87,7 @@ templ PoemViewContent(poem PoemView) {
 			class="pt-1"
 		>
 			<input type="hidden" name="id" value={ poem.ID }/>
+			@CSRFField(ctx)
 			<button
 				type="submit"
 				class="verse-button-danger"

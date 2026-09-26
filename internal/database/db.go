@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -38,15 +39,22 @@ func Connect() error {
 
 		// Apply sensible defaults for Neon/free-tier
 		if v := os.Getenv("DB_MAX_CONNS"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				cfg.MaxConns = int32(n)
+			// Bounded explicitly: a narrowing conversion from a parsed int wraps silently on a
+			// hostile or careless value, and a negative pool size is a runtime panic.
+			// #nosec G109 -- the bound immediately above is the mitigation. gosec tracks the value
+			// back to strconv.Atoi and reports the narrowing conversion without evaluating the
+			// guard, so the fix is invisible to it. math.MaxInt32 is checked, so the conversion
+			// cannot wrap.
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= math.MaxInt32 {
+				cfg.MaxConns = int32(n) // #nosec G109
 			}
 		} else {
 			cfg.MaxConns = 5
 		}
 		if v := os.Getenv("DB_MIN_CONNS"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-				cfg.MinConns = int32(n)
+			// #nosec G109 -- see the note on DB_MAX_CONNS above; the guard is the mitigation.
+			if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= math.MaxInt32 {
+				cfg.MinConns = int32(n) // #nosec G109
 			}
 		} else {
 			cfg.MinConns = 1

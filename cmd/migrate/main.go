@@ -43,8 +43,12 @@ func runMigrations(ctx context.Context, dir string) error {
 	sort.Strings(files)
 
 	for _, name := range files {
+		// #nosec G304 -- the path is not attacker-controlled. `dir` is the migrations directory
+		// passed by this command, and `name` came from os.ReadDir of that same directory, so the
+		// value can only ever be a file that already exists inside it. gosec cannot see that
+		// provenance, only that the argument is a variable.
 		path := filepath.Join(dir, name)
-		sqlBytes, err := os.ReadFile(path)
+		sqlBytes, err := os.ReadFile(path) // #nosec G304
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}

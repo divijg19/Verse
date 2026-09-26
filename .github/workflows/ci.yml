@@ -1,17 +1,51 @@
 name: CI
 
+# Trigger model.
+#
+# The previous configuration triggered only on `main`, but v0.3.x is the working branch and was 58
+# commits ahead of main with none of them ever running CI.
+#
+# A commit is validated exactly twice, and each run answers a different question:
+#
+#   pull_request -> is the change under review sound?
+#   push to main -> is the merge result sound? This is what actually deploys.
+#
+# `v*` is deliberately absent from both branch filters. Every open and merged PR (#46-#51) targets
+# `main`, so `v*` under `pull_request` matched nothing. And a force-push to `v0.3.x` fires the
+# `synchronize` event on the open PR, so the working branch stays covered without a `push` trigger.
+#
+# Release tags deliberately do NOT trigger a run either. A tag points at a commit its pull request
+# has already validated and that the merge to main validates again, so a tag run re-tests an
+# identical SHA and adds no signal. Worse, because the tag is pushed while the pull request is still
+# open, both events land on the same commit and GitHub renders the checks twice on the pull request,
+# which trains a reader to ignore the checks panel. To confirm a release commit on demand, run this
+# workflow manually with workflow_dispatch.
+#
+# The accepted trade-off: pushing a tag at a commit that was never validated runs nothing. The gate
+# for that is the pull request's required check.
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+# Superseded runs are cancelled rather than left to consume runners. This matters most for the
+# amend-then-force-push loop, where each push would otherwise leave a stale run behind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
 
 jobs:
-  build:
+  verify:
+    name: Verify
     runs-on: ubuntu-latest
-
-    env:
-      DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
 
     services:
       postgres:
@@ -35,92 +69,264 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          # Floating patch within the minor line, deliberately NOT go-version-file: go.mod.
+          #
+          # The `go` directive in go.mod is a language and minimum-toolchain requirement, not a
+          # toolchain pin. Reading it as a pin froze CI on go1.26.0 while local development ran
+          # go1.26.8, and govulncheck then reported eighteen standard-library vulnerabilities in CI
+          # that were already fixed in go1.26.6. The Dockerfile has always floated
+          # (golang:1.26-alpine); CI now matches it. A guard below keeps the declared minor in
+          # step with go.mod.
+          go-version: '1.26.x'
           cache: true
+          cache-dependency-path: go.sum
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          # Pinned rather than `latest`, and identical to the tag in the Dockerfile, so the two
+          # build paths cannot silently diverge. Bumping this is a deliberate commit.
+          bun-version: '1.3.5'
 
       - name: Install Bun dependencies
-        run: bun ci
+        run: bun install --frozen-lockfile
 
-      # templ artifacts are committed; skipping regeneration to avoid generator/runtime mismatches
+      - name: Verify vendored asset integrity
+        run: |
+          # static/js/VENDOR.sha256 records a SHA-256 per vendored file, in the standard sha256sum
+          # format. A tampered or unreviewed vendored script would otherwise be indistinguishable
+          # from an intentional upgrade. The prose record of what each file is, and why it is
+          # vendored, lives in static/js/VENDOR.md.
+          cd static/js && sha256sum -c VENDOR.sha256
+
+      - name: Verify committed templ artifacts are current
+        run: |
+          # templ artifacts are committed so `go build` works without a templ toolchain. That makes
+          # stale generated code the failure mode: edit a .templ file, run a test that reads the
+          # stale _templ.go, and ship the old markup with a passing build. This step converts that
+          # from silent drift into a build failure. The generator is pinned to the go.mod version.
+          go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
+          if ! git diff --exit-code --stat -- templ/; then
+            echo "::error::generated templ artifacts are stale. Run 'templ generate' and commit the result."
+            git diff --stat -- templ/
+            exit 1
+          fi
+          echo "templ artifacts match their sources"
 
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
 
-      - name: Build Go packages
-        run: go build ./...
-
-      - name: Run go vet
-        run: go vet ./...
-
-      - name: Build server binary
-        run: go build -o verse ./cmd/server
-
-      - name: Install PostgreSQL client
+      - name: Verify CI Go version matches go.mod
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          # CI deliberately floats the Go patch release, so it is the minor that must agree with
+          # go.mod. Without this, bumping the module to a new minor would leave CI building it with
+          # the previous line.
+          ci_go=$(grep -oE "go-version: '[0-9]+\.[0-9]+\.x'" .github/workflows/ci.yml \
+            | head -1 | grep -oE '[0-9]+\.[0-9]+')
+          mod_go=$(awk '/^go /{print $2}' go.mod | cut -d. -f1,2)
+          if [ -z "$ci_go" ] || [ -z "$mod_go" ]; then
+            echo "::error::could not determine the Go version from both files"; exit 1
+          fi
+          if [ "$ci_go" != "$mod_go" ]; then
+            echo "::error::CI builds with Go $ci_go but go.mod requires $mod_go"
+            exit 1
+          fi
+          echo "CI Go $ci_go.x matches go.mod $mod_go"
 
-      - name: Wait for Postgres
+      # Linters are installed before anything uses them. An earlier revision ran `golangci-lint
+      # config verify` as its own step ahead of the action that installed the binary, which failed
+      # with exit 127 on every run. Installing explicitly makes the ordering a property of the file
+      # rather than of which step happens to come first, and drops a third-party action.
+      - name: Install linters
         run: |
-          for i in $(seq 1 20); do
-            if pg_isready -h localhost -U verse; then
-              echo "Postgres is ready"
-              exit 0
-            fi
-            echo "waiting for postgres... ($i/20)"
-            sleep 1
-          done
-          echo "Postgres did not become ready"
-          exit 1
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+          go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
+
+      - name: Verify lint configuration
+        # A lint config that does not validate is worse than none: the run aborts, or silently
+        # falls back to defaults. Verified before it is relied on.
+        run: golangci-lint config verify
+
+      - name: Check formatting
+        # `golangci-lint fmt --diff` prints a diff and rewrites nothing, but it also exits non-zero
+        # when it finds one, so the exit status is deliberately not the signal here: the output is.
+        # The `|| true` is required because GitHub runs steps under `bash -e`, where a failing
+        # command substitution in an assignment would abort the step before the diff could be
+        # printed.
+        #
+        # Note that `golangci-lint run` does not enforce the formatters section, so this gate is
+        # load-bearing and must not be dropped in favour of relying on the linter.
+        run: |
+          out="$(golangci-lint fmt --diff 2>&1 || true)"
+          if [ -n "$out" ]; then
+            echo "$out"
+            echo "::error::formatting required; run 'golangci-lint fmt' and commit the result"
+            exit 1
+          fi
+          echo "formatting clean"
+
+      - name: Lint
+        # Includes govet, errcheck, ineffassign, staticcheck and unused via default:standard, so
+        # there is deliberately no separate `go vet` step.
+        run: golangci-lint run ./...
+
+      - name: Static analysis
+        # golangci-lint's staticcheck is per-package. The standalone binary is whole-program and
+        # additionally catches unused identifiers across package boundaries, which is how two
+        # genuinely dead symbols were found in this repository.
+        run: staticcheck ./cmd/... ./internal/... ./templ/... ./tests/...
+
+      - name: Build
+        run: go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
 
       - name: Run migrations
-        run: |
-          psql "$DATABASE_URL" -f migrations/001_create_poems.sql
+        run: go run ./cmd/migrate
 
-      - name: Start server (background)
-        run: |
-          nohup ./verse > server.log 2>&1 &
-          echo $! > server.pid
+      - name: Run tests
+        # -p 1: the test packages truncate a shared table, so running them concurrently against one
+        # database races. This is a symptom of boot-time DDL plus an unguarded TRUNCATE, both of
+        # which are addressed in v0.3.8. Until then, serialise.
+        #
+        # VERSE_E2E_DATABASE_URL makes the database-backed tests execute instead of skipping. The
+        # previous configuration ran no tests at all; 23 of 38 silently skipped.
+        run: go test ./... -count=1 -p 1 -race
+        env:
+          VERSE_E2E_DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
 
-      - name: Wait for server
+      - name: Vulnerability scan
+        # Pinned rather than @latest, so a new advisory database cannot change the result of a run
+        # without a deliberate commit.
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  container:
+    name: Container
+    runs-on: ubuntu-latest
+    needs: verify
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: verse
+          POSTGRES_PASSWORD: verse
+          POSTGRES_DB: verse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U verse"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          # Floating patch, for the same reason as the verify job. See the note there.
+          go-version: '1.26.x'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.5'
+
+      - name: Install Bun dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify Dockerfile Go version matches go.mod
         run: |
-          set -euo pipefail
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8080/ >/dev/null 2>&1; then
-              echo "server is up"
-              exit 0
+          # The Dockerfile previously pinned golang:1.25-alpine against `go 1.26.0` in go.mod and was
+          # built by nothing, so the drift was invisible. Fail loudly instead.
+          want=$(awk '/^go /{print $2}' go.mod | cut -d. -f1,2)
+          got=$(grep -oE '^FROM golang:[0-9]+\.[0-9]+' Dockerfile | head -1 | cut -d: -f2)
+          if [ -z "$got" ]; then
+            echo "::error::no golang base image found in Dockerfile"; exit 1
+          fi
+          if [ "$want" != "$got" ]; then
+            echo "::error::Dockerfile uses golang:$got but go.mod requires $want"
+            exit 1
+          fi
+          echo "Dockerfile golang:$got matches go.mod $want"
+
+      - name: Verify Dockerfile Bun version matches CI
+        run: |
+          # The Dockerfile floated oven/bun:1-alpine (1.4.2) while CI pinned 1.3.5, so the two build
+          # paths used different package managers. They must agree.
+          docker_bun=$(grep -oE '^FROM oven/bun:[0-9.]+' Dockerfile | head -1 | cut -d: -f2)
+          ci_bun=$(grep -oE "bun-version: '[0-9.]+'" .github/workflows/ci.yml | head -1 | grep -oE '[0-9.]+')
+          if [ -z "$docker_bun" ] || [ -z "$ci_bun" ]; then
+            echo "::error::could not determine the Bun version from both files"; exit 1
+          fi
+          if [ "$docker_bun" != "$ci_bun" ]; then
+            echo "::error::Dockerfile uses oven/bun:$docker_bun but CI pins $ci_bun"
+            exit 1
+          fi
+          echo "Dockerfile oven/bun:$docker_bun matches CI $ci_bun"
+
+      - name: Build container image
+        # The Dockerfile is a second, independently reproducible build path. It is only worth
+        # keeping if it is actually built.
+        run: docker build -t verse:ci .
+
+      - name: Smoke test the image
+        # --network host puts the container in the runner's network namespace, which is what makes
+        # this work: a plain `docker run` joins the default bridge and can neither reach the job's
+        # postgres service by name nor be reached by `curl localhost:8080`. An earlier revision had
+        # no DATABASE_URL and no published port, so the container exited during boot and this step
+        # could never have passed.
+        run: |
+          set -uo pipefail
+
+          docker run -d --name verse-ci --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e PORT=8080 \
+            -e VERSE_AUTHORIZATION=ci-passphrase \
+            -e VERSE_AUTH_SECRET=ci-auth-secret-0123456789abcdef-0123 \
+            verse:ci
+
+          cleanup() { docker rm -f verse-ci >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+              echo "container healthy after ${i}s"
+              break
             fi
-            echo "waiting for server... ($i/30)"
+            if ! docker inspect -f '{{.State.Running}}' verse-ci 2>/dev/null | grep -q true; then
+              echo "::error::container exited before becoming healthy"
+              docker logs verse-ci || true
+              exit 1
+            fi
             sleep 1
           done
-          echo "server did not start within timeout; dumping server.log"
-          if [ -f server.log ]; then
-            echo "---- server.log (last 200 lines) ----"
-            tail -n 200 server.log || true
-            echo "-------------------------------------"
-          else
-            echo "server.log not found"
+
+          if ! curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+            echo "::error::container did not become healthy within 45s"
+            docker logs verse-ci || true
+            exit 1
           fi
-          curl -v http://localhost:8080/ || true
-          exit 1
 
-      - name: Smoke test GET /
-        run: curl -fsS http://localhost:8080/
+          # The authoring surface must not be reachable without a session.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/library)
+          if [ "$code" != "303" ] && [ "$code" != "401" ]; then
+            echo "::error::/library returned $code for an unauthenticated request; expected 303 or 401"
+            docker logs verse-ci || true
+            exit 1
+          fi
+          echo "unauthenticated /library correctly rejected with $code"
 
-      - name: Smoke test POST /poem
-        run: |
-          curl -fsS -X POST -d "content=ci-test" http://localhost:8080/poem | grep -q "Bloom recorded."
-
-      - name: Verify DB insert
-        run: |
-          psql -At -d "$DATABASE_URL" -c "SELECT count(*) FROM poems;" | tr -d ' ' | grep -q '^1$'
-
-      - name: Stop server
-        if: always()
-        run: |
-          kill $(cat server.pid) || true
+          # The application must refuse to start without its authentication configuration.
+          echo "--- verifying fail-closed startup ---"
+          if docker run --rm --network host \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e PORT=8081 \
+            verse:ci >/tmp/verse-noauth.log 2>&1; then
+            echo "::error::the image started without VERSE_AUTHORIZATION and VERSE_AUTH_SECRET"
+            exit 1
+          fi
+          grep -q "refusing to start: authentication is not configured" /tmp/verse-noauth.log \
+            || { echo "::error::expected a fail-closed startup message"; cat /tmp/verse-noauth.log; exit 1; }
+          echo "image refuses to start without authentication configuration"
