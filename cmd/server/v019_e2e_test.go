@@ -12,7 +12,55 @@ import (
 	"testing"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/testsupport"
 )
+
+// requireDisposableDSN points the application at a verified-disposable test database, or skips.
+//
+// The gate itself lives in internal/testsupport so this package and the tests package cannot drift
+// apart. Only the DATABASE_URL swap is local: the end-to-end scenarios drive the real application
+// startup path, which reads DATABASE_URL. The swap is reverted by t.Cleanup, including unsetting the
+// variable when it was not set to begin with, so a scenario never leaves the process pointed at a
+// test database.
+func requireDisposableDSN(t *testing.T) {
+	t.Helper()
+
+	dsn, reason := testsupport.DisposableDSN()
+	if reason != "" {
+		t.Skip(reason)
+	}
+
+	prev, had := os.LookupEnv("DATABASE_URL")
+	if err := os.Setenv("DATABASE_URL", dsn); err != nil {
+		t.Fatalf("set DATABASE_URL: %v", err)
+	}
+	t.Cleanup(func() {
+		if had {
+			_ = os.Setenv("DATABASE_URL", prev)
+			return
+		}
+		_ = os.Unsetenv("DATABASE_URL")
+	})
+}
+
+// truncateE2EPoems empties the poems table for a scenario.
+//
+// Like its counterpart in the tests package, the gate is re-checked here rather than trusted from
+// the caller, so the point of destruction is the point of enforcement.
+func truncateE2EPoems(t *testing.T) {
+	t.Helper()
+
+	if _, reason := testsupport.DisposableDSN(); reason != "" {
+		t.Skip(reason)
+	}
+
+	if database.Pool == nil {
+		t.Fatalf("database pool is nil")
+	}
+	if _, err := database.Pool.Exec(context.Background(), `TRUNCATE TABLE poems`); err != nil {
+		t.Fatalf("truncate poems: %v", err)
+	}
+}
 
 // e2eAuth performs the real login flow and installs a cookie-carrying client as e2eClient.
 // Authentication is not stubbed: this suite exists to exercise the router, and the router's
@@ -118,18 +166,7 @@ func newE2EServer(t *testing.T) *httptest.Server {
 }
 
 func TestV019LibraryFlowE2E(t *testing.T) {
-	dsn := strings.TrimSpace(os.Getenv("VERSE_E2E_DATABASE_URL"))
-	if dsn == "" {
-		t.Skip("set VERSE_E2E_DATABASE_URL to run v0.1.9 end-to-end tests")
-	}
-
-	prev := os.Getenv("DATABASE_URL")
-	if err := os.Setenv("DATABASE_URL", dsn); err != nil {
-		t.Fatalf("set DATABASE_URL: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Setenv("DATABASE_URL", prev)
-	})
+	requireDisposableDSN(t)
 
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
@@ -145,9 +182,7 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	if _, err := database.Pool.Exec(ctx, `TRUNCATE TABLE poems`); err != nil {
-		t.Fatalf("truncate poems: %v", err)
-	}
+	truncateE2EPoems(t)
 
 	srv := newE2EServer(t)
 
@@ -241,18 +276,7 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 }
 
 func TestV019RouteMapExists(t *testing.T) {
-	dsn := strings.TrimSpace(os.Getenv("VERSE_E2E_DATABASE_URL"))
-	if dsn == "" {
-		t.Skip("set VERSE_E2E_DATABASE_URL to run route map test")
-	}
-
-	prev := os.Getenv("DATABASE_URL")
-	if err := os.Setenv("DATABASE_URL", dsn); err != nil {
-		t.Fatalf("set DATABASE_URL: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Setenv("DATABASE_URL", prev)
-	})
+	requireDisposableDSN(t)
 
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
@@ -279,18 +303,7 @@ func TestV019RouteMapExists(t *testing.T) {
 }
 
 func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
-	dsn := strings.TrimSpace(os.Getenv("VERSE_E2E_DATABASE_URL"))
-	if dsn == "" {
-		t.Skip("set VERSE_E2E_DATABASE_URL to run spatial navigation e2e test")
-	}
-
-	prev := os.Getenv("DATABASE_URL")
-	if err := os.Setenv("DATABASE_URL", dsn); err != nil {
-		t.Fatalf("set DATABASE_URL: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Setenv("DATABASE_URL", prev)
-	})
+	requireDisposableDSN(t)
 
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
@@ -306,9 +319,7 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	if _, err := database.Pool.Exec(ctx, `TRUNCATE TABLE poems`); err != nil {
-		t.Fatalf("truncate poems: %v", err)
-	}
+	truncateE2EPoems(t)
 
 	srv := newE2EServer(t)
 

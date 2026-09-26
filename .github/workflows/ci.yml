@@ -179,19 +179,57 @@ jobs:
       - name: Build
         run: go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
 
+      - name: Create the disposable test database
+        # The truncating tests must target a database whose name marks it disposable, so they can
+        # never share the one the application and the migration step use. One container, two
+        # databases: `verse` keeps the production shape that DATABASE_URL and the Container job
+        # expect, and `verse_test` is the only writable target.
+        #
+        # Idempotent, so running it against an existing container is harmless.
+        run: |
+          psql "postgres://verse:verse@localhost:5432/postgres" \
+            -tAc "SELECT 1 FROM pg_database WHERE datname='verse_test'" | grep -q 1 \
+            || psql "postgres://verse:verse@localhost:5432/postgres" -c 'CREATE DATABASE verse_test'
+          psql "postgres://verse:verse@localhost:5432/verse_test" -tAc 'SELECT current_database()'
+
       - name: Run migrations
         run: go run ./cmd/migrate
 
       - name: Run tests
-        # -p 1: the test packages truncate a shared table, so running them concurrently against one
-        # database races. This is a symptom of boot-time DDL plus an unguarded TRUNCATE, both of
-        # which are addressed in v0.3.8. Until then, serialise.
+        # -p 1 is still required, and v0.3.8 did not remove the need for it. That release gated the
+        # TRUNCATE behind two explicit opt-ins, but it did not give each package its own table or
+        # its own database, so the packages still race on the shared poems table. Serialize until
+        # they no longer need to.
         #
-        # VERSE_E2E_DATABASE_URL makes the database-backed tests execute instead of skipping. The
-        # previous configuration ran no tests at all; 23 of 38 silently skipped.
-        run: go test ./... -count=1 -p 1 -race
+        # Both destructive-test gates are set on purpose. Without them the database-backed tests
+        # skip, and a skip is indistinguishable from a pass in the exit status, so the step below
+        # asserts that nothing skipped.
+        #
+        # `set -o pipefail` is load-bearing: the runner's default shell does not enable it, so
+        # piping into tee would otherwise discard go test's exit status and report a green job for
+        # a failing suite.
+        run: |
+          set -o pipefail
+          go test ./... -count=1 -p 1 -race -v 2>&1 | tee /tmp/verse-tests.log
         env:
-          VERSE_E2E_DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
+          VERSE_E2E_DATABASE_URL: postgres://verse:verse@localhost:5432/verse_test?sslmode=disable
+          VERSE_E2E_ALLOW_DESTRUCTIVE: '1'
+
+      - name: Assert the database-backed tests actually ran
+        # A skipped test and a passed test both leave the exit status at zero. If the gate stopped
+        # being satisfied -- a renamed variable, a typo in the consent value, a missing step --
+        # this job would quietly shrink to a fraction of its coverage and still report green.
+        #
+        # With both gates open the suite is 118 passing and 0 skipped, so expecting zero skips is
+        # exact rather than approximate. If a future test ever needs a genuine skip, this assertion
+        # is the thing that must be updated deliberately, which is the intent.
+        run: |
+          if grep -qE '^(---|[[:space:]]+---) SKIP' /tmp/verse-tests.log; then
+            echo "::error::tests skipped, so the destructive-test gate is not satisfied in CI and coverage was silently reduced"
+            grep -E '^(---|[[:space:]]+---) SKIP' /tmp/verse-tests.log
+            exit 1
+          fi
+          echo "no skips; the database-backed tests executed"
 
       - name: Vulnerability scan
         # Pinned rather than @latest, so a new advisory database cannot change the result of a run

@@ -118,23 +118,44 @@ Migrations live in `migrations/` and run in filename order.
 
 ## Tests
 
+The database-backed tests `TRUNCATE TABLE poems`, so they are gated on two things being set
+explicitly. Both must be present or the tests **skip** — deliberately, so that a contributor with no
+test database still gets a passing `go test ./...`.
+
 ```bash
-# With a database available, all tests execute:
-export VERSE_E2E_DATABASE_URL="postgres://verse:verse@localhost:5432/verse?sslmode=disable"
+# A dedicated, disposable database. Not the one the application uses.
+createdb verse_test
+
+# Gate 1: which database. Not interchangeable with DATABASE_URL — see below.
+export VERSE_E2E_DATABASE_URL="postgres://verse:verse@localhost:5432/verse_test?sslmode=disable"
+
+# Gate 2: explicit acknowledgement that these tests delete rows.
+export VERSE_E2E_ALLOW_DESTRUCTIVE=1
+
 go test ./... -count=1 -p 1
 ```
 
-Two things to know:
+Three things to know:
 
-- **Tests skip without a DSN.** Without `VERSE_E2E_DATABASE_URL` (or `DATABASE_URL`) the
-  database-backed tests skip silently and a green run proves very little. Always set it.
-- **`-p 1` is required.** Test packages truncate a shared table, so running them concurrently
-  against one database races and produces spurious failures. This is a symptom of boot-time schema
-  creation plus an unguarded `TRUNCATE`, both of which are being removed. Serialise until then.
+- **`DATABASE_URL` is not accepted as a fallback, on purpose.** It is the variable the application
+  itself boots from, and the local-development steps above tell you to export it. Accepting it here
+  meant that a developer who followed those steps and then ran `go test ./...` would empty whatever
+  their shell was pointed at. The gate reads only `VERSE_E2E_DATABASE_URL`.
+- **The target database name must contain `test`.** This is the backstop that catches a stale
+  consent export: a production database is not called `verse_test`, so a misconfigured DSN fails
+  loudly. It is a weaker check than the dedicated variable, not a replacement for it.
+- **`-p 1` is still required.** The packages still truncate a shared table, so running them
+  concurrently against one database races. v0.3.8 gated the `TRUNCATE` but did not give each
+  package its own table or database, so this remains until that is done.
 
-> **Warning.** The test suite issues `TRUNCATE TABLE poems` and will destroy real content. Point it
-> at a disposable database only. Guarding against a non-loopback host is planned for the next
-> release; until then, check `DATABASE_URL` before running tests.
+The gate lives in `internal/testsupport` and is shared by both test packages, so `cmd/server` and
+`tests` cannot drift apart. `git grep TRUNCATE` returns exactly two executable lines, and both sit
+inside a helper that re-checks the gate at the moment of destruction rather than trusting the
+caller.
+
+CI sets both variables and additionally asserts that **no** test skipped. A skip leaves the exit
+status at zero, so without that assertion a misconfigured gate would quietly reduce the job to a
+fraction of its coverage and still report green.
 
 Tests authenticate through the real `/login` flow against a TLS test server. Nothing is stubbed, so
 a green run means the authentication path works.
