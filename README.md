@@ -248,22 +248,40 @@ Focus:
 
 # 🚀 Running Locally
 
-```bash id="xq21vd"
-# Install dependencies
-go mod tidy
+```bash
+# 1. Start a database
+podman compose up -d
 
-# Run migrations
-go run cmd/migrate/main.go
+# 2. Dependencies and stylesheet
+bun install --frozen-lockfile
+bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
 
-# Start server
-go run cmd/server/main.go
+# 3. Configuration — all three are required
+export DATABASE_URL="postgres://verse:verse@localhost:5432/verse?sslmode=disable"
+export VERSE_AUTHORIZATION="choose-a-passphrase"
+export VERSE_AUTH_SECRET="at-least-32-characters-of-entropy"
+
+# 4. Create the schema
+go run ./cmd/migrate
+
+# 5. Run
+go run ./cmd/server
 ```
 
-Tailwind (watch mode):
+Open <http://localhost:8080> and enter your passphrase.
+
+`VERSE_AUTHORIZATION` and `VERSE_AUTH_SECRET` are mandatory: the server refuses to start without
+them, by design. There is no way to disable authentication.
+
+**Verse does not read a `.env` file.** Every variable must be exported into the process
+environment. Tailwind watch mode:
 
 ```bash id="t3w67k"
-bunx tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch
+bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch
 ```
+
+Full operational reference — environment variables, migrations, tests, deployment, and
+troubleshooting — is in [`docs/RUNNING.md`](docs/RUNNING.md).
 
 ---
 

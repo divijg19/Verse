@@ -1,0 +1,111 @@
+# golangci-lint configuration for Verse.
+#
+# Verse holds a single author's irreplaceable writing behind one HTTP service, so this gate is
+# treated as a correctness gate rather than a style gate. The linter set is chosen for what it can
+# catch in a small Go web service: unchecked errors, standard-library misuse, dead code, and
+# security-relevant patterns.
+#
+# Run: golangci-lint run ./...
+#
+# staticcheck also runs standalone in CI. golangci-lint includes the SA* checks, but the standalone
+# binary performs whole-program analysis and additionally catches unused identifiers across package
+# boundaries, which is how two genuinely dead symbols were found here.
+
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+
+  enable:
+    # Added on top of default:standard, which already contributes errcheck, govet, ineffassign,
+    # staticcheck, and unused. Those five are deliberately absent below: re-listing them made the
+    # config look like it controlled them while changing nothing.
+
+    # Correctness.
+    - bodyclose     # HTTP response bodies never closed
+    - noctx         # http requests issued without a context
+    - errorlint     # == on errors instead of errors.Is, and %w misuse
+    - copyloopvar   # loop variables captured by reference
+    - unconvert     # redundant type conversions
+    - misspell      # spelling in identifiers, comments, and strings
+    - durationcheck # suspicious time.Duration multiplication
+    - makezero      # slice created with non-zero length and then appended to
+
+    # Security. Justified specifically because the service is internet-reachable and holds private
+    # work. Findings are triaged individually rather than blanket-suppressed.
+    - gosec
+
+    # Explicitly not enabled, and why:
+    #   revive, stylecheck    - generate churn on templ's emitted naming; would train a reader to
+    #                          ignore the gate
+    #   gocyclo, funlen, dupl - threshold gates with no signal at this codebase size
+    #   wsl, nlreturn, godot   - whitespace and comment-placement preferences
+    #   err113                - wrapping every sentinel error is noise for a single-author service
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    misspell:
+      # US English. An earlier UK setting produced 14 findings against a codebase that is
+      # consistently US-spelled, which is exactly the noise that teaches a reader to ignore a gate.
+      locale: US
+      # Project vocabulary a spell checker would otherwise flag. In v2 the schema expects
+      # typo/correction pairs rather than bare words.
+      extra-words:
+        - typo: templ
+          correction: templ
+        - typo: htmx
+          correction: htmx
+        - typo: pgx
+          correction: pgx
+
+    staticcheck:
+      checks:
+        - all
+        # Documentation-only style checks. The templ-generated package and its neighbours cannot all
+        # satisfy these without churning correct code.
+        - -ST1000 # package comment
+        - -ST1003 # naming
+        - -ST1020 # comment on exported function
+        - -ST1021 # comment on exported type
+        - -ST1022 # comment on exported var
+        - -ST1005 # error strings should not be capitalised
+        # QF* quickfix suggestions stay on: QF1002 flagged a real readability problem.
+
+    gosec:
+      # G104 duplicates errcheck and is noisier. errcheck is authoritative for unchecked errors.
+      excludes:
+        - G104
+
+  exclusions:
+    generated: lax
+
+    paths:
+      # tools/ is gitignored developer scratch rather than repository code. Findings in it could
+      # never be fixed by a contributor because the files are not tracked.
+      - tools
+      # Generated templ output. Its correctness is enforced far more strongly by the
+      # committed-source drift gate in CI (templ generate && git diff --exit-code templ/) plus the
+      # rendering tests, which assert on actual output.
+      - templ/.*_templ\.go
+
+    rules:
+      # Test files. Response-body hygiene is not an assertion concern, and the suite deliberately
+      # exercises real HTTP flows against a TLS listener. Production code still checks every error.
+      - path: _test\.go$
+        linters:
+          - errcheck
+          # G101 fires on any identifier containing "passphrase", "secret", or "credential".
+          # The suite defines fixed test-only constants, which are not secrets.
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -153,7 +154,7 @@ func loadDashboardData(ctx context.Context, month time.Time) (dashboardData, err
 func loadLastPoem(ctx context.Context) (*templ.LastPoemSummary, error) {
 	poem, err := services.LatestPoem(ctx)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

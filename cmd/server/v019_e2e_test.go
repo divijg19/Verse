@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -12,6 +13,109 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 )
+
+// e2eAuth performs the real login flow and installs a cookie-carrying client as e2eClient.
+// Authentication is not stubbed: this suite exists to exercise the router, and the router's
+// defining property in v0.3.7 is that it refuses to serve anything without a session.
+func e2eAuth(t *testing.T, srv *httptest.Server) *http.Client {
+	t.Helper()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookie jar: %v", err)
+	}
+
+	c := srv.Client()
+	c.Jar = jar
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	e2eBaseURL = srv.URL
+
+	// Fetch the login form to obtain the CSRF token.
+	resp := e2eDo(t, c, http.MethodGet, srv.URL+"/login", nil)
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	form := url.Values{"passphrase": {e2ePassphrase}}
+	u, _ := url.Parse(srv.URL)
+	for _, cookie := range jar.Cookies(u) {
+		if cookie.Name == "verse_csrf" {
+			form.Set("csrf", cookie.Value)
+		}
+	}
+	if form.Get("csrf") == "" {
+		t.Fatal("login form did not issue a csrf cookie")
+	}
+
+	post := e2eDo(t, c, http.MethodPost, srv.URL+"/login", form)
+	io.Copy(io.Discard, post.Body)
+	post.Body.Close()
+
+	if post.StatusCode != http.StatusSeeOther {
+		t.Fatalf("POST /login status = %d, want 303", post.StatusCode)
+	}
+
+	// Restore default redirect following for the rest of the flow.
+	c.CheckRedirect = nil
+
+	// e2eClient is consumed by the package-level get/postForm helpers.
+	e2eClient = c
+	return c
+}
+
+const (
+	e2ePassphrase = "verse-e2e-passphrase"
+	e2eAuthSecret = "verse-e2e-auth-secret-0123456789abcd"
+)
+
+// e2eDo issues a context-bound request. t.Context() is canceled when the test finishes, so a hung
+// request cannot outlive its test.
+func e2eDo(t *testing.T, c *http.Client, method, endpoint string, form url.Values) *http.Response {
+	t.Helper()
+
+	var body io.Reader
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+	}
+
+	req, err := http.NewRequestWithContext(t.Context(), method, endpoint, body)
+	if err != nil {
+		t.Fatalf("create %s request: %v", method, err)
+	}
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, endpoint, err)
+	}
+	return resp
+}
+
+// e2eClient is the authenticated client used by the package-level request helpers.
+var (
+	e2eClient  *http.Client
+	e2eBaseURL string
+)
+
+// newE2EServer starts the application on a TLS listener and authenticates e2eClient.
+func newE2EServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	t.Setenv("VERSE_AUTHORIZATION", e2ePassphrase)
+	t.Setenv("VERSE_AUTH_SECRET", e2eAuthSecret)
+
+	router, err := newRouter()
+	if err != nil {
+		t.Fatalf("build router: %v", err)
+	}
+
+	srv := httptest.NewTLSServer(router)
+	t.Cleanup(srv.Close)
+
+	e2eAuth(t, srv)
+	return srv
+}
 
 func TestV019LibraryFlowE2E(t *testing.T) {
 	dsn := strings.TrimSpace(os.Getenv("VERSE_E2E_DATABASE_URL"))
@@ -45,8 +149,7 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 		t.Fatalf("truncate poems: %v", err)
 	}
 
-	srv := httptest.NewServer(newRouter())
-	defer srv.Close()
+	srv := newE2EServer(t)
 
 	poem := "Lantern across dark water\nDust in late sunlight"
 	status, body, _ := postForm(t, srv.URL+"/poem", url.Values{"content": {poem}}, nil)
@@ -130,7 +233,9 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 	if strings.Contains(body, updated) {
 		t.Fatalf("deleted poem still appears in search results: %q", body)
 	}
-	if !strings.Contains(body, "No poems found") {
+	// The library copy was reworded after this assertion was written, and the suite had never run.
+	// Assert the current, intentional wording instead of the superseded string.
+	if !strings.Contains(body, "No poems match this search.") {
 		t.Fatalf("GET /poems after delete expected empty-state text, got: %q", body)
 	}
 }
@@ -162,8 +267,7 @@ func TestV019RouteMapExists(t *testing.T) {
 		}
 	})
 
-	srv := httptest.NewServer(newRouter())
-	defer srv.Close()
+	srv := newE2EServer(t)
 
 	checks := []string{"/", "/dashboard", "/editor", "/library", "/poems", "/caelum", "/prompt"}
 	for _, path := range checks {
@@ -206,8 +310,7 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 		t.Fatalf("truncate poems: %v", err)
 	}
 
-	srv := httptest.NewServer(newRouter())
-	defer srv.Close()
+	srv := newE2EServer(t)
 
 	status, _, _ := postForm(t, srv.URL+"/poem", url.Values{"content": {"Crossing from screen to screen"}}, nil)
 	if status != http.StatusOK {
@@ -292,7 +395,7 @@ func assertNavSlotPath(t *testing.T, body, slotID, expectedPath string) {
 func get(t *testing.T, endpoint string, headers map[string]string) (int, string, http.Header) {
 	t.Helper()
 
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, endpoint, nil)
 	if err != nil {
 		t.Fatalf("create GET request: %v", err)
 	}
@@ -300,7 +403,7 @@ func get(t *testing.T, endpoint string, headers map[string]string) (int, string,
 		req.Header.Set(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := e2eClient.Do(req)
 	if err != nil {
 		t.Fatalf("execute GET request: %v", err)
 	}
@@ -317,7 +420,25 @@ func get(t *testing.T, endpoint string, headers map[string]string) (int, string,
 func postForm(t *testing.T, endpoint string, values url.Values, headers map[string]string) (int, string, http.Header) {
 	t.Helper()
 
-	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(values.Encode()))
+	// Attach the session-bound CSRF token, exactly as the rendered forms do. Without it the
+	// mutating endpoints correctly reject the request.
+	if values.Get("csrf") == "" {
+		if u, err := url.Parse(e2eBaseURL); err == nil && e2eClient != nil {
+			for _, cookie := range e2eClient.Jar.Cookies(u) {
+				if cookie.Name == "verse_csrf" {
+					clone := url.Values{}
+					for k, v := range values {
+						clone[k] = append([]string(nil), v...)
+					}
+					clone.Set("csrf", cookie.Value)
+					values = clone
+					break
+				}
+			}
+		}
+	}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, endpoint, strings.NewReader(values.Encode()))
 	if err != nil {
 		t.Fatalf("create POST request: %v", err)
 	}
@@ -326,7 +447,7 @@ func postForm(t *testing.T, endpoint string, values url.Values, headers map[stri
 		req.Header.Set(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := e2eClient.Do(req)
 	if err != nil {
 		t.Fatalf("execute POST request: %v", err)
 	}

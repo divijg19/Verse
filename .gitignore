@@ -41,3 +41,20 @@ tools/
 
 # tmp
 tmp/
+
+# Go build and test output
+#
+# `verse` is the binary name used by render.yaml, .github/workflows/ci.yml and the Dockerfile
+# (`-o verse`). It was previously unignored, so a local build showed up in git status.
+/verse
+*.test
+coverage.out
+vendor/
+
+# server runtime
+#
+# Already listed in .dockerignore; named here so a local run does not leave them in the working
+# tree. The pre-v0.3.7 CI wrote both; ad-hoc local runs still do.
+server.log
+server.pid
+*.log

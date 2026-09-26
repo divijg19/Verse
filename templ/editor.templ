@@ -1,14 +1,16 @@
 package templ
 
-templ Editor() {
-	@EditorScreen("Write", "", "")
+import "context"
+
+templ Editor(ctx context.Context) {
+	@EditorScreen(ctx, "Write", "", "")
 }
 
-templ EditorWithPoem(poemID string, content string) {
-	@EditorScreen("Edit", poemID, content)
+templ EditorWithPoem(ctx context.Context, poemID string, content string) {
+	@EditorScreen(ctx, "Edit", poemID, content)
 }
 
-templ EditorScreen(title string, poemID string, content string) {
+templ EditorScreen(ctx context.Context, title string, poemID string, content string) {
 	<div class="verse-editor-screen">
 		<style>
 			.verse-editor-screen {
@@ -33,12 +35,12 @@ templ EditorScreen(title string, poemID string, content string) {
 			{ title }
 		</h1>
 		<div class="verse-surface-body min-h-0 flex-1">
-			@EditorContent(title, poemID, content)
+			@EditorContent(ctx, title, poemID, content)
 		</div>
 	</div>
 }
 
-templ EditorContent(title string, poemID string, content string) {
+templ EditorContent(ctx context.Context, title string, poemID string, content string) {
 	<div data-editor-root class="not-prose flex h-full min-h-0 flex-col">
 		<style>
 				.verse-editor-root-frame {
@@ -404,6 +406,7 @@ templ EditorContent(title string, poemID string, content string) {
 		>
 			@If(poemID != "") {
 				<input type="hidden" name="id" value={ poemID }/>
+			@CSRFField(ctx)
 			}
 			<div class="verse-editor-card">
 				<div class="verse-editor-card-header"></div>
@@ -466,6 +469,7 @@ templ EditorContent(title string, poemID string, content string) {
 					>
 						@If(poemID != "") {
 							<input type="hidden" name="id" value={ poemID }/>
+			@CSRFField(ctx)
 						}
 						<div class="verse-editor-overlay-well">
 							<textarea

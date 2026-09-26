@@ -1,9 +1,10 @@
 package services
 
-import (
-	"math/rand"
-	"time"
-)
+import "math/rand/v2"
+
+// Prompt selection deliberately uses a non-cryptographic source: the value is a creative prompt
+// with no security property, and Caelum gains nothing from unpredictability. gosec's G404 is
+// triaged as not applicable here. Session and CSRF tokens use crypto/rand, where it matters.
 
 // Prompts is a list of conceptual, poetic prompts (non-imperative).
 var Prompts = []string{
@@ -19,14 +20,13 @@ var Prompts = []string{
 	"lanterns across dark water",
 }
 
-func init() {
-	rand.New(rand.NewSource(time.Now().UnixNano()))
-}
-
 // RandomPrompt returns a random prompt from the static pool.
 func RandomPrompt() string {
 	if len(Prompts) == 0 {
 		return ""
 	}
-	return Prompts[rand.Intn(len(Prompts))]
+	// #nosec G404 -- a creative prompt has no security property. Predictability is irrelevant
+	// here, and Caelum gains nothing from unpredictability. Anything that must resist guessing,
+	// namely session nonces and CSRF tokens, uses crypto/rand.
+	return Prompts[rand.IntN(len(Prompts))] // #nosec G404
 }
