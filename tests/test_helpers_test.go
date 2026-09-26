@@ -15,6 +15,7 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 	appserver "github.com/divijg19/Verse/internal/server"
+	"github.com/divijg19/Verse/internal/testsupport"
 	"github.com/google/uuid"
 )
 
@@ -34,15 +35,16 @@ const (
 // the CSRF synchroniser token to mutating requests, mirroring what a browser does after login.
 var authClient *http.Client
 
+// requireTestDSN returns the DSN for database-backed tests, or skips.
+//
+// The gate lives in internal/testsupport so that this package and cmd/server enforce the same rules
+// from one implementation. See DisposableDSN for why both gates are required.
 func requireTestDSN(t *testing.T) string {
 	t.Helper()
 
-	dsn := strings.TrimSpace(os.Getenv("VERSE_E2E_DATABASE_URL"))
-	if dsn == "" {
-		dsn = strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	}
-	if dsn == "" {
-		t.Skip("set VERSE_E2E_DATABASE_URL (or DATABASE_URL) to run database-backed tests")
+	dsn, reason := testsupport.DisposableDSN()
+	if reason != "" {
+		t.Skip(reason)
 	}
 
 	return dsn
@@ -74,8 +76,20 @@ func connectTestDB(t *testing.T) {
 	})
 }
 
+// truncatePoems empties the poems table.
+//
+// This is one of only two places in the repository that may issue a TRUNCATE; the other is
+// truncateE2EPoems in cmd/server. Both re-check the gate rather than trusting the caller, so a test
+// that reaches one through an unusual path still cannot destroy a database that was never opted in.
+// `git grep TRUNCATE` should return exactly two executable lines, and both should sit inside a
+// guard that calls testsupport.DisposableDSN.
 func truncatePoems(t *testing.T) {
 	t.Helper()
+
+	// Re-evaluated per call, not cached: a test that changed the environment mid-run is refused.
+	if _, reason := testsupport.DisposableDSN(); reason != "" {
+		t.Skip(reason)
+	}
 
 	if database.Pool == nil {
 		t.Fatalf("database pool is nil")
