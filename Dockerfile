@@ -23,8 +23,10 @@
 # ── Stage 1: stylesheet ───────────────────────────────────────────────────────────────
 # The Bun version is pinned to the same value CI uses, and CI asserts the two agree. These were
 # previously `oven/bun:1-alpine` here (resolving to 1.4.2) against a pin of 1.3.5 in the workflow,
-# so the two build paths silently used different package managers.
-FROM oven/bun:1.3.5-alpine AS css
+# so the two build paths silently used different package managers. Both are now 1.4.2, and the tag
+# is fully qualified rather than floating on the 1.x line, so this build cannot drift underneath a
+# release when Bun publishes a new minor.
+FROM oven/bun:1.4.2-alpine AS css
 WORKDIR /src
 
 # Manifests first, so the dependency layer is cached independently of source changes.
