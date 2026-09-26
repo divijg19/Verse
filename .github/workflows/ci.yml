@@ -335,6 +335,137 @@ jobs:
         # keeping if it is actually built.
         run: docker build -t verse:ci .
 
+      - name: The image migrates on boot, from a clean database
+        # The production path. There is no pre-deploy hook on this service's Render plan, so the
+        # service applies its own migrations at startup. This step exercises exactly that, against a
+        # database the postgres service has just created and nothing has touched.
+        #
+        # This is the highest-value check in this job, because the version it replaces asserted the
+        # opposite arrangement: that the image refuses to start until something else migrates first.
+        # That arrangement is not available on this plan, so testing it would have been testing a
+        # deployment model this service does not use.
+        run: |
+          set -uo pipefail
+
+          cleanup() { docker rm -f verse-ci >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          start() {
+            docker rm -f verse-ci >/dev/null 2>&1 || true
+            docker run -d --name verse-ci --network host \
+              -e DATABASE_URL="$DATABASE_URL" \
+              -e PORT=8080 \
+              -e VERSE_AUTHORIZATION=ci-passphrase \
+              -e VERSE_AUTH_SECRET=ci-auth-secret-0123456789abcdef-0123 \
+              verse:ci
+          }
+
+          wait_healthy() {
+            for i in $(seq 1 45); do
+              if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+                echo "container healthy after ${i}s"
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::container never became healthy"
+            docker logs verse-ci || true
+            return 1
+          }
+
+          # Matches the service's own log wording. Note there is no "verse:" prefix: the application
+          # uses log.Printf, which does not add one, and only log.Fatalf does. A grep written against
+          # the fatal path's prefix would match nothing and silently report zero applied every time.
+          # "already applied" and "schema is up to date" do not contain this phrase, so a second boot
+          # correctly counts zero.
+          applied_count() {
+            docker logs verse-ci 2>&1 | grep -c 'applied migration ' || true
+          }
+
+          # ---- first boot: nothing is migrated, so the service must do it itself ----
+          start
+          wait_healthy
+
+          if [ "$(applied_count)" -ne 3 ]; then
+            echo "::error::expected the first boot to apply 3 migrations, got $(applied_count)"
+            docker logs verse-ci || true
+            exit 1
+          fi
+
+          # The schema must really be in the database, not merely reported as applied.
+          for table in poems schema_migrations; do
+            if [ "$(psql "$DATABASE_URL" -tAc "SELECT to_regclass('$table') IS NOT NULL")" != "t" ]; then
+              echo "::error::$table does not exist after the service migrated on boot"
+              exit 1
+            fi
+          done
+
+          cleanup
+
+          # ---- second boot: already migrated, so the service must change nothing ----
+          start
+          wait_healthy
+
+          if [ "$(applied_count)" -ne 0 ]; then
+            echo "::error::the second boot applied $(applied_count) migrations, expected none"
+            docker logs verse-ci || true
+            exit 1
+          fi
+          if ! docker logs verse-ci 2>&1 | grep -q "schema is up to date"; then
+            echo "::error::the second boot did not report the schema as up to date"
+            docker logs verse-ci || true
+            exit 1
+          fi
+
+          # Still serving, which is the point of the whole exercise.
+          curl -fsS -o /dev/null -w "GET /health -> %{http_code}\n" http://localhost:8080/health
+          anon=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/library)
+          if [ "$anon" != "303" ]; then
+            echo "::error::anonymous /library returned $anon, want 303"
+            exit 1
+          fi
+          echo "anonymous /library -> 303, as required"
+
+          cleanup
+
+      - name: The standalone migration binary works
+        # Nothing in the deploy path invokes /app/migrate any more, since the service migrates at
+        # startup. It still ships, because it is the operator's way to apply a migration by hand
+        # without deploying:
+        #
+        #   docker run --rm --entrypoint /app/migrate verse:ci
+        #
+        # A binary that nothing exercises is a binary that is quietly broken. This keeps it honest,
+        # and it is also the mechanism the documented upgrade path to a pre-deploy command would use.
+        run: |
+          set -uo pipefail
+
+          # Start from an empty database rather than inheriting whatever the boot-migration step left
+          # behind, so this step verifies that the binary actually migrates and is not merely
+          # reporting a database someone else already prepared.
+          psql "$DATABASE_URL" -qc 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+
+          if ! docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" \
+            --entrypoint /app/migrate verse:ci; then
+            echo "::error::the standalone migration binary failed on an empty database"
+            exit 1
+          fi
+
+          for table in poems schema_migrations; do
+            if [ "$(psql "$DATABASE_URL" -tAc "SELECT to_regclass('$table') IS NOT NULL")" != "t" ]; then
+              echo "::error::$table does not exist after the standalone binary ran"
+              exit 1
+            fi
+          done
+
+          second=$(docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" \
+            --entrypoint /app/migrate verse:ci 2>&1)
+          echo "$second"
+          if ! echo "$second" | grep -q "schema is up to date"; then
+            echo "::error::the standalone migration binary is not idempotent"
+            exit 1
+          fi
+
       - name: Smoke test the image
         # --network host puts the container in the runner's network namespace, which is what makes
         # this work: a plain `docker run` joins the default bridge and can neither reach the job's

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -103,34 +104,36 @@ func Connect() error {
 	return fmt.Errorf("failed to connect to database after %d attempts: %w", attempts, lastErr)
 }
 
-// EnsureSchema creates the minimal schema expected by the app.
-func EnsureSchema(ctx context.Context) error {
+// RequireSchema verifies that the schema the application needs already exists.
+//
+// The application used to create its own schema on boot, with the DDL hardcoded here. That coupled
+// a read-mostly web service to DDL privileges for the whole of its life: the credential it held
+// could drop tables, not just read and write poems. It also meant the schema existed in two places,
+// this file and the migrations directory, with nothing keeping them equal.
+//
+// Schema is now created only by the migration runner, and the application holds no DDL rights. The
+// cost of that separation is that a deploy can arrive before its migrations have run, so this check
+// exists to turn that into a clear message rather than a missing-relation error on the first query.
+//
+// The check is deliberately limited to the one table the application cannot start without. It does
+// not consult schema_migrations: how the schema is versioned is the runner's business, and reading
+// its bookkeeping table would reintroduce exactly the coupling this change removes. A schema that
+// exists but is only partly migrated is therefore not detected here; the runner is responsible for
+// applying migrations completely or failing.
+func RequireSchema(ctx context.Context) error {
 	if Pool == nil {
-		return fmt.Errorf("database not initialized")
+		return errors.New("database not initialized")
 	}
 
-	return ensurePoemsSchema(ctx, Pool)
-}
-
-func ensurePoemsSchema(ctx context.Context, pool *pgxpool.Pool) error {
-	if _, err := pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS poems (
-			id UUID PRIMARY KEY,
-			content TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT now()
-		)`); err != nil {
-		return err
+	var table *string
+	if err := Pool.QueryRow(ctx, `SELECT to_regclass('poems')::text`).Scan(&table); err != nil {
+		return fmt.Errorf("could not check for the poems table: %w", err)
 	}
 
-	if _, err := pool.Exec(ctx, `ALTER TABLE poems ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL`); err != nil {
-		return err
-	}
-
-	if _, err := pool.Exec(ctx, `
-		CREATE INDEX IF NOT EXISTS idx_poems_active_created_at
-		ON poems (created_at DESC)
-		WHERE deleted_at IS NULL`); err != nil {
-		return err
+	if table == nil {
+		return errors.New(
+			"the poems table does not exist, so the database has not been migrated; " +
+				"run the migrations before starting the service: go run ./cmd/migrate")
 	}
 
 	return nil

@@ -17,6 +17,27 @@ services:
       go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
     startCommand: ./verse
     healthCheckPath: /health
+      # There is deliberately no preDeployCommand here, and an earlier draft of this change had one.
+      #
+      # Migrations ought to run as a step between the build and the deploy, so that the service needs
+      # no DDL rights and the schema is never ahead of the code. Render provides that hook only for
+      # "paid web services, private services, and background workers": a pre-deploy command needs a
+      # paid compute plan, not merely a paid workspace. This service runs on a free instance, so the
+      # setting would have been accepted by this blueprint and then silently never run -- which is the
+      # worst possible failure mode for the step that everything else depends on.
+      #
+      # So the service applies its own pending migrations at startup instead. The .sql files are
+      # embedded in the binary, which means the schema and the code that expects it can never come
+      # from different versions, and there is no step that can be forgotten. The cost is that the
+      # runtime credential holds DDL rights for the life of the process, and that every start touches
+      # the database -- cheap, because applied migrations are verified and skipped.
+      #
+      # If this service ever moves to a paid compute plan, the better arrangement becomes available:
+      # build -o migrate ./cmd/migrate in buildCommand, plus preDeployCommand: ./migrate. The startup
+      # migration then becomes a no-op and DDL rights can be dropped from the runtime credential.
+      # Nothing else changes -- the runner, the bookkeeping and the tests are identical either way.
+      # See docs/RUNNING.md.
+
 
     # Fail closed. The application refuses to start without these, by design: serving the authoring
     # surface unauthenticated is never correct. There is no bypass flag. Recovery from a forgotten

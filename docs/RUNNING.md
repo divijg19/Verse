@@ -104,15 +104,99 @@ deliberately conservative and rarely need changing.
 go run ./cmd/migrate      # apply migrations
 ```
 
-Migrations live in `migrations/` and run in filename order.
+**Migrations are applied by the service, at startup.** The application no longer creates its schema
+from DDL hardcoded in Go — the `.sql` files are the only definition of the schema — but it does run
+them itself before serving. You can also run them by hand with the same command, which is
+equivalent and safe to repeat.
 
-> **Current limitation, planned for the next release.** The migration runner has no version
-> bookkeeping: it re-applies every file on every run. This is currently harmless because every
-> statement is written to be idempotent, but a future non-idempotent migration would need the
-> versioned runner first. Additionally, the application currently creates its schema on boot
-> (`internal/database.EnsureSchema`), so it holds database DDL privileges at runtime. Both are being
-> addressed before any schema is changed to a new shape. **Take a backup before running migrations
-> against production.**
+Migrations live in `migrations/`, run in filename order, and are **embedded into the binaries**, so
+the runner needs nothing from disk. A deployed `./migrate` therefore cannot apply SQL from a
+different version of the repository than the code it ships with.
+
+### What the runner guarantees
+
+- **Each file runs in its own transaction, and its bookkeeping row is written in that same
+  transaction.** A migration that fails partway leaves neither partial schema nor a false record of
+  success, and the next run resumes from that file.
+- **Already-applied files are verified and skipped**, not re-applied. Each record stores a SHA-256 of
+  the file.
+- **Editing an applied migration is an error.** The recorded checksum will not match, and the runner
+  stops rather than applying one version of a file to a database that already has another. Write a
+  new migration instead.
+- **Deleting or renaming an applied migration is an error.** Renaming looks exactly like deleting one
+  and adding a new one, and the database has already absorbed the old one.
+- **A file that is blank after trimming is skipped and never recorded.** A file containing only
+  comments is a valid no-op and is recorded like any other migration.
+
+Applied migrations are recorded in `schema_migrations` (`filename`, `checksum`, `applied_at`).
+
+### Migrating an existing database
+
+A database created by an earlier version was built by the service's own boot DDL and has never seen
+`schema_migrations`. Running the migrations against it is expected and safe: every statement is
+written to be idempotent, so each is a no-op that then gets recorded. **The first deploy of this
+version should therefore succeed with no manual step**, and the row that already existed is
+untouched. This is covered by a test rather than assumed.
+
+> **Take a backup before running migrations against production.** The runner is idempotent and will
+> not re-apply anything, but a new migration that has not been reviewed against real data is still a
+> new migration.
+
+### Why migrations run at startup, and not as a deploy step
+
+The right shape is a step between the build and the deploy: the service would need no DDL rights,
+and the schema could never be ahead of the code that expects it.
+
+Render provides that hook only for "paid web services, private services, and background workers". A
+pre-deploy command needs a **paid compute plan**, not merely a paid workspace, and this service runs
+on a free instance. The setting would be accepted by `render.yaml` and then silently never run —
+the worst possible failure mode for the step everything else depends on. An earlier draft of this
+change had exactly that, and it was removed.
+
+So the service applies its own migrations at startup. Two things follow, and they are worth stating
+plainly:
+
+- **The schema can never be ahead of the code.** Both come from the same binary, and the `.sql`
+  files are embedded in it.
+- **The runtime credential holds DDL rights** for the life of the process, and every start touches
+  the database. Applied migrations are verified and skipped, so the touch is a query, not a schema
+  change — but the rights are real, and any credential rotation must preserve them.
+
+### If this service moves to a paid compute plan
+
+The better arrangement becomes available, and nothing else changes — the runner, the bookkeeping and
+the tests are identical:
+
+1. Add `go build -tags netgo -ldflags="-s -w" -o migrate ./cmd/migrate` to `buildCommand`.
+2. Add `preDeployCommand: ./migrate` to `render.yaml`.
+3. Drop DDL rights from the credential the service runs with.
+
+Step 3 is safe only once step 2 is in place. Until then the startup migration still needs them, so
+revoking first would leave the service unable to start. The startup migration becomes a no-op the
+moment the pre-deploy step exists, so there is no window in which both matter.
+
+The container image already ships `/app/migrate` for applying a migration by hand without deploying:
+
+```bash
+docker run --rm -e DATABASE_URL="$DATABASE_URL" --entrypoint /app/migrate verse:ci
+```
+
+### Concurrency
+
+Migrations are serialized across processes by a Postgres advisory lock, so two instances starting at
+once cannot both apply the same file. The applied set is read *after* the lock is taken — reading it
+first would let both processes conclude the same migration was pending. The wait is bounded at 30
+seconds and reports a clear error rather than appearing to hang.
+
+This is insurance rather than a current need: `WEB_CONCURRENCY` is 1 and there is a single instance.
+It matters because a free instance is recycled periodically, so every new process runs the migration
+step, and it would matter immediately on any scale-up.
+
+### Remaining limitation
+
+The public reading site that would use a genuinely read-only publisher credential does not exist
+yet, so there is nothing to grant one to. That is the only reason the DDL rights above are still
+worth removing.
 
 ---
 
@@ -250,6 +334,11 @@ to the live service deliberately and knowingly.
 | `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
 | `database connection failed` | `DATABASE_URL` unset, unreachable, or the database is asleep | Check the variable; managed databases need a moment to resume |
 | `DATABASE_URL environment variable not set` | The variable is not in the process environment | Export it. A `.env` file in the working directory is **not** read |
+| `database migration failed: ... another process has held the migration lock` | Two instances are migrating at once, or one died holding the lock | Usually transient; the wait is bounded at 30s. If it persists, check for an instance stuck in `pg_locks` |
+| `database schema is not ready: the poems table does not exist` | The migration runner reported success but the `poems` table is absent | A real inconsistency between the runner and the application; check `schema_migrations` and the migration files |
+| `migration <file> was modified after it was applied` | An already-applied `.sql` file was edited | Restore the original file, or write a new migration. Do not edit history |
+| `these migrations are recorded as applied but no longer exist` | An applied `.sql` file was deleted or renamed | Restore it. Renaming an applied migration is indistinguishable from deleting it |
+| `apply migration <file>: ...` | The SQL in a migration failed | Nothing was recorded and nothing was left behind; fix the file and re-run |
 | Unstyled page | The stylesheet was not built | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify` |
 | Blank page or missing navigation in the console | The vendored htmx bundle is missing or its checksum changed | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256` |
 | `templ generate` reports `expected operand` | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper | See `templ/helpers.go` and existing templates for the convention |

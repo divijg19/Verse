@@ -1,20 +1,28 @@
+// Command migrate applies the embedded SQL migrations to the database named by DATABASE_URL.
+//
+// This is the only thing that creates schema. The application itself no longer holds DDL rights, so
+// running this is a deploy step rather than a side effect of starting the service.
+//
+// It is safe to run repeatedly: migrations already applied are verified and skipped.
 package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/migrate"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatalf("verse: migration failed: %v", err)
+	}
+}
+
+func run() error {
 	if err := database.Connect(); err != nil {
-		log.Fatalf("database connection failed: %v", err)
+		return err
 	}
 	defer func() {
 		if database.Pool != nil {
@@ -22,46 +30,22 @@ func main() {
 		}
 	}()
 
-	if err := runMigrations(context.Background(), "migrations"); err != nil {
-		log.Fatalf("migration failed: %v", err)
-	}
-}
-
-func runMigrations(ctx context.Context, dir string) error {
-	entries, err := os.ReadDir(dir)
+	result, err := migrate.Run(context.Background(), database.Pool)
 	if err != nil {
-		return fmt.Errorf("read migrations dir: %w", err)
+		return err
 	}
 
-	files := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
-			continue
-		}
-		files = append(files, entry.Name())
-	}
-	sort.Strings(files)
-
-	for _, name := range files {
-		// #nosec G304 -- the path is not attacker-controlled. `dir` is the migrations directory
-		// passed by this command, and `name` came from os.ReadDir of that same directory, so the
-		// value can only ever be a file that already exists inside it. gosec cannot see that
-		// provenance, only that the argument is a variable.
-		path := filepath.Join(dir, name)
-		sqlBytes, err := os.ReadFile(path) // #nosec G304
-		if err != nil {
-			return fmt.Errorf("read migration %s: %w", name, err)
-		}
-
-		sql := strings.TrimSpace(string(sqlBytes))
-		if sql == "" {
-			continue
-		}
-
-		if _, err := database.Pool.Exec(ctx, sql); err != nil {
-			return fmt.Errorf("apply migration %s: %w", name, err)
-		}
+	for _, name := range result.Applied {
 		log.Printf("applied %s", name)
+	}
+	for _, name := range result.Skipped {
+		log.Printf("already applied %s", name)
+	}
+
+	// A migration run that applied nothing is not obviously different from one that was never
+	// attempted, so it is stated explicitly.
+	if len(result.Applied) == 0 {
+		log.Printf("schema is up to date; %d migration(s) already applied", len(result.Skipped))
 	}
 
 	return nil

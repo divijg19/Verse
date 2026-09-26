@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/migrate"
 )
 
 func TestDatabasePoolDefaults(t *testing.T) {
@@ -25,8 +26,8 @@ func TestDatabasePoolDefaults(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect failed: %v", err)
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("database ensure schema failed: %v", err)
+	if _, err := migrate.Run(context.Background(), database.Pool); err != nil {
+		t.Fatalf("database migrate: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {
@@ -47,7 +48,13 @@ func TestDatabasePoolDefaults(t *testing.T) {
 	}
 }
 
-func TestEnsureSchemaCreatesActivePoemTimelineIndex(t *testing.T) {
+// TestMigrationsCreateActivePoemTimelineIndex asserts the index the application relies on exists
+// after migrations.
+//
+// This previously tested EnsureSchema, the DDL the server used to run on boot. It now tests the
+// migration runner, because that is the only thing that creates schema. The assertions are
+// unchanged: the index and its definition are what matter, not which code path made them.
+func TestMigrationsCreateActivePoemTimelineIndex(t *testing.T) {
 	dsn := requireTestDSN(t)
 
 	t.Setenv("DATABASE_URL", dsn)
@@ -60,8 +67,8 @@ func TestEnsureSchemaCreatesActivePoemTimelineIndex(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect failed: %v", err)
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("database ensure schema failed: %v", err)
+	if _, err := migrate.Run(context.Background(), database.Pool); err != nil {
+		t.Fatalf("database migrate: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {

@@ -53,6 +53,15 @@ RUN CGO_ENABLED=0 go build -trimpath \
       -ldflags="-s -w -X main.version=${VERSION}" \
       -o /out/verse ./cmd/server
 
+# The migration runner ships in the same image. Schema is created only by this binary; the service
+# refuses to start without it having been run, so any deploy of this image needs it. Carrying both
+# also makes the image self-contained: the SQL is embedded, so the runner cannot drift from the code
+# it is migrating.
+RUN CGO_ENABLED=0 go build -trimpath \
+      -tags netgo \
+      -ldflags="-s -w -X main.version=${VERSION}" \
+      -o /out/migrate ./cmd/migrate
+
 # ── Stage 3: runtime ───────────────────────────────────────────────────────────────────
 FROM gcr.io/distroless/static-debian12:nonroot
 
@@ -60,6 +69,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 
 COPY --from=build /out/verse /app/verse
+COPY --from=build /out/migrate /app/migrate
 COPY --from=css /src/static /app/static
 
 USER nonroot:nonroot

@@ -10,11 +10,31 @@ import (
 	"syscall"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/migrate"
 )
 
 func main() {
 	if err := run(); err != nil {
 		log.Fatalf("verse: %v", err)
+	}
+}
+
+// logMigrations reports what the startup migration did.
+//
+// Logged rather than kept quiet because a migration that silently applied nothing is
+// indistinguishable from one that was never attempted, and a migration that silently applied three
+// is worth noticing when diagnosing a deploy. These lines are what the CI deploy-order check and a
+// human reading Render's log both look for.
+func logMigrations(result migrate.Result) {
+	for _, name := range result.Applied {
+		log.Printf("applied migration %s", name)
+	}
+	for _, name := range result.Skipped {
+		log.Printf("migration %s already applied", name)
+	}
+
+	if len(result.Applied) == 0 {
+		log.Printf("schema is up to date; %d migration(s) already applied", len(result.Skipped))
 	}
 }
 
@@ -26,8 +46,35 @@ func run() error {
 	if err := database.Connect(); err != nil {
 		return errors.New("database connection failed: " + err.Error())
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		return errors.New("database schema initialization failed: " + err.Error())
+	// Apply any pending migrations before serving.
+	//
+	// The application used to create its own schema on boot from DDL hardcoded in Go, while a
+	// separate migrations directory held an identical, independent copy. Nothing kept them equal, so
+	// editing the obvious one -- a .sql file -- silently did nothing at runtime. The runner is now
+	// the only thing that creates schema, and the .sql files are the only definition of it.
+	//
+	// This runs in-process rather than as a deploy step because the hosting plan has no pre-deploy
+	// hook: that feature is available only for paid web services. Running here means the step cannot
+	// be forgotten, and it means the schema can never be ahead of the code that expects it, because
+	// both come from the same binary.
+	//
+	// The cost is that this credential holds DDL rights for the life of the process. Removing that
+	// requires a deploy step of some kind; see docs/RUNNING.md.
+	//
+	// Migrations are idempotent, so this is a no-op on every start after the first. It does run on
+	// every start, because a free instance is recycled periodically and each new process repeats it.
+	result, err := migrate.Run(context.Background(), database.Pool)
+	if err != nil {
+		return errors.New("database migration failed: " + err.Error())
+	}
+	logMigrations(result)
+
+	// A cheap assertion that the schema the application needs is actually there. Migrations
+	// returning success without producing the table would mean the runner and the application
+	// disagree about what "migrated" means, which is worth catching at boot rather than on the first
+	// query.
+	if err := database.RequireSchema(context.Background()); err != nil {
+		return errors.New("database schema is not ready: " + err.Error())
 	}
 	defer func() {
 		if database.Pool != nil {
