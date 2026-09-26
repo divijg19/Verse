@@ -21,7 +21,7 @@ requires a passphrase to enter. It is not a blog, a social network, or a reader-
 |---|---|---|
 | Go | 1.26.0 or newer | Declared in `go.mod` |
 | templ CLI | v0.3.1020 | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file |
-| Bun | 1.3.5 or newer | Stylesheet build. Matches the version pinned in CI |
+| Bun | 1.4.2 or newer | Stylesheet build. Matches the version pinned in CI and in the `Dockerfile`; CI asserts the two agree |
 | PostgreSQL | 16 or newer | Any instance; Neon is what production uses |
 
 ---
