@@ -9,10 +9,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/divijg19/Verse/internal/database"
 	views "github.com/divijg19/Verse/templ"
 )
 
@@ -96,17 +98,50 @@ func loginPageHandler(cfg *authConfig) http.HandlerFunc {
 // loginSubmitHandler authenticates a submitted passphrase.
 func loginSubmitHandler(cfg *authConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := verifyLoginCSRF(r); err != nil {
+		if rejection := verifyLoginCSRF(r); rejection != loginAccepted {
+			logLoginRejection(r, rejection)
 			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		// The limiter is consulted before the passphrase is compared, so a blocked caller is refused
+		// without the comparison costing anything.
+		//
+		// A limiter that cannot reach the database is logged and ignored rather than allowed to lock
+		// the author out of their own application. Failing closed here would mean the defense becomes
+		// the outage.
+		subject := subjectKey(r, cfg.secret)
+		if until, blocked, err := cfg.limiter.blockedUntil(r.Context(), database.Pool, subject); err != nil {
+			log.Printf("login rate limit unavailable, proceeding without it: %v", err)
+		} else if blocked {
+			retry := retryAfterSeconds(until.Sub(cfg.limiter.now()))
+			log.Printf("login refused: rate limited, retry in %ds", retry)
+			w.Header().Set("Retry-After", strconv.Itoa(retry))
+			http.Error(w, "too many failed attempts", http.StatusTooManyRequests)
 			return
 		}
 
 		if !cfg.checkPassphrase(r.FormValue("passphrase")) {
 			// No distinction between "wrong" and "empty", and no artificial delay: the comparison is
 			// over fixed-length SHA-256 digests, so there is no timing signal to harvest, and a
-			// sleep would only be a denial-of-service vector.
+			// sleep would only be a denial-of-service vector. The cost of guessing is imposed by the
+			// rate limiter instead, which refuses quickly and does not hold the connection.
+			if until, blocked, err := cfg.limiter.recordFailure(r.Context(), database.Pool, subject); err != nil {
+				log.Printf("record login failure: %v", err)
+			} else if blocked {
+				retry := retryAfterSeconds(until.Sub(cfg.limiter.now()))
+				log.Printf("login refused: rate limit reached after a failure, retry in %ds", retry)
+				w.Header().Set("Retry-After", strconv.Itoa(retry))
+				http.Error(w, "too many failed attempts", http.StatusTooManyRequests)
+				return
+			}
 			renderLogin(w, r, "That passphrase was not accepted.", cfg)
 			return
+		}
+
+		// A correct passphrase clears the record, so a later slip is not punished for this one.
+		if err := cfg.limiter.clear(r.Context(), database.Pool, subject); err != nil {
+			log.Printf("clear login failures: %v", err)
 		}
 
 		if cfg.issueSession(w, r) == nil {
@@ -125,22 +160,150 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-// verifyLoginCSRF validates a login submission's token and origin.
-func verifyLoginCSRF(r *http.Request) error {
+// loginRejection names why a login submission was refused.
+//
+// These reasons are for the log, never for the response. The response is a bare 403 in every case,
+// because a client that cannot produce a valid token has no business learning which of its three
+// mistakes it made.
+//
+// The distinction exists because the refusals are not equally meaningful. A cross-origin submission
+// is the attack this defense exists for. A missing cookie on a plain-HTTP request is a deployment
+// fault -- a browser silently refuses to store a Secure cookie without HTTPS -- and looks identical
+// from the outside. Reporting both as "forbidden" made that indistinguishable.
+type loginRejection int
+
+const (
+	loginAccepted loginRejection = iota
+	loginBadOrigin
+	loginNoCookie
+	loginNoTokenField
+	loginTokenMismatch
+)
+
+func (r loginRejection) String() string {
+	switch r {
+	case loginAccepted:
+		return "accepted"
+	case loginBadOrigin:
+		return "cross-origin submission"
+	case loginNoCookie:
+		return "no synchroniser cookie was sent"
+	case loginNoTokenField:
+		return "the form carried no synchroniser field"
+	case loginTokenMismatch:
+		return "the synchroniser cookie did not match the form"
+	default:
+		return "unrecognized reason"
+	}
+}
+
+// verifyLoginCSRF validates a login submission's origin and synchroniser token.
+func verifyLoginCSRF(r *http.Request) loginRejection {
 	if origin := r.Header.Get("Origin"); origin != "" && !sameOrigin(origin, r) {
-		return errBadCSRF
+		return loginBadOrigin
 	}
 
 	cookie, err := r.Cookie(csrfCookieName)
 	if err != nil {
-		return errBadCSRF
+		return loginNoCookie
 	}
 
-	if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.FormValue(csrfFieldName))) != 1 {
-		return errBadCSRF
+	submitted := r.FormValue(csrfFieldName)
+	if submitted == "" {
+		// Kept separate from a mismatch on purpose. An absent field means the form did not render
+		// one -- a template or deployment fault, visible in the log -- whereas a mismatch means a
+		// token was sent and was wrong. Collapsing them hides the first, which is the one that is
+		// ours rather than an attacker's.
+		return loginNoTokenField
 	}
 
-	return nil
+	if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(submitted)) != 1 {
+		return loginTokenMismatch
+	}
+
+	return loginAccepted
+}
+
+// requestScheme reports the scheme the client believes it is using.
+//
+// Render terminates TLS and forwards the original scheme in X-Forwarded-Proto, so r.TLS is nil even
+// on a perfectly good HTTPS deployment. The header is used for reporting only; it never gates
+// anything, so a forged value can mislead a log line and nothing else.
+func requestScheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+
+	proto := r.Header.Get("X-Forwarded-Proto")
+	if proto == "" {
+		return "http"
+	}
+	// X-Forwarded-Proto may be a list, client-first. The leftmost entry is the client's claim; the
+	// first entry is the one every honest hop agrees on.
+	if i := strings.IndexByte(proto, ','); i >= 0 {
+		proto = proto[:i]
+	}
+	return strings.ToLower(strings.TrimSpace(proto))
+}
+
+// logLoginRejection records why a login was refused, without recording anything usable.
+//
+// The scheme is on every line because it is the fact that explains most of them. The specific case
+// called out separately is a plain-HTTP request with no cookie: that is the signature of a browser
+// discarding the Secure cookie, which is a deployment problem and reads as an attack otherwise.
+func logLoginRejection(r *http.Request, rejection loginRejection) {
+	scheme := requestScheme(r)
+
+	if scheme == "http" && rejection == loginNoCookie {
+		log.Printf("login refused: %s; request arrived over plain HTTP, so a browser would have "+
+			"discarded the Secure %s cookie rather than this being an attack", rejection, csrfCookieName)
+		return
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "(none)"
+	}
+	// Both values are attacker-controlled request headers, so both go through sanitizeLogValue,
+	// which strips control characters and truncates. Without that, a client could put a newline in
+	// an Origin header and forge log lines that look like the application's own -- and a log that can
+	// be forged is worse than none, because it gets trusted during exactly the incident where
+	// trusting it is tempting.
+	//
+	// #nosec G706 -- the suppression is for the taint rule only, and the sanitization above is the
+	// actual mitigation. gosec flags the call on the strength of the argument being request-derived
+	// and does not credit sanitizeLogValue for removing the control characters, so the finding
+	// persists with the fix in place. Verified by removing this line: G706 fires either way.
+	log.Printf("login refused: %s; scheme=%s origin=%s", // #nosec G706
+		rejection, sanitizeLogValue(scheme), sanitizeLogValue(origin))
+}
+
+// maxLoggedHeader bounds a logged request header, so a client cannot fill the log with a megabyte
+// of its own choosing in a line that is supposed to be a diagnostic.
+const maxLoggedHeader = 120
+
+// sanitizeLogValue makes a request-derived value safe to write to a log line.
+//
+// Origin and X-Forwarded-Proto are attacker-controlled: a client can put a newline in either and
+// would otherwise be able to forge log entries that look like the application's own. A log that can
+// be forged is worse than no log, because it is trusted during exactly the incident where trusting
+// it is tempting.
+//
+// Control characters are removed rather than escaped so the line stays readable, and the result is
+// truncated so its length cannot be chosen either. Neither affects the comparison the value took
+// part in: this runs on the reporting path only.
+func sanitizeLogValue(s string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
+
+	if len(cleaned) > maxLoggedHeader {
+		cleaned = cleaned[:maxLoggedHeader] + "..."
+	}
+	return cleaned
 }
 
 // renderLogin writes the login page and its CSRF cookie.

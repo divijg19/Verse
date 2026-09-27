@@ -209,6 +209,32 @@ func login(t *testing.T, baseURL string) {
 	}
 }
 
+// csrfFromJarFor returns the synchroniser cookie held by a specific client.
+//
+// The existing csrfFromJar reads the package-global authClient, which is the right thing for tests
+// that share an authenticated session. The login-diagnostic tests deliberately do not use that
+// global, so they need the lookup scoped to the client they are actually making the request with.
+func csrfFromJarFor(t *testing.T, c *http.Client, baseURL string) string {
+	t.Helper()
+
+	if c.Jar == nil {
+		// A client with no cookie store is a valid state, not a programming error. httptest's
+		// Server.Client() returns exactly that, so this is reached in practice.
+		return ""
+	}
+
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("parse base URL: %v", err)
+	}
+	for _, ck := range c.Jar.Cookies(u) {
+		if ck.Name == "verse_csrf" {
+			return ck.Value
+		}
+	}
+	return ""
+}
+
 // csrfFromJar returns the CSRF token the server issued for the current session.
 func csrfFromJar(t *testing.T, baseURL string) string {
 	t.Helper()
@@ -236,6 +262,27 @@ func sessionFromJar(t *testing.T, baseURL string) string {
 	for _, c := range authClient.Jar.Cookies(u) {
 		if c.Name == testSessionCookie {
 			return c.Value
+		}
+	}
+	return ""
+}
+
+// sessionFromJarFor returns the session cookie held by a specific client, for the same reason
+// csrfFromJarFor exists: these tests drive their own client rather than the shared global.
+func sessionFromJarFor(t *testing.T, c *http.Client, baseURL string) string {
+	t.Helper()
+
+	if c.Jar == nil {
+		return ""
+	}
+
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("parse base url: %v", err)
+	}
+	for _, ck := range c.Jar.Cookies(u) {
+		if ck.Name == testSessionCookie {
+			return ck.Value
 		}
 	}
 	return ""

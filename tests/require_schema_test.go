@@ -9,6 +9,7 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/migrate"
+	appserver "github.com/divijg19/Verse/internal/server"
 	"github.com/divijg19/Verse/internal/testsupport"
 )
 
@@ -101,5 +102,77 @@ func closePool(t *testing.T) {
 	if database.Pool != nil {
 		database.Pool.Close()
 		database.Pool = nil
+	}
+}
+
+// TestPassphraseLengthFloorIsEnforced pins the minimum, from both sides.
+//
+// The floor did not exist before v0.4.2, which made the passphrase guarding the entire archive weaker
+// than the HMAC key next to it: the secret needed 32 characters, the passphrase needed one. The
+// boundary is asserted exactly so a future change to the comparison cannot drift unnoticed.
+func TestPassphraseLengthFloorIsEnforced(t *testing.T) {
+	cases := []struct {
+		name       string
+		passphrase string
+		wantErr    bool
+	}{
+		{"empty", "", true},
+		{"one character", "a", true},
+		{"one below the minimum", strings.Repeat("a", 15), true},
+		{"exactly the minimum", strings.Repeat("a", 16), false},
+		{"above the minimum", strings.Repeat("a", 32), false},
+		{"whitespace only", strings.Repeat(" ", 40), true},
+		{"mostly whitespace", strings.Repeat(" ", 20) + "a", true},
+		{"a real passphrase", "correct horse battery staple", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("VERSE_AUTHORIZATION", tc.passphrase)
+			t.Setenv("VERSE_AUTH_SECRET", "0123456789abcdef0123456789abcdef")
+
+			_, err := appserver.NewRouter()
+			if tc.wantErr && err == nil {
+				t.Fatalf("a %d-character passphrase was accepted, minimum is 16", len(tc.passphrase))
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("a %d-character passphrase was rejected: %v", len(tc.passphrase), err)
+			}
+			// The message must name the variable and both minimums, since an operator reading a
+			// crash-looping deploy needs all three facts at once.
+			if tc.wantErr {
+				if !strings.Contains(err.Error(), "VERSE_AUTHORIZATION") {
+					t.Errorf("the error does not name the variable: %v", err)
+				}
+				if !strings.Contains(err.Error(), "at least 16") {
+					t.Errorf("the error does not state the passphrase minimum: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// TestSecretLengthFloorIsStillEnforced guards the boundary that already existed, so adding the
+// passphrase floor did not disturb it.
+func TestSecretLengthFloorIsStillEnforced(t *testing.T) {
+	cases := []struct {
+		secret  string
+		wantErr bool
+	}{
+		{secret: strings.Repeat("s", 31), wantErr: true},
+		{secret: strings.Repeat("s", 32), wantErr: false},
+	}
+
+	for _, tc := range cases {
+		t.Setenv("VERSE_AUTHORIZATION", "a-sufficiently-long-passphrase")
+		t.Setenv("VERSE_AUTH_SECRET", tc.secret)
+
+		_, err := appserver.NewRouter()
+		if tc.wantErr && err == nil {
+			t.Errorf("a %d-character secret was accepted", len(tc.secret))
+		}
+		if !tc.wantErr && err != nil {
+			t.Errorf("a %d-character secret was rejected: %v", len(tc.secret), err)
+		}
 	}
 }

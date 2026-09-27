@@ -97,8 +97,14 @@ linters:
     rules:
       # Test files. Response-body hygiene is not an assertion concern, and the suite deliberately
       # exercises real HTTP flows against a TLS listener. Production code still checks every error.
+      #
+      # bodyclose belongs in the same category. It cannot see that a response returned from a
+      # helper closure is closed by the caller on the next line, so a test that drives a request
+      # through a table of cases is reported for a leak that is not there. Asserting on a body
+      # means reading it, and these tests do.
       - path: _test\.go$
         linters:
+          - bodyclose
           - errcheck
           # G101 fires on any identifier containing "passphrase", "secret", or "credential".
           # The suite defines fixed test-only constants, which are not secrets.
