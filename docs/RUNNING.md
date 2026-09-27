@@ -66,8 +66,15 @@ Then open <http://localhost:8080> and enter your passphrase.
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string. The application will not start without a reachable database |
-| `VERSE_AUTHORIZATION` | The authoring passphrase. Compared against the submitted value in constant time |
+| `VERSE_AUTHORIZATION` | The authoring passphrase, compared against the submitted value in constant time. **Minimum 16 characters** |
 | `VERSE_AUTH_SECRET` | Key used to sign session and CSRF tokens. **Minimum 32 characters.** Treat it as a secret: changing it invalidates every active session |
+
+**Both have a length floor, and the application refuses to start below either.** The passphrase floor
+did not exist before v0.4.2, which made it the weaker of the pair: the key needed 32 characters and
+the passphrase guarding the entire archive needed one. That is backwards. 16 characters is roughly
+what four ordinary words provide, so a memorable passphrase still qualifies. There is no way to
+measure a string's entropy, so this is a floor on length and nothing more — `aaaaaaaaaaaaaaaa`
+passes it.
 
 **The application refuses to start if either `VERSE_` variable is missing or too short.** This is
 deliberate. There is no flag, environment variable, or header that disables authentication.
@@ -191,6 +198,63 @@ seconds and reports a clear error rather than appearing to hang.
 This is insurance rather than a current need: `WEB_CONCURRENCY` is 1 and there is a single instance.
 It matters because a free instance is recycled periodically, so every new process runs the migration
 step, and it would matter immediately on any scale-up.
+
+### Login rate limiting
+
+Wrong passphrases are counted per caller and refused once they add up. Without it, the passphrase is
+a shared secret on an endpoint reachable from the internet with no other barrier.
+
+| | |
+|---|---|
+| Threshold | 5 failures |
+| Window | 15 minutes, after which failures are forgotten |
+| Backoff | 1 minute at the threshold, doubling per further failure, capped at 15 |
+| Response | `429` with `Retry-After`, and a body with no numbers in it |
+| Key | HMAC-SHA256 of the client address, under `VERSE_AUTH_SECRET` |
+
+Four properties worth knowing before changing any of it:
+
+- **It never sleeps.** A delay holds a connection open and is a cheap way to spend the server's
+  capacity, so the backoff lives in the quota and a blocked caller is refused immediately. The
+  passphrase comparison already declines to sleep for the same reason.
+- **It fails open.** If the limiter cannot reach the database, the refusal is logged and the login
+  proceeds. A defence that becomes the outage is worse than no defence. The trade is that an attacker
+  who can make the database slow also degrades the limiter.
+- **A correct passphrase is still refused while the block holds**, and a successful login clears the
+  counter afterwards.
+- **It is keyed on an address, and the address is only believed when a proxy is known to be in
+  front.** `X-Forwarded-For` is attacker-controlled on a directly reachable service, so it is ignored
+  unless Render's `RENDER=true` is present, and then only its rightmost entry is used. A forged
+  header therefore cannot move a caller into someone else's bucket.
+
+**The cost, stated plainly:** anyone who learns your address can lock you out of your own authoring
+room for up to fifteen minutes. That is accepted. The mitigation is the IP allowlist below, which is
+the outer gate; the rate limit is the inner one. If a second proxy is ever placed in front, every
+caller through it shares a bucket — the right-side rule cannot be forged, so the answer is to narrow
+who can reach the service rather than to widen what is trusted.
+
+### When a login is refused
+
+A refused login answers `403` with the body `forbidden`, whatever the reason, because a client that
+cannot produce a valid token has no business learning which of its mistakes it made. The reason goes
+to the log instead, and each one reads differently:
+
+| Log line | Means |
+|---|---|
+| `no synchroniser cookie was sent; request arrived over plain HTTP…` | **A deployment fault, not an attack.** A browser refuses to store a `Secure` cookie on a plain-HTTP page, so the form renders and the submission then cannot be correlated with it. The message says so explicitly |
+| `the form carried no synchroniser field` | The template did not render a token. Ours, not the caller's |
+| `the synchroniser cookie did not match the form` | A token was sent and was wrong |
+| `cross-origin submission` | The attack this defence exists for |
+| `rate limited, retry in Ns` | Too many failures; see above |
+
+That first line exists because its absence cost a debugging session. Before v0.4.2 every one of these
+produced an identical bare `403` and the log said nothing, so a plain-HTTP deploy fault and a
+genuine cross-origin request could not be told apart from the outside.
+
+`Strict-Transport-Security: max-age=31536000` is now sent, so a browser refuses plain HTTP after the
+first visit instead of silently discarding the cookie. It is deliberately not qualified with
+`includeSubDomains` or `preload`: both are commitments about other hostnames, and this service is a
+single host on a platform that serves a wildcard domain.
 
 ### Remaining limitation
 
@@ -360,7 +424,8 @@ to the live service deliberately and knowingly.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
+| `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or either is under its minimum (16 and 32) | Set both in the environment and restart. The message states both minimums |
+| `too many failed attempts` (HTTP 429) | The caller is rate limited; the body is deliberately numberless | Wait for `Retry-After`. If it is you and you have not been guessing, see the rate-limit section above || `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
 | `database connection failed` | `DATABASE_URL` unset, unreachable, or the database is asleep | Check the variable; managed databases need a moment to resume |
 | `DATABASE_URL environment variable not set` | The variable is not in the process environment | Export it. A `.env` file in the working directory is **not** read |
 | `database migration failed: ... another process has held the migration lock` | Two instances are migrating at once, or one died holding the lock | Usually transient; the wait is bounded at 30s. If it persists, check for an instance stuck in `pg_locks` |

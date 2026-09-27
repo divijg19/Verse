@@ -50,14 +50,16 @@ const (
 var (
 	// errNoSession indicates no valid session was presented.
 	errNoSession = errors.New("no valid session")
-	// errBadCSRF indicates a missing or mismatched CSRF token.
-	errBadCSRF = errors.New("invalid csrf token")
 )
 
 // authConfig holds the validated authentication configuration.
 type authConfig struct {
 	authorization []byte // SHA-256 of the passphrase, for constant-time comparison
 	secret        []byte // HMAC key for session and CSRF tokens
+
+	// limiter bounds how often a caller may get the passphrase wrong. Held on the config so a
+	// request does not construct one, and so the zero value of authConfig is never usable.
+	limiter *rateLimiter
 }
 
 // minAuthSecretLen is the shortest VERSE_AUTH_SECRET accepted.
@@ -69,14 +71,29 @@ type authConfig struct {
 // A secret shorter than this is treated exactly like an absent one, and both are reported by name.
 const minAuthSecretLen = 32
 
+// minPassphraseLen is the shortest VERSE_AUTHORIZATION accepted.
+//
+// This floor did not exist until v0.4.2, which made it the weaker of the pair: the HMAC secret
+// needed 32 characters while the passphrase guarding the entire archive needed only one. That is
+// backwards, and it matters more than usual here because the login route has no rate limiting
+// history to rely on and, until this release, no rate limiting at all -- an unthrottled single
+// shared secret is a guessing target rather than a passphrase.
+//
+// 16 characters is roughly what four ordinary words provide, which keeps it honest without forcing
+// a memorable passphrase to look like machine output. There is no way to measure the entropy of a
+// string, so this is a floor on length and nothing more; "aaaaaaaaaaaaaaaa" passes it.
+const minPassphraseLen = 16
+
 // loadAuthConfig reads and validates the authentication environment. It returns an error naming
 // every missing or invalid variable so a misconfigured deploy fails loudly and actionably instead
 // of silently serving an open application.
 func loadAuthConfig() (*authConfig, error) {
 	var missing []string
 
+	// Trimmed before the length check, so a passphrase that is mostly whitespace is judged on what
+	// the user actually has to type, not on the padding around it.
 	authorization := strings.TrimSpace(os.Getenv("VERSE_AUTHORIZATION"))
-	if authorization == "" {
+	if len(authorization) < minPassphraseLen {
 		missing = append(missing, "VERSE_AUTHORIZATION")
 	}
 
@@ -86,9 +103,11 @@ func loadAuthConfig() (*authConfig, error) {
 	}
 
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("refusing to start: authentication is not configured (missing or too short: %s); "+
-			"the authoring application must never be served unauthenticated",
-			strings.Join(missing, ", "))
+		return nil, fmt.Errorf(
+			"refusing to start: authentication is not configured (missing or too short: %s); "+
+				"the authoring application must never be served unauthenticated. "+
+				"VERSE_AUTHORIZATION must be at least %d characters and VERSE_AUTH_SECRET at least %d",
+			strings.Join(missing, ", "), minPassphraseLen, minAuthSecretLen)
 	}
 
 	// Hash the passphrase so the comparison is over fixed-length digests. Comparing raw bytes with
@@ -99,6 +118,7 @@ func loadAuthConfig() (*authConfig, error) {
 	return &authConfig{
 		authorization: authzDigest[:],
 		secret:        secretDigest[:],
+		limiter:       newRateLimiter(),
 	}, nil
 }
 

@@ -61,6 +61,20 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Content-Security-Policy", securityHeaders)
 		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		// HSTS, and the reason it is here rather than merely noted. The session and synchroniser
+		// cookies are both Secure, and a browser silently discards a Secure cookie on a page reached
+		// over plain HTTP. The symptom is a login that renders and then answers 403 with no
+		// explanation, which cost a debugging session before this header was understood to be the
+		// fix rather than the diagnosis.
+		//
+		// HSTS is ignored over plain HTTP by design, so it can only take effect once a request has
+		// already arrived over TLS. It does not prevent the first downgrade; it prevents every one
+		// after that, which is where the repeated failures come from.
+		//
+		// One year, and deliberately without includeSubDomains or the preload directive. Both are
+		// commitments about other hostnames, and this service is a single host on a platform that
+		// serves a wildcard domain; neither belongs to this repository to make.
+		h.Set("Strict-Transport-Security", "max-age=31536000")
 		// The authoring application is private and must never be cached by a shared proxy.
 		h.Set("Cache-Control", "no-store")
 		next.ServeHTTP(w, r)

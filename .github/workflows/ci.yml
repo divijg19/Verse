@@ -370,7 +370,7 @@ jobs:
             docker run -d --name verse-ci --network host \
               -e DATABASE_URL="$DATABASE_URL" \
               -e PORT=8080 \
-              -e VERSE_AUTHORIZATION=ci-passphrase \
+              -e VERSE_AUTHORIZATION=ci-passphrase-for-smoke-tests \
               -e VERSE_AUTH_SECRET=ci-auth-secret-0123456789abcdef-0123 \
               verse:ci
           }
@@ -397,12 +397,38 @@ jobs:
             docker logs verse-ci 2>&1 | grep -c 'applied migration ' || true
           }
 
+          # Container log capture is asynchronous, so a line the process has already written may not
+          # be readable the instant the health check answers. Polling briefly removes a race that
+          # otherwise fails a correct build at random. An earlier version of this step read the log
+          # once and reported "the second boot did not report the schema as up to date" for a
+          # container whose log plainly said so.
+          wait_for_log() {
+            for _ in $(seq 1 20); do
+              if docker logs verse-ci 2>&1 | grep -q "$1"; then
+                return 0
+              fi
+              sleep 0.5
+            done
+            return 1
+          }
+
           # ---- first boot: nothing is migrated, so the service must do it itself ----
           start
           wait_healthy
 
-          if [ "$(applied_count)" -ne 3 ]; then
-            echo "::error::expected the first boot to apply 3 migrations, got $(applied_count)"
+          # Counted from the repository rather than written as a literal. An earlier version of this
+          # check hardcoded 3 and every release that added a migration broke the Container job --
+          # which is a poor reason to fail, and the kind of assertion that gets bumped until nobody
+          # reads it again. Deriving the number also makes the check stronger: it now asserts the
+          # service applied exactly the migration set that shipped, not a number someone remembered.
+          expected=$(ls migrations/*.sql | wc -l)
+          if [ "$expected" -eq 0 ]; then
+            echo "::error::no migrations found in migrations/, the assertion below would be vacuous"
+            exit 1
+          fi
+
+          if [ "$(applied_count)" -ne "$expected" ]; then
+            echo "::error::expected the first boot to apply $expected migrations, got $(applied_count)"
             docker logs verse-ci || true
             exit 1
           fi
@@ -426,9 +452,17 @@ jobs:
             docker logs verse-ci || true
             exit 1
           fi
-          if ! docker logs verse-ci 2>&1 | grep -q "schema is up to date"; then
+          if ! wait_for_log "schema is up to date"; then
             echo "::error::the second boot did not report the schema as up to date"
             docker logs verse-ci || true
+            exit 1
+          fi
+
+          # And the bookkeeping is unchanged, which is the invariant that matters and does not depend
+          # on log capture at all.
+          recorded=$(psql "$DATABASE_URL" -tAc "SELECT count(*) FROM schema_migrations")
+          if [ "$recorded" -ne "$expected" ]; then
+            echo "::error::schema_migrations holds $recorded rows after two boots, want $expected"
             exit 1
           fi
 
@@ -493,7 +527,7 @@ jobs:
           docker run -d --name verse-ci --network host \
             -e DATABASE_URL="$DATABASE_URL" \
             -e PORT=8080 \
-            -e VERSE_AUTHORIZATION=ci-passphrase \
+            -e VERSE_AUTHORIZATION=ci-passphrase-for-smoke-tests \
             -e VERSE_AUTH_SECRET=ci-auth-secret-0123456789abcdef-0123 \
             verse:ci
 
