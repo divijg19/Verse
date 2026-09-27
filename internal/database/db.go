@@ -138,3 +138,20 @@ func RequireSchema(ctx context.Context) error {
 
 	return nil
 }
+
+// Ping reports whether the database is currently reachable.
+//
+// This backs the platform health probe, and it exists because a probe that cannot fail is not a
+// probe. A handler that answers 200 without consulting the database reports a healthy instance while
+// every page behind it is returning errors, so the platform neither restarts nor alerts, and the log
+// shows an unbroken stream of 200s for the whole outage.
+//
+// A nil pool is reported as unreachable rather than dereferenced. /health is registered before the
+// pool is connected during boot, and a probe that panics takes the process down instead of reporting
+// that it is not ready.
+func Ping(ctx context.Context) error {
+	if Pool == nil {
+		return errors.New("database not initialized")
+	}
+	return Pool.Ping(ctx)
+}

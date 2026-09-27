@@ -38,14 +38,19 @@ No algorithmic interference.
 
 ---
 
-## ✨ MVP Features (v0.1)
+## ✨ Features
 
 * Daily poem editor
-* Mood tagging
+* Version history — every superseded draft is retained, and a restore is itself undoable
+* Recycle — soft-deleted work is listed and can be brought back
+* Export — a lossless JSON copy of the whole library, plus a Markdown rendering for reading
 * Streak tracking
 * Calendar archive
 * `Caelum` (random prompt engine)
 * Private-first architecture
+
+There is **no mood tagging**. It was listed here from the first commit and never built; there has
+never been a `mood` column.
 
 ---
 
@@ -197,22 +202,59 @@ verse/
 
 ---
 
-# 🗄 Database Schema (MVP)
+# 🗄 Database Schema
 
-## users
+There is no `users` table, no registration, and no multi-tenancy. Authentication is a single
+passphrase compared against a configured value; the poems belong to whoever holds it. This section
+used to describe a `users` table and a `poems.mood` enum, none of which have ever existed.
 
-* id (uuid)
-* email
-* created_at
+The block below is checked against the live schema by `TestReadmeSchemaMatchesTheDatabase`, so it
+cannot drift again silently. Types are documented by alias (`timestamptz` for
+`timestamp with time zone`); the test compares table and column names, and checks each documented
+type is one the schema actually uses.
 
-## poems
+<!-- documented-schema:begin -->
+```sql
+table poems {
+    id           uuid        -- primary key
+    content      text        -- the work itself, stored verbatim
+    created_at   timestamp   -- nullable: the column has a default but is not declared NOT NULL
+    deleted_at   timestamp   -- nullable: set by a soft delete, NULL while the work is live
+}
 
-* id (uuid)
-* user_id
-* content (text)
-* mood (enum)
-* prompt_used (nullable text)
-* created_at
+table poem_versions {
+    id           uuid        -- primary key
+    poem_id      uuid        -- references poems(id); the work this revision belongs to
+    content      text        -- what the work said immediately before an edit
+    recorded_at  timestamp   -- when that edit happened; human-facing, not used for ordering
+    seq          bigint      -- identity; the history is ordered by this, because recorded_at can tie
+}
+
+table login_attempts {
+    subject        bytea                 -- HMAC of the caller address; never the address itself
+    failures       integer
+    first_failure  timestamptz
+    blocked_until  timestamptz          -- nullable: NULL means not blocked
+}
+
+table schema_migrations {
+    filename   text       -- primary key
+    checksum   text       -- sha256 of the file, so an applied migration cannot be edited
+    applied_at timestamp
+}
+```
+<!-- documented-schema:end -->
+
+Two notes worth reading rather than skimming:
+
+**`poems.created_at` is `timestamp`, not `timestamptz`.** Every other timestamp in the schema is
+`timestamptz`, so this is an inconsistency rather than a decision. Normalising it is a rewrite of
+the `poems` table — the one table holding the work — so it is deliberately not bundled into a
+release that also starts writing to it. Take an export first.
+
+**`poem_versions` has no pruning.** Nothing updates or deletes a row, and there is no purge path.
+Restoring a revision is an ordinary edit, which records what it replaced, so the history is
+append-only and a restore can itself be undone.
 
 ---
 

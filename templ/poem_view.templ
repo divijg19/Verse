@@ -69,6 +69,13 @@ templ PoemViewContent(ctx context.Context, poem PoemView) {
 					class="verse-poem-view-nav"
 				>◀ Library</a>
 				<a
+					href={ "/poem/" + poem.ID + "/history" }
+					hx-get={ "/poem/" + poem.ID + "/history" }
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-poem-view-nav"
+				>History</a>
+				<a
 					href={ "/editor/" + poem.ID }
 					hx-get={ "/editor/" + poem.ID }
 					hx-target="#screen"

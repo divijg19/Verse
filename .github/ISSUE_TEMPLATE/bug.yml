@@ -1,0 +1,48 @@
+name: Bug
+description: Something does not work as documented
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to …
+        2. …
+        3. …
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The tag, or the short SHA from `git rev-parse --short HEAD`.
+      placeholder: v0.4.3
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: >-
+        If this happened in production, the request ID is the most useful thing you can paste.
+        Every response carries X-Request-Id, and it appears in the log line for the request.
+      render: text
+
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data
+      options:
+        - label: This destroyed or overwrote any saved work
+        - label: This is reproducible locally

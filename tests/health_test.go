@@ -8,6 +8,10 @@ import (
 )
 
 func TestHealthEndpoint(t *testing.T) {
+	// connectTestDB, which this never called. /health used to answer 200 without consulting the
+	// database, so the missing fixture was invisible; now that it reports readiness, a nil pool is
+	// correctly reported as 503 and the omission surfaces.
+	connectTestDB(t)
 	srv := newTestServer(t)
 	defer srv.Close()
 
@@ -21,6 +25,7 @@ func TestHealthEndpoint(t *testing.T) {
 }
 
 func TestHealthEndpointHead(t *testing.T) {
+	connectTestDB(t)
 	srv := newTestServer(t)
 	defer srv.Close()
 

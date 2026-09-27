@@ -11,6 +11,25 @@ type PoemView struct {
 	Snippet   string
 }
 
+// PoemVersionView is one superseded revision, as rendered in a poem's history.
+type PoemVersionView struct {
+	ID         string
+	PoemID     string
+	Content    string
+	Title      string
+	RecordedAt time.Time
+}
+
+// PoemHistory is a poem's history screen: the work itself, and what it used to say.
+type PoemHistory struct {
+	PoemID     string
+	Title      string
+	Current    string
+	Versions   []PoemVersionView
+	Restored   string
+	RestoredID string
+}
+
 // HeatmapDay represents a single day in the selected month.
 type HeatmapDay struct {
 	Date   time.Time

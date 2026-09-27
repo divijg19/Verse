@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/handlers"
 )
 
@@ -28,16 +29,44 @@ const securityHeaders = "default-src 'self'; " +
 	"frame-ancestors 'none'; " +
 	"base-uri 'none'"
 
+// healthHandler answers the platform's liveness probe, and reports readiness rather than merely
+// liveness.
+//
+// The distinction is the point. Before this consulted the database it returned 200 unconditionally,
+// so a total Postgres outage left the platform polling a service it could not serve: no restart, no
+// alert, and a log full of reassuring 200s. A probe that cannot fail is worse than no probe, because
+// it is read as evidence.
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+
+	if err := database.Ping(r.Context()); err != nil {
+		// #nosec G706 -- request-derived; sanitized as in refuseRequest. The error is included
+		// because it is the only place the connection failure is recorded.
+		log.Printf("health: database unreachable (request %s): %v", // #nosec G706
+			sanitizeLogValue(requestIDFrom(r)), err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		if r.Method == http.MethodGet {
+			// The reason is logged but not returned. /health is unauthenticated, and a connection
+			// error carries the database host and user, which is reconnaissance for anyone who can
+			// reach the probe.
+			writeHealthBody(w, "unavailable")
+		}
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 
 	if r.Method == http.MethodGet {
-		if _, err := w.Write([]byte("ok")); err != nil {
-			// The platform probe has already received its status line; a short write is not
-			// actionable, but it is still worth recording rather than discarding.
-			log.Printf("health response write: %v", err)
-		}
+		writeHealthBody(w, "ok")
+	}
+}
+
+// writeHealthBody writes the probe's body, recording a short write rather than discarding it.
+func writeHealthBody(w http.ResponseWriter, body string) {
+	if _, err := w.Write([]byte(body)); err != nil {
+		// The platform probe has already received its status line; a short write is not actionable,
+		// but it is still worth recording.
+		log.Printf("health response write: %v", err)
 	}
 }
 
@@ -50,6 +79,31 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 // methodNotAllowedHandler returns a plain response for unsupported methods.
 func methodNotAllowedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+}
+
+// requestIDHeaderMiddleware copies the request's correlation ID onto the response as X-Request-Id.
+//
+// Set before the handler runs, because a header written after the status line has been flushed is
+// silently dropped. An absent ID is left absent rather than replaced with a placeholder: a client
+// that sees a value will quote it, and a fabricated one sends them looking for a request that does
+// not exist.
+func requestIDHeaderMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id := middleware.GetReqID(r.Context()); id != "" {
+			w.Header().Set("X-Request-Id", id)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requestIDFrom returns the request's correlation ID for log lines, or "-" when there is none.
+//
+// Log output is not a response, so a placeholder is safe here where it would not be in a header.
+func requestIDFrom(r *http.Request) string {
+	if id := middleware.GetReqID(r.Context()); id != "" {
+		return id
+	}
+	return "-"
 }
 
 // securityHeadersMiddleware sets hardening headers on every response.
@@ -116,6 +170,11 @@ func NewRouter() (*chi.Mux, error) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
+	// Echoed onto the response so a client can quote it, and so an application log line can be found
+	// in the platform's own request log. middleware.RequestID honors an inbound X-Request-Id, so on
+	// Render this is already the platform's identifier rather than one minted here -- which is the
+	// only reason the two logs can be joined.
+	r.Use(requestIDHeaderMiddleware)
 	// middleware.RealIP is deliberately NOT used. It rewrites r.RemoteAddr to the leftmost
 	// X-Forwarded-For value, or to True-Client-IP / X-Real-IP, without verifying that the request
 	// actually passed through a trusted proxy. chi marks it deprecated for exactly this reason
@@ -165,6 +224,21 @@ func NewRouter() (*chi.Mux, error) {
 		priv.Post("/poem", handlers.SavePoemHandler)
 		priv.Post("/poem/update", handlers.UpdatePoemHandler)
 		priv.Post("/poem/delete", handlers.DeletePoemHandler)
+		// History and restore. The route sits inside the authenticated group like every other
+		// mutation, and the retained versions are as sensitive as the work itself.
+		priv.Get("/poem/{id}/history", handlers.PoemHistoryHandler)
+		priv.Post("/poem/restore", handlers.RestorePoemVersionHandler)
+
+		// The recycle, and undelete. deleted_at was a one-way trip before this: the row survived,
+		// so an accidental deletion was recoverable by hand in SQL and by no other means.
+		priv.Get("/recycle", handlers.PoemTrashHandler)
+
+		// The whole body of work, as a download. Inside the authenticated group: serving this
+		// publicly would publish the entire library, which is the opposite of this service's
+		// purpose. A GET, and safe as one, because it changes nothing.
+		priv.Get("/export", handlers.ExportHandler)
+		priv.Head("/export", handlers.ExportHandler)
+		priv.Post("/poem/undelete", handlers.RestoreDeletedPoemHandler)
 
 		// Optional prompt endpoint.
 		priv.Get("/prompt", handlers.PromptHandler)

@@ -256,6 +256,13 @@ templ LibraryContent(query string, groups []PoemGroup) {
 			<div class="verse-library-search-band">
 				<div class="verse-library-search-top">
 					<p class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-600">Search</p>
+					<a
+						href="/recycle"
+						hx-get="/recycle"
+						hx-target="#screen"
+						hx-swap="innerHTML"
+						class="text-[0.58rem] tracking-[0.12em] text-neutral-500"
+					>Recycle</a>
 					@If(query != "") {
 						<a
 							href="/library"
