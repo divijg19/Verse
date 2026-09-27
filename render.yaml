@@ -4,8 +4,20 @@
 # (see docs/RUNNING.md), and this service must never hold a Cloudflare credential.
 #
 # Note the health check. Without an explicit path, Render probes "/", which is the dashboard: a full
-# private page render issuing four database queries on every probe. /health touches no database, so
-# uptime no longer depends on Neon being reachable.
+# private page render issuing four database queries on every probe. /health is a real readiness check
+# instead, so the probe means something.
+#
+# It was documented here as touching no database, and that was true when written. It stopped being true
+# in v0.4.5, which made /health ping the database so that a Neon outage would fail the probe rather
+# than produce a stream of reassuring 200s. The consequence for uptime is the opposite of what this
+# comment used to claim: a database outage now takes the service out of rotation until it recovers.
+# That is the intended trade and it is documented in docs/RUNNING.md, but the two are not
+# equivalent -- one is "uptime no longer depends on Neon" and the other is "a Neon outage is now
+# visible" -- and only the second is true.
+#
+# The probe's own deadline (HealthPingTimeout) is deliberately much shorter than Render's five-second
+# check window, so a slow database fails the check quickly instead of holding a pool connection for the
+# life of the request.
 
 services:
   - type: web

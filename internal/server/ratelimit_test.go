@@ -417,3 +417,113 @@ func TestRetryAfterSecondsNeverRoundsDown(t *testing.T) {
 		}
 	}
 }
+
+// TestTrustedClientIPHeader covers the mechanism that replaced the RENDER=true platform guess.
+//
+// The case that motivated it is the first one here. Gating forwarded-header trust on RENDER=true is
+// correct only while Render is the only thing in front. The moment Cloudflare goes in front, RENDER
+// is unset, the header is ignored, and every caller collapses into one bucket keyed on the edge
+// address -- which turns the login limiter into a denial of service the author inflicts on
+// themselves, silently, because nothing logs a disagreement.
+func TestTrustedClientIPHeader(t *testing.T) {
+	cases := []struct {
+		name       string
+		trusted    string // value for TRUSTED_CLIENT_IP_HEADER
+		render     bool
+		remoteAddr string
+		headers    map[string]string
+		want       string
+	}{
+		{
+			// The bug. Cloudflare in front, RENDER unset, and CF-Connecting-IP carrying the real
+			// client: previously the header was ignored and this returned the edge address.
+			name:       "behind cloudflare the named header is used without RENDER",
+			trusted:    "CF-Connecting-IP",
+			render:     false,
+			remoteAddr: "10.0.0.1:5000",
+			headers:    map[string]string{"CF-Connecting-IP": "203.0.113.9"},
+			want:       "203.0.113.9",
+		},
+		{
+			name:       "the named header wins over the RENDER fallback",
+			trusted:    "CF-Connecting-IP",
+			render:     true,
+			remoteAddr: "10.0.0.1:5000",
+			headers: map[string]string{
+				"CF-Connecting-IP": "203.0.113.9",
+				"X-Forwarded-For":  "1.2.3.4",
+			},
+			want: "203.0.113.9",
+		},
+		{
+			// A named header whose value is a chain still takes the rightmost entry, which is what
+			// lets one variable serve both a single-address header and X-Forwarded-For.
+			name:       "a chain in the named header yields the rightmost entry",
+			trusted:    "X-Forwarded-For",
+			remoteAddr: "10.0.0.1:5000",
+			headers:    map[string]string{"X-Forwarded-For": "1.2.3.4, 5.6.7.8, 9.10.11.12"},
+			want:       "9.10.11.12",
+		},
+		{
+			name:       "a host:port in the named header is reduced to the host",
+			trusted:    "CF-Connecting-IP",
+			remoteAddr: "10.0.0.1:5000",
+			headers:    map[string]string{"CF-Connecting-IP": "203.0.113.9:443"},
+			want:       "203.0.113.9",
+		},
+		{
+			// A misconfigured proxy must not produce an arbitrary string as a rate-limit key.
+			name:       "a value that is not an address falls back to the socket",
+			trusted:    "CF-Connecting-IP",
+			remoteAddr: "10.0.0.1:5000",
+			headers:    map[string]string{"CF-Connecting-IP": "not-an-address"},
+			want:       "10.0.0.1",
+		},
+		{
+			name:       "an absent named header falls back to the socket",
+			trusted:    "CF-Connecting-IP",
+			remoteAddr: "10.0.0.1:5000",
+			want:       "10.0.0.1",
+		},
+		{
+			// Unchanged behavior with neither variable set, which is what a local run does.
+			name:       "no configuration at all uses the socket",
+			remoteAddr: "203.0.113.7:5000",
+			want:       "203.0.113.7",
+		},
+		{
+			// The trap, asserted rather than described. Cloudflare in front and the variable unset
+			// is exactly the state that makes every caller share one bucket, so it is worth having
+			// a test that fails the day someone removes the variable.
+			name:       "behind cloudflare with the variable unset, every caller shares the edge address",
+			remoteAddr: "10.0.0.1:5000",
+			headers:    map[string]string{"CF-Connecting-IP": "203.0.113.9"},
+			want:       "10.0.0.1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.trusted != "" {
+				t.Setenv(envTrustedClientIPHeader, tc.trusted)
+			} else {
+				t.Setenv(envTrustedClientIPHeader, "")
+			}
+			if tc.render {
+				t.Setenv("RENDER", "true")
+			} else {
+				t.Setenv("RENDER", "")
+			}
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/login", nil)
+			req.RemoteAddr = tc.remoteAddr
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
+
+			if got := clientIP(req); got != tc.want {
+				t.Errorf("clientIP = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

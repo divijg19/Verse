@@ -5,18 +5,28 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 
 	appserver "github.com/divijg19/Verse/internal/server"
 )
 
-// privateRoutes is the complete set of routes that must never be reachable without a session.
+// privateRoutes is the set of routes that must never be reachable without a session.
 //
 // This list is the regression test for the v0.3.6 finding that all fifteen routes were public,
 // including the two mutating endpoints that could overwrite or destroy any work by UUID. It is
 // written as an explicit enumeration rather than derived from the router, so that adding a route
 // without deciding its exposure is visible in review.
+//
+// It used to call itself complete while listing fourteen of nineteen. The five it omitted were
+// exactly the ones a later release added -- history, version restore, the recycle, the export, and
+// undelete -- and two of them reach deleted work. The list drifting is the failure mode an
+// enumeration cannot catch on its own, so TestPrivateRoutesEnumeratesTheWholeRouter derives the
+// registered set and requires this one to match. The explicit list stays, because the point is that a
+// human decided each entry's exposure; the test is what stops the decision from quietly lapsing.
 var privateRoutes = []struct {
 	method string
 	path   string
@@ -35,6 +45,15 @@ var privateRoutes = []struct {
 	{http.MethodPost, "/poem/update"},
 	{http.MethodPost, "/poem/delete"},
 	{http.MethodPost, "/logout"},
+	// Added in v0.4.4 and v0.4.5, and previously absent from this list. Two of them reach
+	// soft-deleted work, and the export is the entire archive including every retained revision, so
+	// their exposure is worth deciding rather than inheriting.
+	{http.MethodGet, "/poem/some-id/history"},
+	{http.MethodPost, "/poem/restore"},
+	{http.MethodGet, "/recycle"},
+	{http.MethodGet, "/export"},
+	{http.MethodHead, "/export"},
+	{http.MethodPost, "/poem/undelete"},
 }
 
 func TestPrivateRoutesRequireAuthentication(t *testing.T) {
@@ -466,3 +485,112 @@ func TestNewRouterAuthSecretLengthBoundary(t *testing.T) {
 		})
 	}
 }
+
+// publicRoutes is the set of registrations deliberately reachable without a session.
+//
+// Kept as an explicit list for the same reason privateRoutes is one: the point is that a human
+// classified each route, and TestPrivateRoutesEnumeratesTheWholeRouter is what holds both lists to
+// the router. The unauthenticated surface is deliberately tiny -- the platform probe, the login page,
+// the login submission, and the static assets -- and every one of them is either necessary for the
+// service to run or leaks nothing.
+var publicRoutes = map[string]bool{
+	http.MethodGet + " /health":       true,
+	http.MethodHead + " /health":      true,
+	http.MethodGet + " /login":        true,
+	http.MethodPost + " /login":       true,
+	http.MethodGet + " /static/*":     true,
+	http.MethodHead + " /static/*":    true,
+	http.MethodPost + " /static/*":    true,
+	http.MethodPut + " /static/*":     true,
+	http.MethodPatch + " /static/*":   true,
+	http.MethodDelete + " /static/*":  true,
+	http.MethodOptions + " /static/*": true,
+	http.MethodTrace + " /static/*":   true,
+	http.MethodConnect + " /static/*": true,
+	// Found by TestPrivateRoutesEnumeratesTheWholeRouter, which is the argument for having it.
+	"QUERY /static/*": true,
+}
+
+// TestPrivateRoutesEnumeratesTheWholeRouter is the guard on both lists.
+//
+// An explicit enumeration of routes is only useful while it stays complete, and nothing about writing
+// one down keeps it that way. This one claimed to be "the complete set" while listing fourteen of
+// nineteen, having missed every route added since: history, version restore, the recycle, the export,
+// and undelete. Two of those reach soft-deleted work, and the export is the entire archive.
+//
+// So the classification is now checked against the router rather than trusted. Every registration
+// must be in exactly one of the two lists, and a new route that nobody has thought about fails here
+// instead of inheriting an exposure by default. That inverts the failure: the cost of forgetting is a
+// red test, not a published draft.
+func TestPrivateRoutesEnumeratesTheWholeRouter(t *testing.T) {
+	t.Setenv("VERSE_AUTHORIZATION", testPassphrase)
+	t.Setenv("VERSE_AUTH_SECRET", testAuthSecret)
+
+	router, err := appserver.NewRouter()
+	if err != nil {
+		t.Fatalf("build router: %v", err)
+	}
+
+	private := make(map[string]bool, len(privateRoutes))
+	for _, r := range privateRoutes {
+		key := r.method + " " + r.path
+		if private[key] {
+			t.Errorf("privateRoutes lists %q twice", key)
+		}
+		private[key] = true
+	}
+
+	seen := 0
+	err = chi.Walk(router, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		seen++
+		// chi reports patterns; the list uses a concrete placeholder, so a path parameter is
+		// normalised to the same convention rather than the two being compared literally.
+		key := method + " " + normaliseRouteParams(route)
+
+		switch {
+		case private[key] && publicRoutes[key]:
+			t.Errorf("%q is in both lists; a route cannot be both", key)
+		case private[key] || publicRoutes[key]:
+			// Classified. Nothing to do.
+		default:
+			t.Errorf("%q is registered but appears in neither privateRoutes nor publicRoutes.\n"+
+				"  Decide whether it needs a session, then list it. A route with no entry inherits "+
+				"whatever the middleware happens to do, which is how a private surface becomes a "+
+				"public one.", key)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk router: %v", err)
+	}
+	if seen == 0 {
+		t.Fatal("the walk found no routes; the router is not enumerable and this test proves nothing")
+	}
+
+	// A list entry with no route is the other direction of the same drift, and the more likely one:
+	// a route gets renamed or removed and the assertion keeps passing against a path that no longer
+	// exists.
+	registered := make(map[string]bool, seen)
+	_ = chi.Walk(router, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		registered[method+" "+normaliseRouteParams(route)] = true
+		return nil
+	})
+	for key := range private {
+		if !registered[key] {
+			t.Errorf("privateRoutes lists %q, which is not registered", key)
+		}
+	}
+	for key := range publicRoutes {
+		if !registered[key] {
+			t.Errorf("publicRoutes lists %q, which is not registered", key)
+		}
+	}
+}
+
+// normaliseRouteParams rewrites chi's {id} to the concrete placeholder the route lists use, so a
+// pattern and an entry can be compared as strings.
+func normaliseRouteParams(route string) string {
+	return chiPatternParam.ReplaceAllString(route, "some-id")
+}
+
+var chiPatternParam = regexp.MustCompile(`\{[^/}]+\}`)
