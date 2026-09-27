@@ -188,6 +188,20 @@ func subjectKey(r *http.Request, secret []byte) []byte {
 	return mac.Sum(nil)
 }
 
+// envTrustedClientIPHeader names the request header the caller's address is taken from.
+//
+// This exists because the previous mechanism was a platform guess. Gating forwarded-header trust on
+// RENDER=true is correct only while Render is the only thing in front, and it silently stops being
+// correct the moment anything else is: behind Cloudflare, RENDER is unset, so the header is ignored
+// and every caller collapses into one bucket keyed on the edge address. That turns the login limiter
+// into a denial-of-service the author inflicts on themselves -- anyone can exhaust the shared budget
+// by guessing wrong a few times. The failure is silent, which is the worst part.
+//
+// Naming the header makes the trust decision an explicit, auditable statement about the deployment
+// rather than an inference from an unrelated variable. Behind Cloudflare it is CF-Connecting-IP,
+// which the edge overwrites and a client cannot forge. Behind Render alone it is X-Forwarded-For.
+const envTrustedClientIPHeader = "TRUSTED_CLIENT_IP_HEADER"
+
 // clientIP returns the caller's address, preferring a proxy-reported one only when a proxy is
 // actually in front.
 //
@@ -195,23 +209,34 @@ func subjectKey(r *http.Request, secret []byte) []byte {
 // a directly reachable service: a client can send any value it likes, and trusting it blindly lets
 // an attacker evade their own limit or aim it at somebody else.
 //
-// Render sets RENDER=true at runtime and terminates TLS in front of the service, appending the
-// connecting address to the right of the header. Without RENDER there is no such guarantee, so
-// RemoteAddr is used. In both cases the rightmost entry is taken: the leftmost is the client's own
-// claim, and each hop appends to the right.
+// Three sources, in order:
 //
-// The cost is stated rather than hidden. If a second proxy is ever placed in front, every caller
-// through it shares one bucket. The right-side rule is the conservative choice because it cannot be
-// forged, and the answer to "we need a CDN in front" is to narrow who can reach the service, not to
-// widen what is trusted.
+//  1. The header named by TRUSTED_CLIENT_IP_HEADER, when set. Its value is used verbatim if it parses
+//     as an IP, or its rightmost comma-separated entry if it parses as a list -- which is what makes
+//     one variable serve both CF-Connecting-IP (a single address) and X-Forwarded-For (a chain, where
+//     the leftmost entries are the client's own claims and each hop appends to the right).
+//  2. Render's X-Forwarded-For, when RENDER=true. The legacy default, kept so that changing the
+//     mechanism is not the same change as switching behavior on a running service. It is correct
+//     only while Render is the sole front, and TRUSTED_CLIENT_IP_HEADER should replace it.
+//  3. RemoteAddr, which is the only source a client cannot influence.
+//
+// A named header whose value does not parse as an address is ignored rather than used, falling
+// through to RemoteAddr. Trusting the parse as well as the name means a misconfigured proxy produces
+// one odd rate-limit bucket rather than an unbounded string being used as a key.
+//
+// The cost of the fallback is unchanged and still stated: if a second proxy is placed in front and
+// neither variable is updated, every caller through it shares one bucket. That is a configuration
+// error, and it is now one variable to set rather than a platform to reason about.
 func clientIP(r *http.Request) string {
+	if header := strings.TrimSpace(os.Getenv(envTrustedClientIPHeader)); header != "" {
+		if ip := parseForwardedAddress(r.Header.Get(header)); ip != "" {
+			return ip
+		}
+	}
+
 	if os.Getenv("RENDER") == "true" {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			// Rightmost: everything to its left was supplied by the client.
-			parts := strings.Split(xff, ",")
-			if candidate := strings.TrimSpace(parts[len(parts)-1]); candidate != "" {
-				return candidate
-			}
+		if ip := parseForwardedAddress(r.Header.Get("X-Forwarded-For")); ip != "" {
+			return ip
 		}
 	}
 
@@ -220,6 +245,34 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// parseForwardedAddress extracts an address from a header value that may be a single address or a
+// comma-separated chain, returning "" if neither is a valid IP.
+//
+// The rightmost entry of a chain is the one the nearest hop recorded, so it is the only one that
+// cannot have been written by the client. That is the whole reason this is safe to trust at all.
+func parseForwardedAddress(value string) string {
+	candidate := strings.TrimSpace(value)
+	if candidate == "" {
+		return ""
+	}
+	if i := strings.LastIndex(candidate, ","); i >= 0 {
+		candidate = strings.TrimSpace(candidate[i+1:])
+	}
+	if candidate == "" {
+		return ""
+	}
+
+	// A host:port pair, which some proxies emit.
+	if host, _, err := net.SplitHostPort(candidate); err == nil {
+		candidate = host
+	}
+
+	if net.ParseIP(candidate) == nil {
+		return ""
+	}
+	return candidate
 }
 
 // retryAfterSeconds renders a Retry-After value.

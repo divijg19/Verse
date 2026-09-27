@@ -17,9 +17,15 @@ import (
 
 // securityHeaders are applied to every response.
 //
-// The Content-Security-Policy permits inline styles because the templates currently carry 1,746
-// lines of inline <style>. Extracting them into a stylesheet is tracked for v0.4.0-B, at which point
-// 'unsafe-inline' can be dropped from style-src. script-src does NOT permit unsafe-inline, so the
+// The Content-Security-Policy permits inline styles because the templates carry inline <style>.
+// Extracting them into a stylesheet is tracked for v0.4.0-B, at which point 'unsafe-inline' can be
+// dropped from style-src.
+//
+// The line count is deliberately not quoted here. It was quoted once, drifted, and correcting it
+// produced a second wrong number: three different counting methods gave three different answers for
+// the same tree. A figure in a security rationale that nobody recomputes is worse than none, because
+// it reads as a measurement. The claim that matters is the causal one above, and it is asserted by
+// TestSecurityHeaders. script-src does NOT permit unsafe-inline, so the
 // vendored htmx and the single vendored navigation script remain the only executable sources.
 // RequestTimeout bounds any single request, whatever it is doing.
 //

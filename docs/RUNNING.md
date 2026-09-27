@@ -92,6 +92,7 @@ have forgotten `VERSE_AUTH_SECRET`, set a new one; all sessions end, and you sig
 | `DB_MAX_CONN_LIFETIME` | `1h` | Maximum connection lifetime |
 | `DB_MAX_CONN_IDLE` | `5m` | Idle time before a connection is closed |
 | `VERSE_STATIC_DIR` | `static` | Asset directory, resolved relative to the working directory |
+| `TRUSTED_CLIENT_IP_HEADER` | *(unset)* | Request header to take the caller's address from, for the login rate limiter. See below |
 | `SERVER_READ_HEADER_TIMEOUT_SEC` | `10` | |
 | `SERVER_READ_TIMEOUT_SEC` | `30` | |
 | `SERVER_WRITE_TIMEOUT_SEC` | `60` | |
@@ -102,6 +103,31 @@ have forgotten `VERSE_AUTH_SECRET`, set a new one; all sessions end, and you sig
 
 The pool defaults are tuned for a managed connection-limited database such as Neon. They are
 deliberately conservative and rarely need changing.
+
+### `TRUSTED_CLIENT_IP_HEADER`
+
+The login rate limiter buckets callers by address, so it has to know the caller's real address. It
+cannot read that from `X-Forwarded-For` on a directly reachable service, because a client can send
+that header with any value it likes and thereby evade its own limit, or aim it at somebody else.
+
+Naming the header makes that an explicit statement about the deployment rather than an inference
+from an unrelated variable. Set it to the header your front proxy overwrites:
+
+| Front | Value |
+|---|---|
+| Cloudflare | `CF-Connecting-IP` - the edge sets it and strips any client-supplied value |
+| Render only | `X-Forwarded-For` - the rightmost entry is the one the nearest hop recorded |
+| Direct, no proxy | *(unset)* - only `RemoteAddr` is trustworthy, and that is the default |
+
+A value that is a comma-separated chain is reduced to its rightmost entry, so one variable serves
+both a single-address header and a chain. A value that is not a valid address is ignored and the
+socket address is used instead, so a misconfigured proxy produces one odd bucket rather than an
+arbitrary string used as a key.
+
+**Unset is the failure mode to watch for.** With no proxy declared, every caller through a proxy
+shares the socket address, which means one shared rate-limit bucket: anyone can exhaust the author's
+own budget by guessing wrong a few times. That failure is silent, which is the problem - nothing logs
+a disagreement. If the service is ever placed behind something new, set this in the same deploy.
 
 ---
 

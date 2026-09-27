@@ -97,11 +97,16 @@ func connectTestDB(t *testing.T) {
 
 // truncatePoems empties the poems table.
 //
-// This is one of only two places in the repository that may issue a TRUNCATE; the other is
-// truncateE2EPoems in cmd/server. Both re-check the gate rather than trusting the caller, so a test
-// that reaches one through an unusual path still cannot destroy a database that was never opted in.
-// `git grep TRUNCATE` should return exactly two executable lines, and both should sit inside a
-// guard that calls testsupport.DisposableDSN.
+// One of exactly three places in the repository that may issue a TRUNCATE; the others are
+// truncateE2EPoems in cmd/server and the login_attempts reset in tests/rate_limit_test.go. All three
+// re-check the gate rather than trusting the caller, so a test that reaches one through an unusual
+// path still cannot destroy a database that was never opted in.
+//
+// This comment used to claim there were two, and to say a grep should return exactly two. It had
+// already drifted to three by the time anyone looked, which is the whole argument: an invariant
+// written only in prose is documentation, and documentation is not checked. Every TRUNCATE in the
+// tree now has to sit in a file that consults testsupport.DisposableDSN, asserted by
+// TestEveryTruncateIsBehindTheDisposableGate.
 func truncatePoems(t *testing.T) {
 	t.Helper()
 
