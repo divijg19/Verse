@@ -129,11 +129,14 @@ func GetPoemIncludingDeleted(ctx context.Context, id string) (models.Poem, error
 	if database.Pool == nil {
 		return p, fmt.Errorf("database not initialized")
 	}
+	// deleted_at is selected because the caller needs to know whether the work is in the recycle: the
+	// history screen offers different controls depending on it, and v0.4.4 offered the wrong ones to
+	// everyone because nothing carried this value.
 	row := database.Pool.QueryRow(ctx, `
-        SELECT id, content, created_at
+        SELECT id, content, created_at, deleted_at
         FROM poems
         WHERE id = $1`, id)
-	if err := row.Scan(&p.ID, &p.Content, &p.CreatedAt); err != nil {
+	if err := row.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.DeletedAt); err != nil {
 		return p, err
 	}
 	return p, nil
@@ -240,6 +243,23 @@ func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, er
 	return out, nil
 }
 
+// CountDeletedPoems reports how many works are in the recycle, which is not the number the listing
+// shows.
+//
+// Exists so the recycle can say "100 of 143" instead of quietly truncating. A screen whose entire
+// purpose is answering "did I lose it?" cannot hide 43 answers.
+func CountDeletedPoems(ctx context.Context) (int, error) {
+	if database.Pool == nil {
+		return 0, fmt.Errorf("database not initialized")
+	}
+	var n int
+	if err := database.Pool.QueryRow(ctx,
+		`SELECT count(*) FROM poems WHERE deleted_at IS NOT NULL`).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // RestorePoem clears deleted_at, returning a soft-deleted work to the library.
 //
 // Reports ErrNotFound for a poem that is not soft-deleted, mirroring SoftDeletePoem's treatment of
@@ -315,11 +335,28 @@ func GetPoemVersion(ctx context.Context, poemID, versionID string) (models.PoemV
 	return v, nil
 }
 
-// RestorePoemVersion makes a superseded revision the poem's current content.
+// RestorePoemVersion makes a superseded revision the poem's current content, bringing a soft-deleted
+// work back with it.
 //
-// Implemented as an ordinary edit rather than a direct write, so restoring records the text it
-// replaced and can itself be undone. An unknown version, or one belonging to a different poem,
-// reports ErrNotFound.
+// If the work is currently in the recycle, the restore also clears deleted_at, in the same
+// transaction. That is deliberate rather than incidental: the history screen is explicitly a recovery
+// surface, so "restore this draft" reasonably means "bring this work back, with this text". Before
+// this, a deleted work's history rendered a Restore button that was guaranteed to fail, because the
+// update it routed through refuses to touch a soft-deleted row.
+//
+// This does NOT reuse UpdatePoem, and the duplication is the point. UpdatePoem's
+// `deleted_at IS NULL` guard is load-bearing: it is what stops a soft-deleted work being silently
+// edited while remaining hidden, so a restore that edits it would leave no record. Parameterising
+// UpdatePoem with a flag that weakens the guard would put one careless caller away from editing
+// deleted work invisibly. The version-insert statement is shared; the guard deliberately is not.
+//
+// Two properties follow from doing it in one transaction. The work is never visible in the library
+// with the deleted text, not even momentarily. And the restore stays undoable, because the text it
+// replaced is recorded as a new version -- including when the work was deleted, so a restore can be
+// undone back to "deleted, with the bad paste".
+//
+// Undeleting is not itself versioned, because it changes no content. The history records what the
+// work said, not whether it was filed.
 func RestorePoemVersion(ctx context.Context, poemID, versionID string) error {
 	version, err := GetPoemVersion(ctx, poemID, versionID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -328,7 +365,44 @@ func RestorePoemVersion(ctx context.Context, poemID, versionID string) error {
 	if err != nil {
 		return err
 	}
-	return UpdatePoem(ctx, poemID, version.Content)
+
+	if database.Pool == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }() //nolint:errcheck // after Commit this is ErrTxClosed
+
+	// No deleted_at filter, and FOR UPDATE for the same reason UpdatePoem locks: a concurrent edit
+	// between the read and the write would leave the history describing a change that did not happen.
+	var previous string
+	err = tx.QueryRow(ctx,
+		`SELECT content FROM poems WHERE id = $1 FOR UPDATE`, poemID).Scan(&previous)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if previous != version.Content {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO poem_versions (id, poem_id, content) VALUES ($1, $2, $3)`,
+			uuid.NewString(), poemID, previous); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE poems SET content = $1, deleted_at = NULL WHERE id = $2`,
+		version.Content, poemID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // SoftDeletePoem marks an active poem as deleted by setting deleted_at.

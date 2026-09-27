@@ -451,9 +451,20 @@ probe is unauthenticated, and a connection error carries the database host and u
 
 Note what a `503` does and does not mean. The service refuses to start without a database —
 `RequireSchema` runs at boot — so an unreachable database at startup is a failed deploy, visible in
-the logs, not a `503`. A `503` therefore means the database was reachable at boot and has since
-become unreachable, which on Render's free tier is the case worth alerting on: a restarting or
-crashed instance comes back healthy, a `503` is a live instance that can no longer serve.
+the logs, not a `503`.
+
+A `503` means the check did not succeed within `HealthPingTimeout` (1.5s). That is *not* the same as
+"the database is gone", and the distinction matters when deciding whether to restart. It is reported
+when the database is unreachable, and also when it is merely slow — including when the connection
+pool is saturated, which the probe cannot tell apart from a slow database from inside the handler. The
+log line carries the underlying error, so the cause is always recoverable from there rather than from
+the status code.
+
+That is also why the deadline is short and separate from the request timeout. The pool holds five
+connections and the platform probes every few seconds, so a probe that inherited the 30s request
+timeout could hold a scarce connection for half a minute — long enough to starve the application it
+shares the pool with, turning a slow database into a total outage. `TestHealthProbeYieldsWhenThePoolIsExhausted`
+drains the pool and asserts the probe still answers in about a second and a half.
 
 ### Diagnosing a refusal
 

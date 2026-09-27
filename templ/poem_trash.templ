@@ -10,6 +10,13 @@ type PoemTrash struct {
 	Poems     []TrashEntry
 	Restored  string
 	RestoredI string
+
+	// Total is how many works are in the recycle, which is not the number listed.
+	//
+	// The listing is capped, and a screen whose entire purpose is answering "did I lose it?" must not
+	// quietly show 100 of 143. An author who deleted a work in March and cannot find it here would
+	// reasonably conclude it was destroyed.
+	Total int
 }
 
 // TrashEntry is one deleted work.
@@ -66,6 +73,19 @@ templ PoemTrashContent(ctx context.Context, trash PoemTrash) {
 				>◀ Library</a>
 			</div>
 		</div>
+		@If(trash.Restored != "") {
+			<div class="verse-panel verse-trash-card">
+				<p class="text-purple-400">{ trash.Restored }</p>
+			</div>
+		}
+		@If(trash.Total > len(trash.Poems)) {
+			<div class="verse-panel verse-trash-card">
+				<p class="text-neutral-400">
+					Showing the { len(trash.Poems) } most recently deleted of { trash.Total }. The rest
+					are still in the database.
+				</p>
+			</div>
+		}
 		if len(trash.Poems) == 0 {
 			<div class="verse-panel verse-trash-card">
 				<p class="text-neutral-400">Nothing has been deleted. The recycle is empty.</p>
@@ -88,7 +108,7 @@ templ PoemTrashContent(ctx context.Context, trash PoemTrash) {
 									class="verse-trash-nav"
 								>History</a>
 								<form
-									hx-post="/poem/restore"
+									hx-post="/poem/undelete"
 									hx-target="#screen"
 									hx-swap="innerHTML"
 								>

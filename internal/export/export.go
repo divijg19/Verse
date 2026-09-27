@@ -19,6 +19,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/divijg19/Verse/internal/database"
 )
 
 // Format is the version tag written into every export.
@@ -233,7 +235,7 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 		Poems:      []Poem{},
 	}
 
-	p := pool()
+	p := database.Pool
 	if p == nil {
 		return doc, fmt.Errorf("database not initialized")
 	}
@@ -261,11 +263,42 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 		return doc, fmt.Errorf("read poems: %w", err)
 	}
 
-	// Ordered oldest first, so a reader sees the history of a poem in the order it happened.
+	// Versions for every retained poem, in one query.
+	//
+	// This was one query per poem, which for a library of any size meant thousands of round trips
+	// inside a single 30s request timeout. A LEFT JOIN over the same tables returns exactly the same
+	// rows: poems with no revisions produce a NULL version row, which the scan turns back into the
+	// empty slice it was before.
+	versionRows, err := p.Query(ctx, `
+        SELECT pv.poem_id, pv.id, pv.content, pv.recorded_at
+        FROM poem_versions pv
+        ORDER BY pv.poem_id, pv.seq`)
+	if err != nil {
+		return doc, fmt.Errorf("read retained revisions: %w", err)
+	}
+	defer versionRows.Close()
+
+	byPoem := map[string][]Version{}
+	for versionRows.Next() {
+		var poemID string
+		var v Version
+		if err := versionRows.Scan(&poemID, &v.ID, &v.Content, &v.RecordedAt); err != nil {
+			return doc, fmt.Errorf("read retained revision: %w", err)
+		}
+		byPoem[poemID] = append(byPoem[poemID], v)
+	}
+	if err := versionRows.Err(); err != nil {
+		return doc, fmt.Errorf("read retained revisions: %w", err)
+	}
+
+	// Oldest first, so a reader sees the history of a poem in the order it happened.
 	for i := range doc.Poems {
-		versions, err := versionsFor(ctx, doc.Poems[i].ID)
-		if err != nil {
-			return doc, err
+		versions := byPoem[doc.Poems[i].ID]
+		if versions == nil {
+			// Empty, never null: a consumer reading the file back must be able to tell "no
+			// history" from "field absent", which is the kind of ambiguity that only surfaces
+			// during a restore.
+			versions = []Version{}
 		}
 		doc.Poems[i].Versions = versions
 	}

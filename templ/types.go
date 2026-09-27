@@ -28,6 +28,14 @@ type PoemHistory struct {
 	Versions   []PoemVersionView
 	Restored   string
 	RestoredID string
+
+	// DeletedAt reports whether the work is currently in the recycle.
+	//
+	// The screen cannot omit it. A soft-deleted work's /poem/{id} and /editor/{id} both resolve
+	// through reads that filter deleted_at, so rendering those links unconditionally offers two
+	// controls that 404 -- and the only reason v0.4.4 shipped them that way is that nothing knew
+	// the state of the work being viewed.
+	DeletedAt *time.Time
 }
 
 // HeatmapDay represents a single day in the selected month.

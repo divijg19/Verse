@@ -6,13 +6,19 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/export"
 	"github.com/divijg19/Verse/internal/services"
+	"github.com/divijg19/Verse/internal/testsupport"
 )
 
 // This file covers export, which exists because the work had no way out of the application.
@@ -359,4 +365,100 @@ func versionContents(t *testing.T, poemID string) []string {
 		out = append(out, versions[i].Content)
 	}
 	return out
+}
+
+// countingTracer records how many queries a pool issues.
+type countingTracer struct {
+	mu      sync.Mutex
+	queries []string
+}
+
+func (c *countingTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.queries = append(c.queries, data.SQL)
+	return ctx
+}
+
+func (c *countingTracer) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+func (c *countingTracer) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.queries)
+}
+
+// TestExportIssuesAConstantNumberOfQueries is the claim that v0.4.4's export could not support.
+//
+// Build issued one query per poem to collect its retained revisions. At ten thousand works that is
+// ten thousand and one round trips inside a single 30s request, so the export would have timed out on
+// a library a tenth of that size. Correctness was not the problem; the shape of the query was.
+//
+// Asserting the count rather than the output is the point: the round-trip test above already proves
+// the export is faithful, and it would keep passing if this regressed.
+func TestExportIssuesAConstantNumberOfQueries(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	dsn, reason := testsupport.DisposableDSN()
+	if reason != "" {
+		t.Skip(reason)
+	}
+
+	// A pool of the test's own, with a tracer attached, swapped in for the duration. The tracer is
+	// the only way to observe the shape of the access rather than inferring it from a duration,
+	// which would be slow and would not distinguish one query from fifty on a fast machine.
+	scoped, err := testsupport.WithSearchPath(dsn, packageSchema)
+	if err != nil {
+		t.Fatalf("scope dsn: %v", err)
+	}
+	cfg, err := pgxpool.ParseConfig(scoped)
+	if err != nil {
+		t.Fatalf("parse dsn: %v", err)
+	}
+	tracer := &countingTracer{}
+	cfg.ConnConfig.Tracer = tracer
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("connect traced pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	original := database.Pool
+	database.Pool = pool
+	t.Cleanup(func() { database.Pool = original })
+
+	// Seed, so the count is measured over real data rather than an empty table.
+	const works = 40
+	for i := 0; i < works; i++ {
+		id := insertPoem(t, "work "+strconv.Itoa(i))
+		if err := services.UpdatePoem(context.Background(), id, "work "+strconv.Itoa(i)+" edited"); err != nil {
+			t.Fatalf("edit %d: %v", i, err)
+		}
+	}
+
+	tracer.mu.Lock()
+	tracer.queries = nil
+	tracer.mu.Unlock()
+
+	doc, err := export.Build(context.Background(), true)
+	if err != nil {
+		t.Fatalf("build export: %v", err)
+	}
+	if len(doc.Poems) != works {
+		t.Fatalf("export has %d poem(s), want %d", len(doc.Poems), works)
+	}
+
+	queries := tracer.count()
+	t.Logf("exporting %d works with %d retained revisions took %d query/queries",
+		works, works, queries)
+
+	// Two: the poems, and the revisions. The old shape was one plus one per work, so 41 here and 41
+	// for a library of any size. A small ceiling rather than an exact figure, so a future extra
+	// lookup does not fail this for the wrong reason.
+	if queries > 4 {
+		t.Errorf("building an export of %d works issued %d queries; the revisions must be read in "+
+			"one pass, not one query per work", works, queries)
+	}
 }
