@@ -264,6 +264,68 @@ worth removing.
 
 ---
 
+## Backups
+
+Until this existed, the database was the only copy of the work. Reading it in a browser, editing it,
+and hand-written SQL were the only ways to get at it, so a provider incident or a mistaken migration
+was total loss. Version history (below) protects against a bad edit; this protects against everything
+else.
+
+```bash
+# Lossless archival copy. Reads DATABASE_URL, like every other command.
+go run ./cmd/verse-export -include-deleted -out verse-$(date +%F).json
+
+# For reading rather than restoring.
+go run ./cmd/verse-export -format md > verse-$(date +%F).md
+```
+
+`verse-export` writes `0600`. The export is the entire body of work, so a world-readable copy is the
+same mistake the application exists to avoid.
+
+**JSON is the archival format and is lossless**: re-reading an export and comparing it to the
+database yields byte-identical content for every work and every retained revision. It carries the
+retained history too, so it is a complete copy rather than a snapshot of current text. A poem is
+stored verbatim — nothing is trimmed, translated or truncated on the way out.
+
+**Markdown is not lossless and is not for restoring.** It cannot represent the difference between a
+deleted work and a live one, nor the retained revisions, without ceasing to be prose. Use it to read
+your own writing; use JSON to keep it.
+
+The browser route at `/export` produces the same document, with `Content-Disposition: attachment`.
+It includes soft-deleted work, unlike the command's default: a download clicked in a browser is an
+archival act, and an archive that silently omitted the deleted works would be a partial copy of the
+thing it claims to preserve. Pass `-include-deleted` to the command for the same completeness.
+
+`verse-export` is a bulk read of everything, so it is the one command where pointing it at something
+other than the live database is routine — a replica, or a copy you are verifying. Take a copy before
+any migration you are unsure about, rather than relying on the provider's own backups:
+
+```bash
+# Neon and most hosted providers can branch a database in seconds. Branch, migrate the branch,
+# and only then migrate production. A branch is a rollback, not a backup.
+```
+
+---
+
+## Recovering work
+
+Three things can destroy a saved work, and all three are now recoverable:
+
+| What happened | How to undo it |
+|---|---|
+| A bad edit overwrote it | Open the work, then **History**. Every superseded draft is retained, newest first, and restoring one is itself undoable. |
+| It was deleted | **Recycle**, reachable from the library. Soft-deleted work is listed there and can be restored; it keeps its history. |
+| The database was lost | `verse-export` from before the incident, restored with `psql`. |
+
+Version history is written by the application, not by a database trigger, so work edited by hand in
+SQL has no history. That is a deliberate trade: a trigger would capture every change including
+migrations, and would make the write path's transaction considerably harder to reason about.
+
+Retention is unbounded. There is no pruning, and no purge — a version has to be reached through a
+restore, which records what it replaced.
+
+---
+
 ## Tests
 
 The database-backed tests `TRUNCATE TABLE poems`, so they are gated on two things being set
@@ -369,8 +431,48 @@ Recommended order:
 
 ### Health check
 
-`/health` returns `200` and `ok`, and touches no database. `render.yaml` points the platform health
-check at it. A health probe therefore never depends on database availability.
+`/health` returns `200` and `ok` when the database is reachable, and `503` when it is not.
+`render.yaml` points the platform health check at it.
+
+This is a change of behaviour, and deliberately so. It previously answered `200` without touching the
+database, on the reasoning that a probe should not depend on database availability. The result was
+worse than the problem it avoided: a total Postgres outage left the platform polling a service that
+could not serve a single page, so nothing restarted, nothing alerted, and the log showed an unbroken
+stream of `200` for the whole incident. A probe that cannot fail is read as evidence, so it must be
+able to fail.
+
+If the database is the thing you most need to stay up regardless, configure the platform to treat
+`/health` as a liveness probe only and monitor readiness separately — but do not restore the
+unconditional `200` without understanding that you are disabling the restart and the signal.
+
+`GET /health` returns a body (`ok`, or `unavailable` when degraded). `HEAD /health` returns the same
+status with no body. The reason for a `503` is logged with the request ID and never returned: the
+probe is unauthenticated, and a connection error carries the database host and user.
+
+Note what a `503` does and does not mean. The service refuses to start without a database —
+`RequireSchema` runs at boot — so an unreachable database at startup is a failed deploy, visible in
+the logs, not a `503`. A `503` therefore means the database was reachable at boot and has since
+become unreachable, which on Render's free tier is the case worth alerting on: a restarting or
+crashed instance comes back healthy, a `503` is a live instance that can no longer serve.
+
+### Diagnosing a refusal
+
+A refused request answers `403` with a body of exactly `forbidden`, and that is a contract. A caller
+that cannot produce a valid token has no business being told which of its mistakes to correct —
+distinguishing the reasons is the entire value of the synchroniser token.
+
+Every response carries `X-Request-Id`, including refusals. `middleware.RequestID` honours an inbound
+`X-Request-Id`, so on Render this is the platform's own identifier, and the same value appears in the
+platform's request log. That is what lets a bug report be turned into a log line.
+
+Every refusal is logged with its reason and request ID, on both the login path and the authenticated
+mutation path.
+
+To have the reason echoed in a response header as well, set `VERSE_DEBUG_LOGIN=1`. This is intended
+for a deployment you control, and it reveals only a fixed word from the application's own vocabulary —
+never a value derived from the request — so it cannot be used as a reflector. The body stays
+`forbidden` regardless. Leave it unset in production unless you are actively debugging; the log
+already carries the reason.
 
 ### Restricting access
 

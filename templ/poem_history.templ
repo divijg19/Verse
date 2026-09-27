@@ -1,0 +1,105 @@
+package templ
+
+import "context"
+
+// PoemHistoryScreen renders a poem's retained history.
+//
+// This exists because an edit used to overwrite in place with nothing kept, so a mistaken paste
+// destroyed the previous text permanently. Everything here is in service of the one question a
+// writer needs answered after a bad edit: what did this say before?
+templ PoemHistoryScreen(ctx context.Context, history PoemHistory) {
+	@Screen("History", PoemHistoryContent(ctx, history))
+}
+
+templ PoemHistoryContent(ctx context.Context, history PoemHistory) {
+	<div class="space-y-5">
+		<style>
+			.verse-history-card {
+				min-width: 0;
+				padding: 1.25rem 1.25rem 1.1rem;
+			}
+			.verse-history-nav {
+				display: inline-flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 0.55rem;
+				font-size: 0.68rem;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				color: rgb(163 163 163);
+				text-decoration: none;
+				transition: color 150ms ease;
+			}
+			.verse-history-nav:hover {
+				color: rgb(229 229 229);
+			}
+			.verse-history-entry {
+				min-width: 0;
+				padding: 0.9rem 1rem;
+			}
+			.verse-history-entry pre {
+				margin: 0;
+				font-family: inherit;
+				white-space: pre-wrap;
+				word-break: break-word;
+			}
+		</style>
+		<div class="verse-history-card verse-panel">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<a
+					href={ "/poem/" + history.PoemID }
+					hx-get={ "/poem/" + history.PoemID }
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-history-nav"
+				>◀ Work</a>
+				<a
+					href={ "/editor/" + history.PoemID }
+					hx-get={ "/editor/" + history.PoemID }
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-history-nav"
+				>Editor ▶</a>
+			</div>
+			<p class="pt-5 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">Current</p>
+			<h2 class="pt-1 text-lg text-neutral-200">{ history.Title }</h2>
+			<article class="pt-3 whitespace-pre-wrap text-neutral-300">{ history.Current }</article>
+		</div>
+		if len(history.Versions) == 0 {
+			<div class="verse-panel verse-history-card">
+				<p class="text-neutral-400">
+					No earlier drafts are retained for this work. History begins at its first edit.
+				</p>
+			</div>
+		} else {
+			<div class="space-y-3">
+				for _, v := range history.Versions {
+					<div class="verse-panel verse-history-entry">
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							<div>
+								<p class="text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">
+									{ v.RecordedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }
+								</p>
+								<p class="pt-1 text-sm text-neutral-300">{ v.Title }</p>
+							</div>
+							<form
+								hx-post="/poem/restore"
+								hx-target="#screen"
+								hx-swap="innerHTML"
+								hx-confirm="Make this draft the current text? The draft it replaces is kept too, so this can be undone."
+							>
+								<input type="hidden" name="id" value={ history.PoemID }/>
+								<input type="hidden" name="version" value={ v.ID }/>
+								@CSRFField(ctx)
+								<button type="submit" class="verse-button">
+									Restore this draft
+								</button>
+							</form>
+						</div>
+						<pre class="pt-3 text-neutral-400">{ v.Content }</pre>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}

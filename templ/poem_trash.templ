@@ -1,0 +1,108 @@
+package templ
+
+import "context"
+
+// PoemTrash is the list of soft-deleted works, and the way back to one deleted by accident.
+//
+// deleted_at used to be a one-way trip with no listing and no restore, so an accidental deletion was
+// unrecoverable through the application even though the row was still there.
+type PoemTrash struct {
+	Poems     []TrashEntry
+	Restored  string
+	RestoredI string
+}
+
+// TrashEntry is one deleted work.
+type TrashEntry struct {
+	ID      string
+	Title   string
+	Snippet string
+}
+
+templ PoemTrashScreen(ctx context.Context, trash PoemTrash) {
+	@Screen("Recycle", PoemTrashContent(ctx, trash))
+}
+
+templ PoemTrashContent(ctx context.Context, trash PoemTrash) {
+	<div class="space-y-5">
+		<style>
+			.verse-trash-card {
+				min-width: 0;
+				padding: 1.25rem 1.25rem 1.1rem;
+			}
+			.verse-trash-nav {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.55rem;
+				font-size: 0.68rem;
+				letter-spacing: 0.16em;
+				text-transform: uppercase;
+				color: rgb(163 163 163);
+				text-decoration: none;
+				transition: color 150ms ease;
+			}
+			.verse-trash-nav:hover {
+				color: rgb(229 229 229);
+			}
+			.verse-trash-entry {
+				min-width: 0;
+				padding: 0.9rem 1rem;
+			}
+		</style>
+		<div class="verse-panel verse-trash-card">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h2 class="text-lg text-neutral-200">Recycle</h2>
+					<p class="pt-1 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">
+						Deleted works. Nothing here is gone until you remove it from the database.
+					</p>
+				</div>
+				<a
+					href="/library"
+					hx-get="/library"
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-trash-nav"
+				>◀ Library</a>
+			</div>
+		</div>
+		if len(trash.Poems) == 0 {
+			<div class="verse-panel verse-trash-card">
+				<p class="text-neutral-400">Nothing has been deleted. The recycle is empty.</p>
+			</div>
+		} else {
+			<div class="space-y-3">
+				for _, p := range trash.Poems {
+					<div class="verse-panel verse-trash-entry">
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							<div class="min-w-0">
+								<p class="text-sm text-neutral-300">{ p.Title }</p>
+								<p class="pt-1 text-neutral-500">{ p.Snippet }</p>
+							</div>
+							<div class="flex flex-wrap items-center gap-3">
+								<a
+									href={ "/poem/" + p.ID + "/history" }
+									hx-get={ "/poem/" + p.ID + "/history" }
+									hx-target="#screen"
+									hx-swap="innerHTML"
+									class="verse-trash-nav"
+								>History</a>
+								<form
+									hx-post="/poem/restore"
+									hx-target="#screen"
+									hx-swap="innerHTML"
+								>
+									<input type="hidden" name="id" value={ p.ID }/>
+									@CSRFField(ctx)
+									<button type="submit" class="verse-button">
+										Restore
+									</button>
+								</form>
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}

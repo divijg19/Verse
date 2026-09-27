@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -60,6 +61,27 @@ type authConfig struct {
 	// limiter bounds how often a caller may get the passphrase wrong. Held on the config so a
 	// request does not construct one, and so the zero value of authConfig is never usable.
 	limiter *rateLimiter
+
+	// explainRefusals adds a header naming which check refused a request. Off by default, because
+	// the refusal body is opaque on purpose; see refuseForbidden.
+	explainRefusals bool
+}
+
+// refuseForbidden writes the standard refusal, optionally naming the reason in a response header.
+//
+// The body is always exactly "forbidden\n", and that is a contract rather than an accident. A client
+// that cannot produce a valid token has no business being told which of its mistakes to correct, and
+// the distinction between the reasons is the entire value of a synchroniser token.
+//
+// VERSE_DEBUG_LOGIN=1 relaxes that for the operator, and only the operator: it is an environment
+// variable on a service whose environment only the deployer controls. What it adds is the reason name
+// from this package's own fixed vocabulary, never a value derived from the request, so enabling it
+// cannot become a reflector for anything a caller chose.
+func refuseForbidden(w http.ResponseWriter, cfg *authConfig, reason string) {
+	if cfg != nil && cfg.explainRefusals {
+		w.Header().Set("X-Verse-Refusal", reason)
+	}
+	http.Error(w, "forbidden", http.StatusForbidden)
 }
 
 // minAuthSecretLen is the shortest VERSE_AUTH_SECRET accepted.
@@ -116,9 +138,10 @@ func loadAuthConfig() (*authConfig, error) {
 	secretDigest := sha256.Sum256([]byte(secret))
 
 	return &authConfig{
-		authorization: authzDigest[:],
-		secret:        secretDigest[:],
-		limiter:       newRateLimiter(),
+		authorization:   authzDigest[:],
+		secret:          secretDigest[:],
+		limiter:         newRateLimiter(),
+		explainRefusals: os.Getenv("VERSE_DEBUG_LOGIN") == "1",
 	}, nil
 }
 
@@ -331,15 +354,16 @@ func requireCSRF(cfg *authConfig) func(http.Handler) http.Handler {
 
 			s := cfg.sessionFromRequest(r)
 			if s == nil {
-				http.Error(w, "forbidden", http.StatusForbidden)
+				refuseRequest(w, r, cfg, "no session")
 				return
 			}
 
 			// Reject a cross-origin request outright. This is belt-and-braces: the synchroniser token
 			// is the real control, but an unexpected Origin on a same-origin form is a signal worth
-			// refusing rather than logging.
-			if origin := r.Header.Get("Origin"); origin != "" && !sameOrigin(origin, r) {
-				http.Error(w, "forbidden", http.StatusForbidden)
+			// refusing rather than logging. An opaque origin is not such a signal -- see
+			// originIsCrossSite.
+			if originIsCrossSite(r.Header.Get("Origin"), r) {
+				refuseRequest(w, r, cfg, "cross-origin")
 				return
 			}
 
@@ -350,13 +374,33 @@ func requireCSRF(cfg *authConfig) func(http.Handler) http.Handler {
 			}
 
 			if subtle.ConstantTimeCompare([]byte(expected), []byte(submitted)) != 1 {
-				http.Error(w, "forbidden", http.StatusForbidden)
+				refuseRequest(w, r, cfg, "token mismatch")
 				return
 			}
 
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// refuseRequest logs why a request was refused, then refuses it.
+//
+// Every refusal is logged, not only the ones an operator has enabled diagnostics for. These were
+// previously silent: a bare 403 with nothing in the log is indistinguishable from a client that
+// gave up, which is exactly the ambiguity that made a production login failure expensive to
+// diagnose. The reason is a fixed word and the request ID is the platform's own, so neither is
+// derived from anything the caller controls.
+func refuseRequest(w http.ResponseWriter, r *http.Request, cfg *authConfig, reason string) {
+	// Every value here is request-derived and is sanitized for the same reason as the login
+	// diagnostics: the request ID in particular is whatever the caller sent in X-Request-Id, since
+	// middleware.RequestID honors an inbound value. A log that can be forged is worse than none,
+	// because it gets trusted during exactly the incident where trusting it is tempting.
+	//
+	// #nosec G706 -- the suppression covers the taint rule only. The sanitization is the actual
+	// mitigation; gosec does not credit sanitizeLogValue for removing the control characters.
+	log.Printf("request refused: %s (%s %s, request %s)", // #nosec G706
+		reason, sanitizeLogValue(r.Method), sanitizeLogValue(r.URL.Path), sanitizeLogValue(requestIDFrom(r)))
+	refuseForbidden(w, cfg, reason)
 }
 
 // sameOrigin reports whether an Origin header matches the request's own scheme and host.
@@ -366,6 +410,37 @@ func sameOrigin(origin string, r *http.Request) bool {
 	// Compare against the Host header, which is what the browser used to reach us. Behind a proxy
 	// the scheme may differ, so only the authority is compared.
 	return strings.EqualFold(trimmed, "https://"+host) || strings.EqualFold(trimmed, "http://"+host)
+}
+
+// opaqueOrigin is the literal Origin value a client sends when it considers its own origin opaque.
+// The specification requires the four-character string "null" rather than an absent header, so it
+// must be matched exactly: a real origin of "null" is not a thing a browser produces.
+const opaqueOrigin = "null"
+
+// originIsCrossSite reports whether an Origin header is a cross-site claim worth refusing.
+//
+// There are three cases and the difference between them is the entire fix. Production refused a
+// legitimate login because the first two were conflated with the third:
+//
+//   - Absent: the client made no claim at all. There is nothing to compare, so this has always been
+//     allowed through and must stay that way.
+//   - "null": the client's origin is opaque. It names no authority, so it is not evidence of a
+//     cross-site request any more than an absent header is -- it is evidence of a client this server
+//     does not recognize. Producers include a sandboxed frame, a file:// page, and hardened privacy
+//     settings. Refusing here locks a real author out of their own writing.
+//   - Anything else: a concrete origin, compared against the request's own authority.
+//
+// The security of skipping the second case does not rest on this function. Both callers that consult
+// it are already guarded by a synchroniser token comparison, and an attacker forcing a cross-site
+// request cannot read that token, so it fails there regardless. The Origin check is defense in depth
+// that costs nothing when it agrees and locks users out when it does not.
+func originIsCrossSite(origin string, r *http.Request) bool {
+	switch origin {
+	case "", opaqueOrigin:
+		return false
+	default:
+		return !sameOrigin(origin, r)
+	}
 }
 
 // wantsHTMLRedirect reports whether the client expects a browser-style navigation.

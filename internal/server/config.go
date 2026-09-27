@@ -100,7 +100,7 @@ func loginSubmitHandler(cfg *authConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if rejection := verifyLoginCSRF(r); rejection != loginAccepted {
 			logLoginRejection(r, rejection)
-			http.Error(w, "forbidden", http.StatusForbidden)
+			refuseForbidden(w, cfg, rejection.String())
 			return
 		}
 
@@ -115,7 +115,7 @@ func loginSubmitHandler(cfg *authConfig) http.HandlerFunc {
 			log.Printf("login rate limit unavailable, proceeding without it: %v", err)
 		} else if blocked {
 			retry := retryAfterSeconds(until.Sub(cfg.limiter.now()))
-			log.Printf("login refused: rate limited, retry in %ds", retry)
+			log.Printf("login refused: rate limited, retry in %ds (request %s)", retry, requestIDFrom(r))
 			w.Header().Set("Retry-After", strconv.Itoa(retry))
 			http.Error(w, "too many failed attempts", http.StatusTooManyRequests)
 			return
@@ -199,7 +199,7 @@ func (r loginRejection) String() string {
 
 // verifyLoginCSRF validates a login submission's origin and synchroniser token.
 func verifyLoginCSRF(r *http.Request) loginRejection {
-	if origin := r.Header.Get("Origin"); origin != "" && !sameOrigin(origin, r) {
+	if originIsCrossSite(r.Header.Get("Origin"), r) {
 		return loginBadOrigin
 	}
 
@@ -256,7 +256,8 @@ func logLoginRejection(r *http.Request, rejection loginRejection) {
 
 	if scheme == "http" && rejection == loginNoCookie {
 		log.Printf("login refused: %s; request arrived over plain HTTP, so a browser would have "+
-			"discarded the Secure %s cookie rather than this being an attack", rejection, csrfCookieName)
+			"discarded the Secure %s cookie rather than this being an attack (request %s)",
+			rejection, csrfCookieName, requestIDFrom(r))
 		return
 	}
 
@@ -274,8 +275,8 @@ func logLoginRejection(r *http.Request, rejection loginRejection) {
 	// actual mitigation. gosec flags the call on the strength of the argument being request-derived
 	// and does not credit sanitizeLogValue for removing the control characters, so the finding
 	// persists with the fix in place. Verified by removing this line: G706 fires either way.
-	log.Printf("login refused: %s; scheme=%s origin=%s", // #nosec G706
-		rejection, sanitizeLogValue(scheme), sanitizeLogValue(origin))
+	log.Printf("login refused: %s; scheme=%s origin=%s (request %s)", // #nosec G706
+		rejection, sanitizeLogValue(scheme), sanitizeLogValue(origin), requestIDFrom(r))
 }
 
 // maxLoggedHeader bounds a logged request header, so a client cannot fill the log with a megabyte

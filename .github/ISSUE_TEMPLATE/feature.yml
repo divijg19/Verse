@@ -1,0 +1,37 @@
+name: Feature
+description: Something Verse should be able to do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What you were trying to do that Verse makes hard. What does the current shape of the
+        application force you to do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data
+      description: Tick anything this touches.
+      options:
+        - label: Needs a migration
+        - label: Could destroy work, or needs a recovery path
+        - label: Touches authentication or what is readable without the passphrase
+        - label: Touches the deployment (render.yaml, the Dockerfile, CI)
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including "do nothing" and why that is not good enough.

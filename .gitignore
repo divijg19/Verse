@@ -55,6 +55,11 @@ tmp/
 # `migrations/` is the SQL and is tracked. These two are easy to confuse, and a pattern that matched
 # both would silently stop the schema from being committed.
 /migrate
+  #
+  # `verse-export` is the export command's build-output name, same convention. It arrived with the
+  # export command in v0.4.4, and a local `go build ./cmd/verse-export` committed a 14MB binary
+  # before this line existed.
+/verse-export
 *.test
 coverage.out
 vendor/
