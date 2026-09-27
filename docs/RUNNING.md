@@ -259,6 +259,35 @@ go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
 
 A container build is also provided in the `Dockerfile` and is exercised by CI.
 
+### `render.yaml` is the source of truth; the dashboard must mirror it
+
+The two have already diverged once. The dashboard's build command was a copy of an older revision of
+`render.yaml`, so Render was building with an unlocked dependency install where the repository
+specified `--frozen-lockfile` — and nothing noticed, because nothing compared them.
+
+When changing how the service is built, change `render.yaml` **and** the dashboard setting, in the
+same commit. CI checks the repository's three build paths against each other; it cannot see the
+dashboard.
+
+### Toolchain: Bun is pinned, Go cannot be
+
+| | CI and `Dockerfile` | Render |
+|---|---|---|
+| Bun | `1.4.2`, asserted equal across all three paths | `1.4.2`, via `BUN_VERSION` in `render.yaml` |
+| Go | `1.26.x` from `go.mod`, asserted equal to the `Dockerfile` | **latest stable 1.x** — not pinnable |
+
+Render's default Bun depends on when the service was created, and this one defaulted to `1.3.4` while
+the repository was on `1.3.5` and then `1.4.2`. Production was therefore building the stylesheet with
+a package manager version no other build path used. `BUN_VERSION` fixes that, and CI now fails if the
+three disagree — including when the pin is *absent*, which was the state that produced `1.3.4`.
+
+Go is a genuine, accepted difference. Render's native Go runtime always tracks the latest stable 1.x
+and, in their words, "you can't pin to a specific Go version unless you deploy a Docker image." CI
+asserts the `Dockerfile` matches `go.mod`; it cannot make Render match, and asserting a value Render
+ignores would be a gate that is permanently red or ignored. A newer Go toolchain is backward
+compatible, so this is recorded rather than engineered around. Deploying the `Dockerfile` on Render
+would close it.
+
 ### Before the first deploy of the authenticated build
 
 The service **will not start** unless `VERSE_AUTHORIZATION` and `VERSE_AUTH_SECRET` are set in the
@@ -339,6 +368,8 @@ to the live service deliberately and knowingly.
 | `migration <file> was modified after it was applied` | An already-applied `.sql` file was edited | Restore the original file, or write a new migration. Do not edit history |
 | `these migrations are recorded as applied but no longer exist` | An applied `.sql` file was deleted or renamed | Restore it. Renaming an applied migration is indistinguishable from deleting it |
 | `apply migration <file>: ...` | The SQL in a migration failed | Nothing was recorded and nothing was left behind; fix the file and re-run |
+| Production stylesheet differs from CI | Render's Bun drifted from the repository's | Check `BUN_VERSION` on the service; CI asserts all three build paths agree |
+| Deploy used a stale or different build command | The dashboard diverged from `render.yaml` | Re-sync the dashboard from `render.yaml`; CI cannot detect this |
 | Unstyled page | The stylesheet was not built | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify` |
 | Blank page or missing navigation in the console | The vendored htmx bundle is missing or its checksum changed | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256` |
 | `templ generate` reports `expected operand` | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper | See `templ/helpers.go` and existing templates for the convention |
