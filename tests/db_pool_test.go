@@ -81,7 +81,7 @@ func TestMigrationsCreateActivePoemTimelineIndex(t *testing.T) {
 	err := database.Pool.QueryRow(context.Background(), `
 		SELECT indexdef
 		FROM pg_indexes
-		WHERE schemaname = 'public'
+		WHERE schemaname = current_schema()
 		AND tablename = 'poems'
 		AND indexname = 'idx_poems_active_created_at'`).Scan(&indexDef)
 	if err != nil {

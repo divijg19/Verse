@@ -527,6 +527,12 @@ func TestAcquireLockReportsBusyAndRecovers(t *testing.T) {
 	pool := testPool(t)
 	ctx := context.Background()
 
+	// A key of this test's own, not the production one. pg advisory locks are database-wide, so
+	// competing for migrationLockKey here would make this test fail whenever any other package ran a
+	// migration concurrently -- which is exactly what happened once -p 1 stopped serializing the
+	// packages. The lock's behavior is what is under test, not which key holds it.
+	const key int64 = 0x7E57_0BAD_C0DE_0001
+
 	hogger, err := pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("acquire the hogging connection: %v", err)
@@ -534,7 +540,7 @@ func TestAcquireLockReportsBusyAndRecovers(t *testing.T) {
 	defer hogger.Release()
 
 	var held bool
-	if err := hogger.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, migrationLockKey).Scan(&held); err != nil {
+	if err := hogger.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, key).Scan(&held); err != nil {
 		t.Fatalf("take the lock: %v", err)
 	}
 	if !held {
@@ -549,7 +555,7 @@ func TestAcquireLockReportsBusyAndRecovers(t *testing.T) {
 	}
 	defer waiter.Release()
 
-	if _, err := acquireLock(ctx, waiter, 200*time.Millisecond); err == nil {
+	if _, err := acquireLock(ctx, waiter, key, 200*time.Millisecond); err == nil {
 		t.Fatal("acquireLock succeeded while another connection held the lock")
 	} else if !strings.Contains(err.Error(), "busy") {
 		t.Fatalf("error does not explain that the database is busy: %v", err)
@@ -559,32 +565,49 @@ func TestAcquireLockReportsBusyAndRecovers(t *testing.T) {
 	// a session that already holds the lock, so re-probing the hogger would succeed either way and
 	// prove nothing. Counting the advisory locks in the cluster is the direct observation: only the
 	// hogger should hold one.
-	if got := advisoryLockHolders(t, pool); got != 1 {
+	if got := advisoryLockHolders(t, pool, key); got != 1 {
 		t.Fatalf("%d sessions hold an advisory lock, want 1; a failed acquire leaked a hold", got)
 	}
 
 	// Now let go, and the waiter must get in.
-	if _, err := hogger.Exec(ctx, `SELECT pg_advisory_unlock($1)`, migrationLockKey); err != nil {
+	if _, err := hogger.Exec(ctx, `SELECT pg_advisory_unlock($1)`, key); err != nil {
 		t.Fatalf("release the lock: %v", err)
 	}
-	if got := advisoryLockHolders(t, pool); got != 0 {
+	if got := advisoryLockHolders(t, pool, key); got != 0 {
 		t.Fatalf("%d advisory locks held after the release, want 0", got)
 	}
 
-	unlock, err := acquireLock(ctx, waiter, 5*time.Second)
+	unlock, err := acquireLock(ctx, waiter, key, 5*time.Second)
 	if err != nil {
 		t.Fatalf("acquireLock did not recover after the holder released: %v", err)
 	}
 	unlock()
 }
 
-// advisoryLockHolders counts the sessions currently holding an advisory lock in this database.
-func advisoryLockHolders(t *testing.T, pool *pgxpool.Pool) int {
+// advisoryLockHolders counts the sessions currently holding a specific advisory lock key.
+//
+// Scoped to one key deliberately. Postgres advisory locks live in a database-wide namespace, so
+// counting all of them attributes another package's legitimate lock to this test -- which is what
+// happened, since a concurrent migrate.Run in another package holds the production key. That first
+// version counted every lock and failed for reasons that had nothing to do with the code under test.
+//
+// A bigint key is reported by Postgres as classid (high 32 bits), objid (low 32) and objsubid 1.
+func advisoryLockHolders(t *testing.T, pool *pgxpool.Pool, key int64) int {
 	t.Helper()
 
+	// Both sides cast to bigint. classid and objid are unsigned oids, so casting the computed halves
+	// to a signed int raises "integer out of range" for any key whose low half exceeds 2^31 -- which
+	// is most of them. Widening both sides sidesteps the signedness question entirely.
+	const query = `
+		SELECT count(*)
+		FROM pg_locks
+		WHERE locktype = 'advisory'
+		  AND classid::bigint = (($1::bigint >> 32) & 0xFFFFFFFF)
+		  AND objid::bigint = ($1::bigint & 0xFFFFFFFF)
+		  AND objsubid = 1`
+
 	var count int
-	if err := pool.QueryRow(context.Background(),
-		`SELECT count(*) FROM pg_locks WHERE locktype = 'advisory'`).Scan(&count); err != nil {
+	if err := pool.QueryRow(context.Background(), query, key).Scan(&count); err != nil {
 		t.Fatalf("count advisory locks: %v", err)
 	}
 	return count
