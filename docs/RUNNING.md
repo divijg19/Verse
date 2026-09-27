@@ -175,6 +175,34 @@ go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
 
 A container build is also provided in the `Dockerfile` and is exercised by CI.
 
+### `render.yaml` is the source of truth; the dashboard must mirror it
+
+The two have already diverged once. The dashboard's build command was a copy of an older revision of
+`render.yaml`, so Render was building with an unlocked dependency install and no `migrate` binary
+while the repository said otherwise — and nothing noticed, because nothing compared them.
+
+When changing how the service is built, change `render.yaml` **and** the dashboard setting, in the
+same commit. CI checks the repository's three build paths against each other; it cannot see the
+dashboard.
+
+### Toolchain: Bun is pinned, Go cannot be
+
+| | Value used by CI / `Dockerfile` | Value used by Render |
+|---|---|---|
+| Bun | `1.4.2`, asserted equal across all three paths | `1.4.2`, via `BUN_VERSION` in `render.yaml` |
+| Go | `1.26.x` from `go.mod`, asserted equal to the `Dockerfile` | **latest stable 1.x** — not pinnable |
+
+Render's default Bun depends on when the service was created, and this one defaulted to `1.3.4` while
+the repository was on `1.3.5` and then `1.4.2`. Production was therefore building the stylesheet with
+a package manager version no other build path used. `BUN_VERSION` in `render.yaml` fixes that, and
+CI now fails if the three disagree.
+
+Go is a genuine, accepted difference. Render's native Go runtime always tracks the latest stable 1.x
+and, in their words, "you can't pin to a specific Go version unless you deploy a Docker image." CI
+asserts the `Dockerfile` matches `go.mod`; it cannot make Render match, and asserting a value Render
+ignores would be a check that cannot pass. A newer Go toolchain is backward compatible, so this is
+recorded rather than engineered around. Deploying the `Dockerfile` on Render would close it.
+
 ### Before the first deploy of the authenticated build
 
 The service **will not start** unless `VERSE_AUTHORIZATION` and `VERSE_AUTH_SECRET` are set in the
@@ -250,6 +278,8 @@ to the live service deliberately and knowingly.
 | `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
 | `database connection failed` | `DATABASE_URL` unset, unreachable, or the database is asleep | Check the variable; managed databases need a moment to resume |
 | `DATABASE_URL environment variable not set` | The variable is not in the process environment | Export it. A `.env` file in the working directory is **not** read |
+| Production stylesheet differs from CI | Render's Bun drifted from the repository's | Check `BUN_VERSION` on the service; CI asserts all three build paths agree |
+| Deploy used a stale or different build command | The dashboard diverged from `render.yaml` | Re-sync the dashboard from `render.yaml`; CI cannot detect this |
 | Unstyled page | The stylesheet was not built | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify` |
 | Blank page or missing navigation in the console | The vendored htmx bundle is missing or its checksum changed | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256` |
 | `templ generate` reports `expected operand` | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper | See `templ/helpers.go` and existing templates for the convention |

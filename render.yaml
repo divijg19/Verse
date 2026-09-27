@@ -7,30 +7,52 @@
 # private page render issuing four database queries on every probe. /health touches no database, so
 # uptime no longer depends on Neon being reachable.
 
-services:
-  - type: web
-    name: verse
-    runtime: go
-    buildCommand: |
-      bun install --frozen-lockfile
-      bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
-      go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
-    startCommand: ./verse
-    healthCheckPath: /health
+  services:
+    - type: web
+      name: verse
+      runtime: go
+      # This file is the source of truth for how the service is deployed. The Render dashboard must
+      # mirror it. They diverged once already: the dashboard's build command was a copy of an older
+      # revision of this file, so Render built with an unlocked dependency install and no migrate
+      # binary while the repository said otherwise. Nothing detected it, because nothing compared
+      # the two.
+      buildCommand: |
+        bun install --frozen-lockfile
+        bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
+        go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
+      startCommand: ./verse
+      healthCheckPath: /health
 
-    # Fail closed. The application refuses to start without these, by design: serving the authoring
-    # surface unauthenticated is never correct. There is no bypass flag. Recovery from a forgotten
-    # passphrase is to rotate VERSE_AUTHORIZATION and redeploy.
-    #
-    # Set these in the Render dashboard BEFORE the first deploy of v0.3.7, or the service will not
-    # start. See docs/RUNNING.md.
-    envVars:
-      - key: DATABASE_URL
-        sync: false
+      # Toolchain pins, and what cannot be pinned.
+      #
+      # Bun is pinned to the same version CI uses and the Dockerfile uses. Render's default depends
+      # on when the service was created, and this one defaulted to 1.3.4 while the repository was on
+      # 1.3.5 and then 1.4.2 -- so the production build was using a package manager version that no
+      # other build path used, and nothing noticed. CI now asserts all three agree.
+      #
+      # Go deliberately has no pin. Render's native Go runtime always tracks the latest stable 1.x
+      # and "you can't pin to a specific Go version unless you deploy a Docker image." go.mod asks
+      # for 1.26.0 as a minimum, and building with a newer toolchain is compatible, so production
+      # runs a newer Go than CI and the Dockerfile. That is a real difference, recorded here rather
+      # than papered over with a pin that would be ignored. CI asserts the Dockerfile matches
+      # go.mod; it cannot make Render match, and a check that cannot pass is worse than no check.
+      envVars:
+        - key: BUN_VERSION
+          value: '1.4.2'
 
-      - key: VERSE_AUTHORIZATION
-        sync: false # the authoring passphrase; compared in constant time
+        - key: DATABASE_URL
+          sync: false
 
-      - key: VERSE_AUTH_SECRET
-        sync: false # HMAC key for session and CSRF tokens; minimum 32 characters
-        generateValue: false
+        # Fail closed. The application refuses to start without these, by design: serving the
+        # authoring surface unauthenticated is never correct. There is no bypass flag. Recovery from
+        # a forgotten passphrase is to rotate VERSE_AUTHORIZATION and redeploy.
+        #
+        # Set these in the Render dashboard BEFORE the first deploy of v0.3.7, or the service will
+        # not start. See docs/RUNNING.md.
+        - key: VERSE_AUTHORIZATION
+          sync: false # the authoring passphrase; compared in constant time
+
+        - key: VERSE_AUTH_SECRET
+          sync: false # HMAC key for session and CSRF tokens; minimum 32 characters
+          generateValue: false
+

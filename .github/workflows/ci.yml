@@ -291,16 +291,22 @@ jobs:
 
       - name: Verify every Bun pin agrees
         run: |
-          # The Dockerfile floated oven/bun:1-alpine while CI pinned an exact version, so the two
-          # build paths used different package managers. Both are fully qualified now, and this
-          # step is what keeps them that way.
+          # Three build paths exist: the Dockerfile, this workflow, and Render. They all install Bun
+          # and all produce the stylesheet, so they have to agree.
           #
-          # Every occurrence is compared, not just the first. The previous version of this check
-          # piped through `head -1`, so it compared the Dockerfile against only the first
-          # `bun-version` line and would have reported success while a second one still disagreed.
-          # There are two separate setup-bun steps, and a release whose stylesheet was built by a
-          # different package manager depending on which job ran it is precisely the failure this
-          # guard exists to prevent.
+          # render.yaml is the newest of the three and the one that had drifted furthest. Render's
+          # default Bun depends on the service's creation date, so production was building the
+          # stylesheet with 1.3.4 while CI and the Dockerfile used 1.3.5 and then 1.4.2. The two
+          # repository paths were cross-checked against each other; Render was not checked against
+          # anything, which is why nothing noticed.
+          #
+          # Every occurrence is compared, not just the first. An earlier version of this check piped
+          # through `head -1`, so it compared the Dockerfile against only the first `bun-version`
+          # line and would have reported success while a second one still disagreed.
+          #
+          # Go is deliberately absent. Render's native Go runtime always tracks the latest stable 1.x
+          # and cannot be pinned without deploying a Docker image, so asserting it here would be a
+          # check that cannot pass. docs/RUNNING.md records the difference instead.
           docker_bun=$(grep -oE '^FROM oven/bun:[0-9.]+' Dockerfile | head -1 | cut -d: -f2)
           if [ -z "$docker_bun" ]; then
             echo "::error::could not determine the Bun version from the Dockerfile"; exit 1
@@ -311,6 +317,12 @@ jobs:
             echo "::error::could not determine the Bun version from the workflow"; exit 1
           fi
 
+          render_bun=$(grep -A1 'key: BUN_VERSION' render.yaml | grep -oE "value: '[0-9.]+'" | grep -oE '[0-9.]+')
+          if [ -z "$render_bun" ]; then
+            echo "::error::render.yaml does not pin BUN_VERSION, so Render builds the stylesheet with whatever its default is"
+            exit 1
+          fi
+
           for ci_bun in "${ci_buns[@]}"; do
             if [ "$docker_bun" != "$ci_bun" ]; then
               echo "::error::Dockerfile uses oven/bun:$docker_bun but CI pins $ci_bun"
@@ -318,17 +330,20 @@ jobs:
             fi
           done
 
-          # Agreement with the Dockerfile is necessary but not sufficient: if a step were ever added
-          # with a pin the loop above did not see, the two CI pins could still disagree with each
-          # other. Compare the set, so "all pins are one value" is asserted rather than assumed.
-          distinct=$(printf '%s\n' "${ci_buns[@]}" | sort -u | wc -l)
+          # Agreement with the Dockerfile is necessary but not sufficient: a pin the loops above did
+          # not see could still disagree with the others. Compare the set, so "all pins are one
+          # value" is asserted rather than assumed.
+          all_pins=("${ci_buns[@]}" "$render_bun")
+          distinct=$(printf '%s\n' "${all_pins[@]}" | sort -u | wc -l)
           if [ "$distinct" -ne 1 ]; then
-            echo "::error::CI pins more than one Bun version:"
-            printf '  %s\n' "${ci_buns[@]}"
+            echo "::error::the build paths disagree about the Bun version:"
+            printf '  Dockerfile:  %s\n' "$docker_bun"
+            printf '  CI:          %s\n' "${ci_buns[*]}"
+            printf '  render.yaml: %s\n' "$render_bun"
             exit 1
           fi
 
-          echo "Dockerfile oven/bun:$docker_bun matches all ${#ci_buns[@]} CI pins"
+          echo "all build paths agree on Bun $docker_bun (CI: ${#ci_buns[@]} pins, render.yaml: 1 pin)"
 
       - name: Build container image
         # The Dockerfile is a second, independently reproducible build path. It is only worth
