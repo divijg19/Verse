@@ -261,8 +261,8 @@ export DATABASE_URL="postgres://verse:verse@localhost:5432/verse?sslmode=disable
 export VERSE_AUTHORIZATION="choose-a-passphrase"
 export VERSE_AUTH_SECRET="at-least-32-characters-of-entropy"
 
-# 4. Create the schema
-go run ./cmd/migrate
+  # 4. Apply the migrations — required before the service will start
+  go run ./cmd/migrate
 
 # 5. Run
 go run ./cmd/server

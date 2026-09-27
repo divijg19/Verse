@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/migrate"
 	"github.com/divijg19/Verse/internal/testsupport"
 )
 
@@ -171,8 +172,8 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("database ensure schema: %v", err)
+	if _, err := migrate.Run(context.Background(), database.Pool); err != nil {
+		t.Fatalf("database migrate: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {
@@ -281,8 +282,8 @@ func TestV019RouteMapExists(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("database ensure schema: %v", err)
+	if _, err := migrate.Run(context.Background(), database.Pool); err != nil {
+		t.Fatalf("database migrate: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {
@@ -308,8 +309,8 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect: %v", err)
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("database ensure schema: %v", err)
+	if _, err := migrate.Run(context.Background(), database.Pool); err != nil {
+		t.Fatalf("database migrate: %v", err)
 	}
 	t.Cleanup(func() {
 		if database.Pool != nil {

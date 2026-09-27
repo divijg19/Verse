@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/migrate"
 	appserver "github.com/divijg19/Verse/internal/server"
 	"github.com/divijg19/Verse/internal/testsupport"
 	"github.com/google/uuid"
@@ -64,8 +65,8 @@ func connectTestDB(t *testing.T) {
 	if err := database.Connect(); err != nil {
 		t.Fatalf("database connect failed: %v", err)
 	}
-	if err := database.EnsureSchema(context.Background()); err != nil {
-		t.Fatalf("database ensure schema failed: %v", err)
+	if _, err := migrate.Run(context.Background(), database.Pool); err != nil {
+		t.Fatalf("database migrate: %v", err)
 	}
 
 	t.Cleanup(func() {
