@@ -2,6 +2,7 @@ package testsupport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -132,4 +133,55 @@ func ConnectScratch(ctx context.Context, dsn, schema string) (*pgxpool.Pool, fun
 	}
 
 	return pool, cleanup, nil
+}
+
+// EnsurePackageSchema creates a schema for a test package if it is not already there, and returns a
+// DSN scoped to it.
+//
+// This is the difference between ConnectScratch, which gives one test its own schema and drops it
+// afterwards, and this, which gives a whole package one schema and leaves it. A package's tests run
+// sequentially inside one process and share it deliberately; what must not be shared is state between
+// packages, and that is what this prevents.
+//
+// Idempotent, so every test in the package can call it without coordinating. The name is normalised
+// because it is used as an unqualified search_path value, which folds to lower case -- see
+// NormalizeSchemaName.
+func EnsurePackageSchema(ctx context.Context, dsn, schema string) (string, error) {
+	if err := checkSchemaName(schema); err != nil {
+		return "", err
+	}
+
+	admin, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return "", fmt.Errorf("connect to create schema %s: %w", schema, err)
+	}
+	defer admin.Close()
+
+	if err := CreateSchema(ctx, admin, schema); err != nil {
+		return "", err
+	}
+
+	return WithSearchPath(dsn, schema)
+}
+
+// checkSchemaName rejects a name that is not a plain lower-case identifier.
+//
+// The name is interpolated into DDL after quoting and is used as a search_path value, so anything
+// with a quote, a space or upper-case in it is either a mistake or an injection. Rejecting it here
+// means no caller has to think about it.
+func checkSchemaName(schema string) error {
+	if schema == "" {
+		return errors.New("schema name is empty")
+	}
+	if schema != strings.ToLower(schema) {
+		return fmt.Errorf("schema name %q must be lower case; it is used as a search_path value", schema)
+	}
+	// De Morgan applied deliberately: "not a lower-case letter AND not a digit AND not an
+	// underscore" says exactly what is allowed, which is the complement that reads correctly.
+	if strings.ContainsFunc(schema, func(r rune) bool {
+		return r != '_' && !strings.ContainsRune("abcdefghijklmnopqrstuvwxyz0123456789", r)
+	}) {
+		return fmt.Errorf("schema name %q must contain only lower-case letters, digits and underscores", schema)
+	}
+	return nil
 }

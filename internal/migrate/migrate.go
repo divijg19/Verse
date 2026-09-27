@@ -141,7 +141,7 @@ func run(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) (Result, error) {
 	}
 	defer conn.Release()
 
-	unlock, err := acquireLock(ctx, conn, lockWait)
+	unlock, err := acquireLock(ctx, conn, migrationLockKey, lockWait)
 	if err != nil {
 		return result, err
 	}
@@ -187,21 +187,21 @@ func run(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) (Result, error) {
 // acquireLock takes the migration advisory lock, waiting up to wait, and returns the function that
 // releases it.
 //
-// The deadline is a parameter rather than a constant so a test can exercise the exhausted-wait path
-// in milliseconds instead of waiting out the real lockWait.
-//
-// pg_try_advisory_lock is polled rather than pg_advisory_lock blocking indefinitely, so that a lock
-// held by a process that will never release it produces an explanatory error instead of a boot that
-// appears to hang. Waiting is the correct behavior for the ordinary case: the other process is
-// finishing the same work this one would otherwise duplicate.
-func acquireLock(ctx context.Context, conn *pgxpool.Conn, wait time.Duration) (func(), error) {
+// The key and the deadline are both parameters rather than constants, for the same reason. A test
+// that exercised this against the production key would be competing for a database-wide lock with
+// every other package's migration run: pg advisory locks are scoped to the database, not to a schema,
+// so two packages migrating their own schemas still contend for the same one. That collision was
+// invisible while CI serialized packages with -p 1, and surfaced as an intermittent failure the
+// moment it did not. Taking the key as an argument lets a test use its own and still observe the
+// exhausted-wait path, without that dependency.
+func acquireLock(ctx context.Context, conn *pgxpool.Conn, key int64, wait time.Duration) (func(), error) {
 	deadline := time.Now().Add(wait)
 
 	for {
 		var acquired bool
 		// pg_try_advisory_lock returns a boolean rather than raising, so this needs no error
 		// handling beyond a transport failure.
-		if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, migrationLockKey).Scan(&acquired); err != nil {
+		if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, key).Scan(&acquired); err != nil {
 			return nil, fmt.Errorf("try to take the migration lock: %w", err)
 		}
 		if acquired {
@@ -209,7 +209,7 @@ func acquireLock(ctx context.Context, conn *pgxpool.Conn, wait time.Duration) (f
 				// WithoutCancel: the release must happen even when the run is unwinding because its
 				// context was canceled. Otherwise the session goes back to the pool still holding
 				// the lock, and every later run on that pool blocks until lockWait expires.
-				if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, migrationLockKey); err != nil {
+				if _, err := conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, key); err != nil {
 					discardUnlock(err)
 				}
 			}, nil

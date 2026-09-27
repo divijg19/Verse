@@ -23,6 +23,14 @@ import (
 // startup path, which reads DATABASE_URL. The swap is reverted by t.Cleanup, including unsetting the
 // variable when it was not set to begin with, so a scenario never leaves the process pointed at a
 // test database.
+// e2eSchema is this package's private schema in the test database.
+//
+// The end-to-end scenarios truncate poems, and they used to do it in the default schema alongside the
+// tests package. That is the shared state -p 1 existed to serialize. A schema per package removes
+// the sharing, so the constraint is a property of the setup rather than a flag someone has to
+// remember.
+const e2eSchema = "verse_t_cmdserver"
+
 func requireDisposableDSN(t *testing.T) {
 	t.Helper()
 
@@ -31,8 +39,13 @@ func requireDisposableDSN(t *testing.T) {
 		t.Skip(reason)
 	}
 
+	scoped, err := testsupport.EnsurePackageSchema(t.Context(), dsn, e2eSchema)
+	if err != nil {
+		t.Fatalf("package schema: %v", err)
+	}
+
 	prev, had := os.LookupEnv("DATABASE_URL")
-	if err := os.Setenv("DATABASE_URL", dsn); err != nil {
+	if err := os.Setenv("DATABASE_URL", scoped); err != nil {
 		t.Fatalf("set DATABASE_URL: %v", err)
 	}
 	t.Cleanup(func() {

@@ -51,11 +51,29 @@ func requireTestDSN(t *testing.T) string {
 	return dsn
 }
 
+// packageSchema is this package's private schema in the test database.
+//
+// Its own schema is what lets the test packages run concurrently. They used to share the default
+// one, and the only thing stopping them truncating each other's rows was -p 1 in the workflow --
+// a constraint that had to be remembered locally, could be forgotten silently, and applied to
+// packages that do not need it.
+//
+// A schema per package is also the honest expression of the dependency. This package's tests truncate
+// poems and login_attempts; nothing outside it should be able to see or affect that.
+const packageSchema = "verse_t_tests"
+
 func connectTestDB(t *testing.T) {
 	t.Helper()
 
 	dsn := requireTestDSN(t)
-	t.Setenv("DATABASE_URL", dsn)
+
+	// Idempotent, so every test may call this. Created on a separate connection because the scoped
+	// one searches for the schema and so cannot create it.
+	scoped, err := testsupport.EnsurePackageSchema(t.Context(), dsn, packageSchema)
+	if err != nil {
+		t.Fatalf("package schema: %v", err)
+	}
+	t.Setenv("DATABASE_URL", scoped)
 
 	if database.Pool != nil {
 		database.Pool.Close()

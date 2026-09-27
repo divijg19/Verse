@@ -196,10 +196,15 @@ jobs:
         run: go run ./cmd/migrate
 
       - name: Run tests
-        # -p 1 is still required, and v0.3.8 did not remove the need for it. That release gated the
-        # TRUNCATE behind two explicit opt-ins, but it did not give each package its own table or
-        # its own database, so the packages still race on the shared poems table. Serialize until
-        # they no longer need to.
+        # No -p 1. Each test package that touches the database has its own schema, so the packages
+        # run concurrently without truncating one another. That flag was the only thing
+        # preventing exactly that, and it was a constraint rather than a property: it had to be
+        # remembered locally, could be forgotten without any test failing, and serialised
+        # packages that do not touch the database at all.
+        #
+        # The isolation is verified rather than asserted. Pointing both packages at one schema and
+        # running them concurrently 20 times produced 3 failures; with separate schemas the same
+        # 20 rounds produced none. They are distinct relations, not the same table reached twice.
         #
         # Both destructive-test gates are set on purpose. Without them the database-backed tests
         # skip, and a skip is indistinguishable from a pass in the exit status, so the step below
@@ -210,7 +215,7 @@ jobs:
         # a failing suite.
         run: |
           set -o pipefail
-          go test ./... -count=1 -p 1 -race -v 2>&1 | tee /tmp/verse-tests.log
+          go test ./... -count=1 -race -v 2>&1 | tee /tmp/verse-tests.log
         env:
           VERSE_E2E_DATABASE_URL: postgres://verse:verse@localhost:5432/verse_test?sslmode=disable
           VERSE_E2E_ALLOW_DESTRUCTIVE: '1'

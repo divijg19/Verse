@@ -280,7 +280,7 @@ export VERSE_E2E_DATABASE_URL="postgres://verse:verse@localhost:5432/verse_test?
 # Gate 2: explicit acknowledgement that these tests delete rows.
 export VERSE_E2E_ALLOW_DESTRUCTIVE=1
 
-go test ./... -count=1 -p 1
+go test ./... -count=1
 ```
 
 Three things to know:
@@ -292,9 +292,12 @@ Three things to know:
 - **The target database name must contain `test`.** This is the backstop that catches a stale
   consent export: a production database is not called `verse_test`, so a misconfigured DSN fails
   loudly. It is a weaker check than the dedicated variable, not a replacement for it.
-- **`-p 1` is still required.** The packages still truncate a shared table, so running them
-  concurrently against one database races. v0.3.8 gated the `TRUNCATE` but did not give each
-  package its own table or database, so this remains until that is done.
+- **No `-p 1` is needed.** Each test package that touches the database has its own schema, so
+  they run concurrently without truncating one another. The two are `verse_t_tests` and
+  `verse_t_cmdserver`, and the tables in them are distinct relations rather than one table
+  reached two ways. Until v0.4.3 they shared the default schema and `-p 1` was the only
+  thing preventing the conflict — a constraint that had to be remembered locally and could be
+  forgotten without any test failing.
 
 The gate lives in `internal/testsupport` and is shared by both test packages, so `cmd/server` and
 `tests` cannot drift apart. `git grep TRUNCATE` returns exactly two executable lines, and both sit
@@ -439,4 +442,4 @@ to the live service deliberately and knowingly.
 | Blank page or missing navigation in the console | The vendored htmx bundle is missing or its checksum changed | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256` |
 | `templ generate` reports `expected operand` | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper | See `templ/helpers.go` and existing templates for the convention |
 | Tests pass but almost nothing ran | No DSN was set, so the database-backed tests skipped silently | Set `VERSE_E2E_DATABASE_URL` and check the skip count in the output |
-| Tests fail intermittently | Test packages ran concurrently against one database | Use `-p 1` |
+| Tests fail intermittently with a truncated or missing row | Two packages shared one `poems` table | Should be impossible as of v0.4.3, since each package has its own schema. If it recurs the isolation has been broken: check that `verse_t_tests` and `verse_t_cmdserver` each exist and hold their own `poems` |
