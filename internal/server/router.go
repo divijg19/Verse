@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +21,13 @@ import (
 // lines of inline <style>. Extracting them into a stylesheet is tracked for v0.4.0-B, at which point
 // 'unsafe-inline' can be dropped from style-src. script-src does NOT permit unsafe-inline, so the
 // vendored htmx and the single vendored navigation script remain the only executable sources.
+// RequestTimeout bounds any single request, whatever it is doing.
+//
+// It is the ceiling on how long anything in this service can hold a scarce resource, so it is a named
+// constant rather than a literal: HealthPingTimeout exists to stay well under it, and that
+// relationship is asserted by a test.
+const RequestTimeout = 30 * time.Second
+
 const securityHeaders = "default-src 'self'; " +
 	"script-src 'self'; " +
 	"style-src 'self' 'unsafe-inline'; " +
@@ -29,17 +38,38 @@ const securityHeaders = "default-src 'self'; " +
 	"frame-ancestors 'none'; " +
 	"base-uri 'none'"
 
+// healthPingTimeout bounds the database check behind /health.
+//
+// Deliberately far shorter than the router's 30s request timeout, and the reason is the connection
+// pool rather than the probe. The pool holds five connections by default, Render probes roughly every
+// five seconds, and pgx holds a connection for the whole of a Ping. Inheriting the request timeout
+// therefore allowed up to six probes to be in flight against five connections: if the database was
+// slow but alive -- a Neon compute resuming, added latency -- every application query would then
+// block waiting for a connection and be killed by the same 30s timeout, turning a slow database into
+// a total outage. Before this endpoint consulted the database at all, that mode did not exist.
+//
+// 1500ms is a quarter of the platform's own five-second check window, so a ping slower than this was
+// already a failed check. Holding a scarce connection for six times that bought nothing.
+//
+// Exported so a test can pin the relationship against RequestTimeout. Asserting it through timing
+// alone would be a slow, flaky test that eventually gets deleted, and the relationship is the whole
+// point of the constant.
+const HealthPingTimeout = 1500 * time.Millisecond
+
 // healthHandler answers the platform's liveness probe, and reports readiness rather than merely
 // liveness.
 //
 // The distinction is the point. Before this consulted the database it returned 200 unconditionally,
 // so a total Postgres outage left the platform polling a service it could not serve: no restart, no
-// alert, and a log full of reassuring 200s. A probe that cannot fail is worse than no probe, because
-// it is read as evidence.
+// alert, and a log full of reassuring 200s.
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 
-	if err := database.Ping(r.Context()); err != nil {
+	// The probe's own deadline, not the request's. See healthPingTimeout.
+	ctx, cancel := context.WithTimeout(r.Context(), HealthPingTimeout)
+	defer cancel()
+
+	if err := database.Ping(ctx); err != nil {
 		// #nosec G706 -- request-derived; sanitized as in refuseRequest. The error is included
 		// because it is the only place the connection failure is recorded.
 		log.Printf("health: database unreachable (request %s): %v", // #nosec G706
@@ -81,19 +111,75 @@ func methodNotAllowedHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
+// inboundRequestIDMiddleware bounds the caller's X-Request-Id before anything else reads it.
+//
+// This runs before middleware.RequestID, and that ordering is the whole point. RequestID honors an
+// inbound value verbatim, and from there the value reaches two places: chi's request logger, which
+// writes it into the log line, and the response header below. Sanitizing on the way out would have
+// bounded only the response and left the log forgeable -- a caller could write arbitrary text into
+// this service's logs, which is worse than having no log at all because the result gets trusted
+// during exactly the incident where trusting it is tempting.
+//
+// Sanitizing once, here, means the two surfaces cannot disagree about what the value is. The
+// cost is that a caller sending an over-long ID gets a truncated one back, which is the intended
+// behavior: the ID exists to correlate, and a correlation handle is not worth a megabyte of
+// caller-supplied text.
+//
+// Rewriting the request header rather than only the context is deliberate, since it is the header
+// that chi reads.
+func inboundRequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id := r.Header.Get(requestIDHeader); id != "" {
+			if cleaned := sanitizeHeaderValue(id); cleaned != id {
+				r.Header.Set(requestIDHeader, cleaned)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // requestIDHeaderMiddleware copies the request's correlation ID onto the response as X-Request-Id.
 //
 // Set before the handler runs, because a header written after the status line has been flushed is
 // silently dropped. An absent ID is left absent rather than replaced with a placeholder: a client
 // that sees a value will quote it, and a fabricated one sends them looking for a request that does
 // not exist.
+//
+// The value needs no further sanitizing -- inboundRequestIDMiddleware has already bounded it on the
+// way in -- and this copies what chi resolved, so an inbound ID and a generated one are echoed
+// identically.
 func requestIDHeaderMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if id := middleware.GetReqID(r.Context()); id != "" {
-			w.Header().Set("X-Request-Id", id)
+			w.Header().Set(requestIDHeader, id)
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// requestIDHeader is the header carrying the correlation ID, in both directions.
+const requestIDHeader = "X-Request-Id"
+
+// maxRequestIDValue bounds a caller-supplied correlation ID.
+//
+// Generous for a platform request ID and small enough that a caller cannot turn every log line and
+// every response into a megabyte of their own text. Separate from maxLoggedHeader, which bounds what
+// the application logs: these are different surfaces with different costs, and conflating them would
+// either over-truncate the log or under-bound the value at the edge.
+const maxRequestIDValue = 200
+
+// sanitizeHeaderValue strips control characters and truncates, for a value that came from a request.
+func sanitizeHeaderValue(s string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
+	if len(cleaned) > maxRequestIDValue {
+		cleaned = cleaned[:maxRequestIDValue] + "..."
+	}
+	return cleaned
 }
 
 // requestIDFrom returns the request's correlation ID for log lines, or "-" when there is none.
@@ -169,6 +255,10 @@ func NewRouter() (*chi.Mux, error) {
 
 	r := chi.NewRouter()
 
+	// First, so nothing downstream sees an unbounded caller-supplied value. middleware.RequestID
+	// honors an inbound X-Request-Id verbatim, and from there the value reaches both the log line
+	// and the response.
+	r.Use(inboundRequestIDMiddleware)
 	r.Use(middleware.RequestID)
 	// Echoed onto the response so a client can quote it, and so an application log line can be found
 	// in the platform's own request log. middleware.RequestID honors an inbound X-Request-Id, so on
@@ -185,7 +275,7 @@ func NewRouter() (*chi.Mux, error) {
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeadersMiddleware)
 	r.Use(bodyLimitMiddleware(cfg.MaxBodyBytes))
-	r.Use(middleware.Timeout(30 * time.Second))
+	r.Use(middleware.Timeout(RequestTimeout))
 
 	r.NotFound(notFoundHandler)
 	r.MethodNotAllowed(methodNotAllowedHandler)

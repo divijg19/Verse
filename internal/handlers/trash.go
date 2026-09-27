@@ -5,8 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
@@ -75,14 +73,27 @@ func buildPoemTrash(r *http.Request, restored, restoredID string) (templ.PoemTra
 		})
 	}
 
-	return templ.PoemTrash{Poems: entries, Restored: restored, RestoredI: restoredID}, nil
+	// The total, so the screen can disclose that the listing is capped rather than truncating
+	// silently. Counted separately from the listing because ListDeletedPoems is paged.
+	total, err := services.CountDeletedPoems(r.Context())
+	if err != nil {
+		return templ.PoemTrash{}, err
+	}
+
+	return templ.PoemTrash{
+		Poems:     entries,
+		Restored:  restored,
+		RestoredI: restoredID,
+		Total:     total,
+	}, nil
 }
 
 func writeTrashError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
+	// No ErrNoRows branch, and deliberately: the previous version had one, checking a condition that
+	// cannot occur. ListDeletedPoems returns a slice, so its error is a database failure or nothing at
+	// all -- never "no such row". The branch was a misconception about what this function returns, and
+	// a reader would reasonably have trusted it.
+	_ = r
 	log.Printf("list recycle: %v", err)
 	http.Error(w, "failed to load the recycle", http.StatusInternalServerError)
 }

@@ -7,6 +7,14 @@ type Poem struct {
 	ID        string
 	Content   string
 	CreatedAt time.Time
+
+	// DeletedAt is set only by GetPoemIncludingDeleted.
+	//
+	// The other reads -- ListPoems, SearchPoems, GetPoem -- all filter on deleted_at IS NULL, so they
+	// leave it nil, and nil is the correct value for them. That asymmetry is the trap: a nil here
+	// means "not deleted" for those three and "not populated" for this one, and the two are only
+	// distinguishable because the queries differ. It is worth knowing before adding a fifth read.
+	DeletedAt *time.Time
 }
 
 // PoemVersion is one superseded revision of a poem's content.

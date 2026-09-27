@@ -106,6 +106,7 @@ func buildPoemHistory(r *http.Request, poemID, restored, restoredID string) (tem
 		Versions:   views,
 		Restored:   restored,
 		RestoredID: restoredID,
+		DeletedAt:  poem.DeletedAt,
 	}, nil
 }
 

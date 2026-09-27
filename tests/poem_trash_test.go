@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -260,4 +261,86 @@ func listActivePoemContents(t *testing.T) []string {
 		out = append(out, p.Content)
 	}
 	return out
+}
+
+// TestTheRecycleDisclosesTruncation is the failure mode that matters most on this screen.
+//
+// The listing is capped at 100. Without a total, an author who deleted a work in March and cannot
+// find it here would reasonably conclude it was destroyed -- on the one screen whose entire purpose is
+// proving it was not.
+func TestTheRecycleDisclosesTruncation(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	srv := newTestServer(t)
+
+	// Under the cap: no disclosure needed, and none should appear.
+	for i := 0; i < 3; i++ {
+		id := insertPoem(t, "work "+strconv.Itoa(i))
+		if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+			t.Fatalf("delete %d: %v", i, err)
+		}
+	}
+	_, body, _ := get(t, srv.URL+"/recycle", nil)
+	if strings.Contains(body, "most recently deleted of") {
+		t.Error("the recycle claims truncation when everything fits")
+	}
+
+	// Over the cap: it must say so, and say how much is hidden.
+	for i := 3; i < 105; i++ {
+		id := insertPoem(t, "work "+strconv.Itoa(i))
+		if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+			t.Fatalf("delete %d: %v", i, err)
+		}
+	}
+	_, body, _ = get(t, srv.URL+"/recycle", nil)
+
+	if !strings.Contains(body, "most recently deleted of 105") {
+		t.Error("the recycle lists 100 of 105 deleted works without saying so; " +
+			"an author looking for an older work would conclude it was destroyed")
+	}
+	if !strings.Contains(body, "still in the database") {
+		t.Error("the recycle does not say the unlisted works are still in the database")
+	}
+}
+
+// TestCountDeletedPoems covers the count the disclosure depends on.
+func TestCountDeletedPoems(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	total, err := services.CountDeletedPoems(context.Background())
+	if err != nil {
+		t.Fatalf("count on an empty library: %v", err)
+	}
+	if total != 0 {
+		t.Fatalf("count = %d on an empty library, want 0", total)
+	}
+
+	live := insertPoem(t, "live")
+	for i := 0; i < 4; i++ {
+		id := insertPoem(t, "gone "+strconv.Itoa(i))
+		if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+			t.Fatalf("delete: %v", err)
+		}
+	}
+
+	total, err = services.CountDeletedPoems(context.Background())
+	if err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if total != 4 {
+		t.Fatalf("count = %d, want 4; a live work must not be counted", total)
+	}
+	_ = live
+
+	// Restoring one brings the count back down, so it cannot drift.
+	trash, _ := services.ListDeletedPoems(context.Background(), 100, 0)
+	if err := services.RestorePoem(context.Background(), trash[0].ID); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	total, _ = services.CountDeletedPoems(context.Background())
+	if total != 3 {
+		t.Fatalf("count after a restore = %d, want 3", total)
+	}
 }

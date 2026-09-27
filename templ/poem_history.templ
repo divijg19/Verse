@@ -46,21 +46,44 @@ templ PoemHistoryContent(ctx context.Context, history PoemHistory) {
 		</style>
 		<div class="verse-history-card verse-panel">
 			<div class="flex flex-wrap items-center justify-between gap-3">
-				<a
-					href={ "/poem/" + history.PoemID }
-					hx-get={ "/poem/" + history.PoemID }
-					hx-target="#screen"
-					hx-swap="innerHTML"
-					class="verse-history-nav"
-				>◀ Work</a>
-				<a
-					href={ "/editor/" + history.PoemID }
-					hx-get={ "/editor/" + history.PoemID }
-					hx-target="#screen"
-					hx-swap="innerHTML"
-					class="verse-history-nav"
-				>Editor ▶</a>
+				if history.DeletedAt == nil {
+					<a
+						href={ "/poem/" + history.PoemID }
+						hx-get={ "/poem/" + history.PoemID }
+						hx-target="#screen"
+						hx-swap="innerHTML"
+						class="verse-history-nav"
+					>◀ Work</a>
+				} else {
+					<a
+						href="/recycle"
+						hx-get="/recycle"
+						hx-target="#screen"
+						hx-swap="innerHTML"
+						class="verse-history-nav"
+					>◀ Recycle</a>
+				}
+				@If(history.DeletedAt == nil) {
+					<a
+						href={ "/editor/" + history.PoemID }
+						hx-get={ "/editor/" + history.PoemID }
+						hx-target="#screen"
+						hx-swap="innerHTML"
+						class="verse-history-nav"
+					>Editor ▶</a>
+				}
 			</div>
+			@If(history.Restored != "") {
+				<p class="pt-4 text-[0.62rem] uppercase tracking-[0.18em] text-purple-400">
+					{ history.Restored }
+				</p>
+			}
+			@If(history.DeletedAt != nil) {
+				<p class="pt-4 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">
+					In the recycle since { history.DeletedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }.
+					Restoring a draft brings it back to the library.
+				</p>
+			}
 			<p class="pt-5 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">Current</p>
 			<h2 class="pt-1 text-lg text-neutral-200">{ history.Title }</h2>
 			<article class="pt-3 whitespace-pre-wrap text-neutral-300">{ history.Current }</article>

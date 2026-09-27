@@ -465,3 +465,145 @@ func TestHistoryRequiresASession(t *testing.T) {
 		t.Fatal("a retained draft was served to an unauthenticated request")
 	}
 }
+
+// TestRestoringADraftUndeletesTheWork is the v0.4.4 defect this release fixes.
+//
+// The history screen is a recovery surface, and the recycle links a deleted work to its history, but
+// restoring a draft of a deleted work always failed: it routed through UpdatePoem, whose deleted_at
+// guard refuses to touch a soft-deleted row. The screen rendered a Restore button that could only 404.
+func TestRestoringADraftUndeletesTheWork(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "the draft worth keeping")
+	if err := services.UpdatePoem(context.Background(), id, "a bad paste"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	versions, err := services.ListPoemVersions(context.Background(), id)
+	if err != nil {
+		t.Fatalf("list versions: %v", err)
+	}
+	if len(versions) != 1 {
+		t.Fatalf("version count = %d, want 1", len(versions))
+	}
+
+	if err := services.RestorePoemVersion(context.Background(), id, versions[0].ID); err != nil {
+		t.Fatalf("restoring a draft of a deleted work failed: %v", err)
+	}
+
+	// Back in the library, with the restored text.
+	poem, err := services.GetPoem(context.Background(), id)
+	if err != nil {
+		t.Fatalf("the work is still not readable as live: %v", err)
+	}
+	if poem.Content != "the draft worth keeping" {
+		t.Fatalf("content after restore = %q, want the retained draft", poem.Content)
+	}
+
+	// And gone from the recycle.
+	trash, err := services.ListDeletedPoems(context.Background(), 100, 0)
+	if err != nil {
+		t.Fatalf("list deleted: %v", err)
+	}
+	for _, p := range trash {
+		if p.ID == id {
+			t.Fatal("the work is still in the recycle after restoring a draft from its history")
+		}
+	}
+}
+
+// TestRestoringADraftOfADeletedWorkIsStillUndoable keeps the append-only property under the new path.
+//
+// The restore now clears deleted_at, which is a second thing changing at once. It must still record
+// what it replaced, so the text that was displaced is not lost -- which is the whole reason the
+// history exists.
+func TestRestoringADraftOfADeletedWorkIsStillUndoable(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "first")
+	if err := services.UpdatePoem(context.Background(), id, "bad paste"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	first, _ := services.ListPoemVersions(context.Background(), id)
+	if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	if err := services.RestorePoemVersion(context.Background(), id, first[0].ID); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+
+	versions, err := services.ListPoemVersions(context.Background(), id)
+	if err != nil {
+		t.Fatalf("list versions: %v", err)
+	}
+	if len(versions) != 2 {
+		t.Fatalf("version count after restoring over a deleted work = %d, want 2; "+
+			"the displaced text must still be recoverable", len(versions))
+	}
+	if versions[0].Content != "bad paste" {
+		t.Fatalf("newest version = %q, want the text the restore displaced", versions[0].Content)
+	}
+}
+
+// TestUpdatingADeletedWorkIsStillRefused is the guard that must NOT have been weakened.
+//
+// RestorePoemVersion no longer routes through UpdatePoem, precisely so this stays true. If a future
+// change reintroduces the shared path or relaxes the filter, this fails -- which is the point of
+// having written it separately.
+func TestUpdatingADeletedWorkIsStillRefused(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "in the recycle")
+	if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	if err := services.UpdatePoem(context.Background(), id, "a silent edit of hidden work"); !errors.Is(err, services.ErrNotFound) {
+		t.Fatalf("editing a deleted work = %v, want ErrNotFound; "+
+			"the deleted_at guard is what stops a hidden work being edited invisibly", err)
+	}
+	if got := poemContentByID(t, id); got != "in the recycle" {
+		t.Fatalf("content = %q, want it untouched", got)
+	}
+}
+
+// TestTheHistoryScreenOfADeletedWorkOffersNoDeadLinks is the sweep's finding, made specific.
+//
+// /poem/{id} and /editor/{id} both resolve through reads that filter deleted_at, so a deleted work's
+// history offered two controls that could only 404.
+func TestTheHistoryScreenOfADeletedWorkOffersNoDeadLinks(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "deleted, with history")
+	if err := services.UpdatePoem(context.Background(), id, "deleted, edited"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if err := services.SoftDeletePoem(context.Background(), id); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	srv := newTestServer(t)
+
+	_, body, _ := get(t, srv.URL+"/poem/"+id+"/history", nil)
+
+	for _, dead := range []string{`hx-get="` + "/poem/" + id + `"`, `hx-get="` + "/editor/" + id + `"`} {
+		if strings.Contains(body, dead) {
+			t.Errorf("the history of a deleted work offers %s, which 404s for a soft-deleted poem", dead)
+		}
+	}
+	// And it says where the work is, and that restoring brings it back.
+	if !strings.Contains(body, "In the recycle") {
+		t.Error("the history of a deleted work does not say it is in the recycle")
+	}
+	if !strings.Contains(body, "Restoring a draft brings it back") {
+		t.Error("the history of a deleted work does not say that restoring a draft recovers it")
+	}
+}
