@@ -156,6 +156,10 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		templ_7745c5c3_Err = CSRFField(ctx).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -175,17 +179,13 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(poemID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 408, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 409, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = CSRFField(ctx).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -208,7 +208,7 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</textarea></div></div><div class=\"verse-editor-actions\"><div id=\"result\" role=\"status\" aria-live=\"polite\" class=\"verse-editor-status text-sm text-neutral-400\"><span class=\"verse-editor-status-message\"></span></div><button type=\"submit\" class=\"verse-editor-submit px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\"><span class=\"verse-editor-submit-text\">Save Bloom</span> <span class=\"verse-editor-saving\">Saving</span></button> <button type=\"button\" aria-label=\"Open full screen editor\" title=\"Open full screen editor\" class=\"verse-editor-fullscreen-button\" onclick=\"verseOpenEditorOverlay(this)\"><span>Full screen</span></button></div></form><div data-editor-overlay class=\"verse-editor-overlay\" hidden><div class=\"verse-editor-overlay-backdrop\" onclick=\"verseCloseEditorOverlay(this)\"></div><div class=\"verse-editor-overlay-panel\"><div class=\"verse-editor-overlay-card\"><div class=\"verse-editor-overlay-header\"><div class=\"verse-editor-overlay-meta\"><p class=\"verse-editor-overlay-eyebrow\">Focus Mode</p><p class=\"verse-editor-overlay-title\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</textarea></div></div><div class=\"verse-editor-actions\"><div id=\"result\" role=\"status\" aria-live=\"polite\" class=\"verse-editor-status text-sm text-neutral-400\"><span class=\"verse-editor-status-message\"></span></div><button type=\"submit\" class=\"verse-editor-submit px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\"><span class=\"verse-editor-submit-text\">Save Bloom</span> <span class=\"verse-editor-saving\">Saving</span></button> <button type=\"button\" aria-label=\"Open full screen editor\" title=\"Open full screen editor\" class=\"verse-editor-fullscreen-button\" data-editor-overlay-open><span>Full screen</span></button></div></form><div data-editor-overlay class=\"verse-editor-overlay\" hidden><div class=\"verse-editor-overlay-backdrop\" data-editor-overlay-close></div><div class=\"verse-editor-overlay-panel\"><div class=\"verse-editor-overlay-card\"><div class=\"verse-editor-overlay-header\"><div class=\"verse-editor-overlay-meta\"><p class=\"verse-editor-overlay-eyebrow\">Focus Mode</p><p class=\"verse-editor-overlay-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -221,7 +221,7 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</p></div><button type=\"button\" aria-label=\"Close full screen editor\" title=\"Close full screen editor\" class=\"verse-editor-fullscreen-button\" onclick=\"verseCloseEditorOverlay(this)\">Close</button></div><form hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</p></div><button type=\"button\" aria-label=\"Close full screen editor\" title=\"Close full screen editor\" class=\"verse-editor-fullscreen-button\" data-editor-overlay-close>Close</button></div><form hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -235,6 +235,10 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" hx-target=\"#result-fullscreen\" hx-swap=\"innerHTML\" hx-on::after-request=\"this.querySelector('textarea').focus()\" class=\"verse-editor-overlay-form\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = CSRFField(ctx).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -257,7 +261,7 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(poemID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 471, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 472, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 			if templ_7745c5c3_Err != nil {
@@ -267,30 +271,26 @@ func EditorContent(ctx context.Context, title string, poemID string, content str
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = CSRFField(ctx).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
 			return nil
 		})
 		templ_7745c5c3_Err = If(poemID != "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"verse-editor-overlay-well\"><textarea name=\"content\" data-editor-overlay-textarea placeholder=\"Write your poem...\" oninput=\"verseSyncEditorOverlay(this)\" class=\"verse-editor-textarea verse-editor-overlay-textarea w-full flex-1 min-h-0 overflow-y-auto rounded-xl outline-none focus:ring-2 focus:ring-purple-600\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"verse-editor-overlay-well\"><textarea name=\"content\" data-editor-overlay-textarea placeholder=\"Write your poem...\" class=\"verse-editor-textarea verse-editor-overlay-textarea w-full flex-1 min-h-0 overflow-y-auto rounded-xl outline-none focus:ring-2 focus:ring-purple-600\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(content)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 481, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/editor.templ`, Line: 480, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</textarea></div><div class=\"verse-editor-overlay-actions\"><div id=\"result-fullscreen\" role=\"status\" aria-live=\"polite\" class=\"verse-editor-status text-sm text-neutral-400\"><span class=\"verse-editor-status-message\"></span></div><button type=\"submit\" class=\"verse-editor-submit px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\"><span class=\"verse-editor-submit-text\">Save Bloom</span> <span class=\"verse-editor-saving\">Saving</span></button></div></form></div></div></div><script>\n\t\t\tfunction verseEditorRoot(node) {\n\t\t\t\treturn node.closest(\"[data-editor-root]\");\n\t\t\t}\n\n\t\t\tfunction verseEditorViewport() {\n\t\t\t\treturn document.getElementById(\"viewport\");\n\t\t\t}\n\n\t\t\tfunction verseSetEditorOverlayState(open) {\n\t\t\t\tconst viewport = verseEditorViewport();\n\t\t\t\tif (!viewport) return;\n\t\t\t\tif (open) {\n\t\t\t\t\tviewport.dataset.editorOverlayOpen = \"true\";\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\tdelete viewport.dataset.editorOverlayOpen;\n\t\t\t}\n\n\t\t\tfunction verseOpenEditorOverlay(node) {\n\t\t\t\tconst root = verseEditorRoot(node);\n\t\t\t\tif (!root) return;\n\t\t\t\tconst overlay = root.querySelector(\"[data-editor-overlay]\");\n\t\t\t\tconst base = root.querySelector(\"[data-editor-base]\");\n\t\t\t\tconst overlayTextarea = root.querySelector(\"[data-editor-overlay-textarea]\");\n\t\t\t\tif (!overlay || !base || !overlayTextarea) return;\n\t\t\t\toverlayTextarea.value = base.value;\n\t\t\t\toverlay.hidden = false;\n\t\t\t\tverseSetEditorOverlayState(true);\n\t\t\t\tif (window.verseLockBodyScroll) {\n\t\t\t\t\twindow.verseLockBodyScroll();\n\t\t\t\t} else {\n\t\t\t\t\tdocument.body.style.overflow = \"hidden\";\n\t\t\t\t}\n\t\t\t\trequestAnimationFrame(() => overlayTextarea.focus());\n\t\t\t}\n\n\t\t\tfunction verseCloseEditorOverlay(node) {\n\t\t\t\tconst root = verseEditorRoot(node);\n\t\t\t\tif (!root) return;\n\t\t\t\tconst overlay = root.querySelector(\"[data-editor-overlay]\");\n\t\t\t\tconst base = root.querySelector(\"[data-editor-base]\");\n\t\t\t\tconst overlayTextarea = root.querySelector(\"[data-editor-overlay-textarea]\");\n\t\t\t\tif (!overlay || !base || !overlayTextarea) return;\n\t\t\t\tbase.value = overlayTextarea.value;\n\t\t\t\toverlay.hidden = true;\n\t\t\t\tverseSetEditorOverlayState(false);\n\t\t\t\tif (window.verseUnlockBodyScroll) {\n\t\t\t\t\twindow.verseUnlockBodyScroll();\n\t\t\t\t} else {\n\t\t\t\t\tdocument.body.style.overflow = \"\";\n\t\t\t\t}\n\t\t\t\trequestAnimationFrame(() => base.focus());\n\t\t\t}\n\n\t\t\tfunction verseSyncEditorOverlay(node) {\n\t\t\t\tconst root = verseEditorRoot(node);\n\t\t\t\tif (!root) return;\n\t\t\t\tconst base = root.querySelector(\"[data-editor-base]\");\n\t\t\t\tif (!base) return;\n\t\t\t\tbase.value = node.value;\n\t\t\t}\n\n\t\t\tif (!window.verseEditorEscapeBound) {\n\t\t\t\twindow.verseEditorEscapeBound = true;\n\t\t\t\tdocument.addEventListener(\"keydown\", function(event) {\n\t\t\t\t\tif (event.key !== \"Escape\") return;\n\t\t\t\t\tconst overlay = document.querySelector(\"[data-editor-overlay]:not([hidden])\");\n\t\t\t\t\tif (!overlay) return;\n\t\t\t\t\tconst closeButton = overlay.querySelector(\"[aria-label='Close full screen editor']\");\n\t\t\t\t\tif (closeButton) {\n\t\t\t\t\t\tverseCloseEditorOverlay(closeButton);\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t}\n\t\t</script></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</textarea></div><div class=\"verse-editor-overlay-actions\"><div id=\"result-fullscreen\" role=\"status\" aria-live=\"polite\" class=\"verse-editor-status text-sm text-neutral-400\"><span class=\"verse-editor-status-message\"></span></div><button type=\"submit\" class=\"verse-editor-submit px-4 py-2 bg-purple-600 rounded-md hover:bg-purple-500 transition\"><span class=\"verse-editor-submit-text\">Save Bloom</span> <span class=\"verse-editor-saving\">Saving</span></button></div></form></div></div></div><script src=\"/static/js/editor.js\"></script></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -404,9 +404,9 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 			hx-on::after-request="this.querySelector('textarea').focus()"
 			class="verse-editor-root-frame"
 		>
+			@CSRFField(ctx)
 			@If(poemID != "") {
 				<input type="hidden" name="id" value={ poemID }/>
-			@CSRFField(ctx)
 			}
 			<div class="verse-editor-card">
 				<div class="verse-editor-card-header"></div>
@@ -435,14 +435,14 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 					aria-label="Open full screen editor"
 					title="Open full screen editor"
 					class="verse-editor-fullscreen-button"
-					onclick="verseOpenEditorOverlay(this)"
+					data-editor-overlay-open
 				>
 					<span>Full screen</span>
 				</button>
 			</div>
 		</form>
 		<div data-editor-overlay class="verse-editor-overlay" hidden>
-			<div class="verse-editor-overlay-backdrop" onclick="verseCloseEditorOverlay(this)"></div>
+			<div class="verse-editor-overlay-backdrop" data-editor-overlay-close></div>
 			<div class="verse-editor-overlay-panel">
 				<div class="verse-editor-overlay-card">
 					<div class="verse-editor-overlay-header">
@@ -455,7 +455,7 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 							aria-label="Close full screen editor"
 							title="Close full screen editor"
 							class="verse-editor-fullscreen-button"
-							onclick="verseCloseEditorOverlay(this)"
+							data-editor-overlay-close
 						>
 							Close
 						</button>
@@ -467,16 +467,15 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 						hx-on::after-request="this.querySelector('textarea').focus()"
 						class="verse-editor-overlay-form"
 					>
+						@CSRFField(ctx)
 						@If(poemID != "") {
 							<input type="hidden" name="id" value={ poemID }/>
-			@CSRFField(ctx)
 						}
 						<div class="verse-editor-overlay-well">
 							<textarea
 								name="content"
 								data-editor-overlay-textarea
 								placeholder="Write your poem..."
-								oninput="verseSyncEditorOverlay(this)"
 								class="verse-editor-textarea verse-editor-overlay-textarea w-full flex-1 min-h-0 overflow-y-auto rounded-xl outline-none focus:ring-2 focus:ring-purple-600"
 							>{ content }</textarea>
 						</div>
@@ -496,82 +495,7 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 				</div>
 			</div>
 		</div>
-		<script>
-			function verseEditorRoot(node) {
-				return node.closest("[data-editor-root]");
-			}
-
-			function verseEditorViewport() {
-				return document.getElementById("viewport");
-			}
-
-			function verseSetEditorOverlayState(open) {
-				const viewport = verseEditorViewport();
-				if (!viewport) return;
-				if (open) {
-					viewport.dataset.editorOverlayOpen = "true";
-					return;
-				}
-				delete viewport.dataset.editorOverlayOpen;
-			}
-
-			function verseOpenEditorOverlay(node) {
-				const root = verseEditorRoot(node);
-				if (!root) return;
-				const overlay = root.querySelector("[data-editor-overlay]");
-				const base = root.querySelector("[data-editor-base]");
-				const overlayTextarea = root.querySelector("[data-editor-overlay-textarea]");
-				if (!overlay || !base || !overlayTextarea) return;
-				overlayTextarea.value = base.value;
-				overlay.hidden = false;
-				verseSetEditorOverlayState(true);
-				if (window.verseLockBodyScroll) {
-					window.verseLockBodyScroll();
-				} else {
-					document.body.style.overflow = "hidden";
-				}
-				requestAnimationFrame(() => overlayTextarea.focus());
-			}
-
-			function verseCloseEditorOverlay(node) {
-				const root = verseEditorRoot(node);
-				if (!root) return;
-				const overlay = root.querySelector("[data-editor-overlay]");
-				const base = root.querySelector("[data-editor-base]");
-				const overlayTextarea = root.querySelector("[data-editor-overlay-textarea]");
-				if (!overlay || !base || !overlayTextarea) return;
-				base.value = overlayTextarea.value;
-				overlay.hidden = true;
-				verseSetEditorOverlayState(false);
-				if (window.verseUnlockBodyScroll) {
-					window.verseUnlockBodyScroll();
-				} else {
-					document.body.style.overflow = "";
-				}
-				requestAnimationFrame(() => base.focus());
-			}
-
-			function verseSyncEditorOverlay(node) {
-				const root = verseEditorRoot(node);
-				if (!root) return;
-				const base = root.querySelector("[data-editor-base]");
-				if (!base) return;
-				base.value = node.value;
-			}
-
-			if (!window.verseEditorEscapeBound) {
-				window.verseEditorEscapeBound = true;
-				document.addEventListener("keydown", function(event) {
-					if (event.key !== "Escape") return;
-					const overlay = document.querySelector("[data-editor-overlay]:not([hidden])");
-					if (!overlay) return;
-					const closeButton = overlay.querySelector("[aria-label='Close full screen editor']");
-					if (closeButton) {
-						verseCloseEditorOverlay(closeButton);
-					}
-				});
-			}
-		</script>
+		<script src="/static/js/editor.js"></script>
 	</div>
 }
 

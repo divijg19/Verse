@@ -3,6 +3,8 @@ package tests
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -116,10 +118,33 @@ func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
 		`.verse-editor-root-frame.htmx-request .verse-editor-saving,`,
 		`.verse-editor-overlay-form.htmx-request .verse-editor-saving {`,
 		`.verse-editor-overlay-header {`,
-		`viewport.dataset.editorOverlayOpen = "true";`,
-		`delete viewport.dataset.editorOverlayOpen;`,
 		`flex-direction: column;`,
 	)
+
+	// The two statements that actually lock the viewport moved to static/js/editor.js in v0.4.8,
+	// because the content security policy blocks an inline <script> and the previous version of this
+	// test asserted they were in the rendered page. It could not have been right for long: those
+	// statements were in the markup and therefore never ran in any browser, and this test passed
+	// anyway. The assertion is kept, against the file the policy now permits.
+	assertContainsAll(t, readStaticFile(t, filepath.Join("static", "js", "editor.js")),
+		`viewport.dataset.editorOverlayOpen = "true";`,
+		`delete viewport.dataset.editorOverlayOpen;`,
+	)
+}
+
+// readStaticFile reads a file from the repository's static directory, from either the repository root
+// or the tests directory, since the suite runs with either as its working directory.
+func readStaticFile(t *testing.T, path string) string {
+	t.Helper()
+
+	if _, err := os.Stat(path); err != nil {
+		path = filepath.Join("..", path)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s failed: %v", path, err)
+	}
+	return string(body)
 }
 
 func TestDashboardHeatmapScalesDownOnSmallerScreens(t *testing.T) {
