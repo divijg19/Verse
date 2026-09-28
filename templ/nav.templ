@@ -6,6 +6,7 @@ templ Nav(surface string) {
 	@navSlot("nav-left", surface, "left", false)
 	@navSlot("nav-right", surface, "right", false)
 	@navSlot("nav-bottom", surface, "down", false)
+	@desktopSignOut()
 }
 
 templ NavOOB(surface string) {
@@ -14,6 +15,7 @@ templ NavOOB(surface string) {
 	@navSlot("nav-left", surface, "left", true)
 	@navSlot("nav-right", surface, "right", true)
 	@navSlot("nav-bottom", surface, "down", true)
+	@desktopSignOut()
 }
 
 templ mobileNav(surface string, oob bool) {
@@ -40,7 +42,6 @@ templ mobileNavContent(surface string) {
 				aria-controls="mobile-nav-sheet"
 				aria-label="Open navigation menu"
 				class="verse-mobile-nav-toggle"
-				onclick="verseOpenMobileNav(this)"
 			>
 				<span></span>
 				<span></span>
@@ -49,7 +50,7 @@ templ mobileNavContent(surface string) {
 		</div>
 	</div>
 	<div id="mobile-nav-sheet" data-mobile-nav-sheet class="verse-mobile-nav-sheet" hidden>
-		<div class="verse-mobile-nav-backdrop" onclick="verseCloseMobileNav(this)"></div>
+		<div class="verse-mobile-nav-backdrop" data-mobile-nav-close></div>
 		<div class="verse-mobile-nav-panel">
 			<div class="verse-mobile-nav-list">
 				@mobileNavLink(surface, "/dashboard", "Dashboard")
@@ -58,7 +59,35 @@ templ mobileNavContent(surface string) {
 				@mobileNavLink(surface, "/caelum", "Caelum")
 				@mobileNavLink(surface, "/share", "Share")
 			</div>
+			<div class="verse-mobile-nav-actions">
+				@signOut()
+			</div>
 		</div>
+	</div>
+}
+
+// signOut ends the session.
+//
+// This route has been registered and working since it was written, and tests/auth_test.go has covered
+// it the whole time. What was missing was any control that reached it: no form, no link, and no
+// reference in a single template. The only way to end a session was to wait out the eight-hour TTL or
+// clear cookies by hand, which on a shared or borrowed machine leaves the writing surface open.
+//
+// A plain form posting to the route, deliberately, rather than an htmx request. A sign-out that
+// depends on JavaScript is a sign-out that does not work on the surface where the script did not load,
+// and this release has just spent its length removing a dependence on script that was never running.
+// The handler redirects to /login, and a full navigation to there is the correct outcome.
+templ signOut() {
+	<form method="post" action="/logout" class="verse-signout-form">
+		@CSRFField(ctx)
+		<button type="submit" class="verse-signout-button">Sign out</button>
+	</form>
+}
+
+// desktopSignOut is the copy in the navigation rail, shown from 1024px up.
+templ desktopSignOut() {
+	<div id="nav-signout">
+		@signOut()
 	</div>
 }
 

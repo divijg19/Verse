@@ -8,6 +8,7 @@ require (
 	github.com/a-h/templ v0.3.1020
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
+	golang.org/x/net v0.51.0
 	golang.org/x/sync v0.23.0
 )
 

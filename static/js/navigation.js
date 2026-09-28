@@ -160,3 +160,35 @@ window.addEventListener("resize", () => {
         verseCloseMobileNav();
     }
 });
+
+// Delegated listeners for the mobile navigation.
+//
+// Both of these were onclick attributes until v0.4.8, and neither had run since v0.3.7: the content
+// security policy sets script-src 'self' with no 'unsafe-inline' and no nonce anywhere in this
+// application, so every inline attribute was blocked in every browser. The desktop nav is
+// display:none below 1024px, which left the hamburger as the only route to the navigation on a
+// phone, pointing at nothing.
+//
+// The functions below are unchanged. verseOpenMobileNav took the triggering element and uses it
+// only to remember where focus came from, so the matched element is the same argument the inline
+// attribute passed as `this`. verseCloseMobileNav takes none, and the attribute's `this` was already
+// being discarded.
+//
+// The target is checked for being an Element first: a click can land on a text node or the document
+// itself, and calling closest on those is a TypeError rather than a false result. An inline
+// attribute never had to consider it, because the browser passed the element directly.
+document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) {
+        return;
+    }
+
+    const toggle = event.target.closest("[data-mobile-nav-toggle]");
+    if (toggle) {
+        verseOpenMobileNav(toggle);
+        return;
+    }
+
+    if (event.target.closest("[data-mobile-nav-close]")) {
+        verseCloseMobileNav();
+    }
+});

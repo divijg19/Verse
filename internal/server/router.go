@@ -21,17 +21,34 @@ import (
 // Extracting them into a stylesheet is tracked for v0.4.0-B, at which point 'unsafe-inline' can be
 // dropped from style-src.
 //
+// script-src does NOT permit unsafe-inline, and there is no nonce and no hash anywhere in this
+// application. That is a deliberate policy and it stays: an inline <script> or an on*= attribute in
+// the markup would be blocked.
+//
+// It was also, until v0.4.8, a policy the application violated on every page it served. The previous
+// version of this comment claimed that the policy meant "the vendored htmx and the single vendored
+// navigation script remain the only executable sources", which is how the violation was read as
+// intended behavior for eleven releases. The editor shipped a 75-line inline <script> and six
+// inline on*= attributes; the mobile navigation shipped two more. All of them were blocked in every
+// browser, so the editor's Focus Mode never opened and the mobile navigation -- the only route to
+// the nav below 1024px -- did nothing. Nothing in the test suite related the policy to the markup, so
+// the contradiction was invisible: one test asserted the header string and another asserted the
+// markup, and no assertion joined them.
+//
+// The code moved rather than the policy loosening. Adding 'unsafe-inline' would have made the header
+// true by making it useless. TestContentSecurityPolicyMatchesTheMarkup is the assertion that was
+// missing, and it is the reason this cannot recur.
+//
 // The line count is deliberately not quoted here. It was quoted once, drifted, and correcting it
 // produced a second wrong number: three different counting methods gave three different answers for
 // the same tree. A figure in a security rationale that nobody recomputes is worse than none, because
-// it reads as a measurement. The claim that matters is the causal one above, and it is asserted by
-// TestSecurityHeaders. script-src does NOT permit unsafe-inline, so the
-// vendored htmx and the single vendored navigation script remain the only executable sources.
-// RequestTimeout bounds any single request, whatever it is doing.
+// it reads as a measurement. The claims that matter are the causal one above and the violation that
+// followed from it, and both are now asserted.
 //
-// It is the ceiling on how long anything in this service can hold a scarce resource, so it is a named
-// constant rather than a literal: HealthPingTimeout exists to stay well under it, and that
-// relationship is asserted by a test.
+// RequestTimeout bounds any single request, whatever it is doing. It is the ceiling on how long
+// anything in this service can hold a scarce resource, so it is a named constant rather than a
+// literal: HealthPingTimeout exists to stay well under it, and that relationship is asserted by a
+// test.
 const RequestTimeout = 30 * time.Second
 
 const securityHeaders = "default-src 'self'; " +
