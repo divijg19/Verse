@@ -1,1 +1,39 @@
-@import "tailwindcss"
+@import "tailwindcss" source(none);
+
+/* Content sources are declared here rather than inferred.
+ *
+ * Tailwind v4 discovers the class names it should generate by scanning the working directory, so with
+ * the default `source()` the set of generated utilities depends entirely on what happens to be present
+ * beside the stylesheet when the build runs. That is a property of the environment, not of the project.
+ *
+ * It cost us the container image. Two build paths exist for the same application:
+ *
+ *   - render.yaml and CI build in the repository root, where templ/ and internal/ are present, so
+ *     automatic detection found them and the stylesheet was complete;
+ *   - the Dockerfile builds in a css stage containing package.json, bun.lock and static/css/input.css,
+ *     and nothing else, so automatic detection found no class names at all.
+ *
+ * Measured on the same Tailwind version, same input file, same command:
+ *
+ *   repository root:  22,440 bytes, every utility present
+ *   css stage:         4,165 bytes, zero utilities
+ *
+ * The image therefore shipped with theme variables and preflight and no utility classes, so every
+ * `flex`, `min-h-0` and `overflow-hidden` in the markup silently did nothing. The image also carried no
+ * JavaScript at all, because the css stage never held static/js -- a second, independent failure in
+ * the same stage.
+ *
+ * `source(none)` turns automatic detection off, so the two builds can no longer diverge however their
+ * working directories differ, and the @source directives below become the whole input set. Both build
+ * paths must now supply these two directories, which the Dockerfile does explicitly. That is the point:
+ * the inputs are stated in the one file both builds read, rather than being a side effect of where the
+ * build happened to run.
+ *
+ * The paths are relative to this file, so they resolve to the repository's templ/ and internal/.
+ *
+ * templ/ holds the class names, because that is where the markup is. internal/ is included because
+ * Go code renders markup too: internal/handlers/dashboard.go and templ/heatmap_helpers.go both contain
+ * class attributes, and a class only ever written from Go would otherwise be missing.
+ */
+@source "../../templ";
+@source "../../internal";

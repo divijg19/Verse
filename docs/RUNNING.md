@@ -444,6 +444,18 @@ go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
 
 A container build is also provided in the `Dockerfile` and is exercised by CI.
 
+Since v0.4.9 that exercise asserts the image *renders*, not merely that it starts. The job requests
+`/static/js/htmx.min.js`, `/static/js/navigation.js` and `/static/css/output.css` from the running
+container and requires a 200 for each, then greps the served stylesheet for a generated utility class.
+Earlier revisions checked only `/health` and that `/library` refuses an anonymous caller, and an image
+with no JavaScript and no Tailwind utilities passed both: `/health` answers from the process, and
+`/library` is refused by the router before any handler runs. That gap is why the image spent its
+existence shipping a 4,165-byte stylesheet with no utility classes in it — see R16 in
+`.opencode/RISK_REGISTER.md`.
+
+If you add a static asset, add it to the same assertions. The allowlist in
+`internal/server/router.go` is the other place that needs to hear about it.
+
 ### `render.yaml` is the source of truth; the dashboard must mirror it
 
 The two have already diverged once. The dashboard's build command was a copy of an older revision of
@@ -528,9 +540,17 @@ A refused request answers `403` with a body of exactly `forbidden`, and that is 
 that cannot produce a valid token has no business being told which of its mistakes to correct —
 distinguishing the reasons is the entire value of the synchroniser token.
 
-Every response carries `X-Request-Id`, including refusals. `middleware.RequestID` honours an inbound
-`X-Request-Id`, so on Render this is the platform's own identifier, and the same value appears in the
-platform's request log. That is what lets a bug report be turned into a log line.
+Every response carries `X-Request-Id`, including refusals. `requestIDHeaderMiddleware` in
+`internal/server/router.go` honours an inbound `X-Request-Id`, so on Render this is the platform's own
+identifier, and the same value appears in the platform's request log. That is what lets a bug report
+be turned into a log line.
+
+The value is bounded before anything reads it, by `inboundRequestIDMiddleware`. This document
+previously named `middleware.RequestID`, which does not exist: there is no `internal/middleware`
+package, and never has been. The empty directory sat untracked in a working tree, which is enough for
+a path check to pass and not enough for the project to contain it — the README's project tree made
+that mistake in the same release, and `TestReadmeProjectTreeNamesOnlyRealPaths` caught it in CI but
+not locally, for the same reason.
 
 Every refusal is logged with its reason and request ID, on both the login path and the authenticated
 mutation path.

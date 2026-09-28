@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/divijg19/Verse/internal/clock"
+	"github.com/divijg19/Verse/internal/models"
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -21,13 +20,21 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	month := parseDashboardMonth(r.URL.Query().Get("month"))
 
 	if isHeatmapRequest(r) {
-		activeDates, err := services.MonthActivity(ctx, month)
+		// The same query the full dashboard uses, narrowed to the month.
+		//
+		// This path used to call a month-only query of its own, which was one acquisition and
+		// perfectly reasonable in isolation. Keeping it meant two ways to answer "which days in this
+		// month have work on them", and two ways is how a streak and a heatmap end up disagreeing
+		// about a day -- which is exactly what happened once, when one bucketed on the session's zone
+		// and the other did not. Reading the shared window costs a few hundred short values on a
+		// request a user makes by clicking a month arrow, and buys a single definition of a day.
+		activeDates, err := services.ActivityDays(ctx, month)
 		if err != nil {
 			http.Error(w, "failed to load heatmap", http.StatusInternalServerError)
 			return
 		}
 
-		days := buildHeatmapDays(month, activeDates)
+		days := buildHeatmapDays(month, services.MonthDays(activeDates, month))
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := templ.Heatmap(month, days).Render(ctx, w); err != nil {
 			http.Error(w, "failed to render heatmap", http.StatusInternalServerError)
@@ -96,6 +103,18 @@ type dashboardData struct {
 	days          []templ.HeatmapDay
 }
 
+// loadDashboardData fetches everything the dashboard shows in two pool acquisitions.
+//
+// It was four, run concurrently, and the pool has five connections. One dashboard load plus one
+// health probe was therefore the whole pool: the probe's connection request queued behind a page view,
+// and there is no AcquireTimeout to cap the wait, so a slow database turned the probe into the last
+// caller served. The probe then fails, and the platform restarts the instance into the same slow
+// database.
+//
+// Two acquisitions leave three, which is the point. It is two rather than three because the streak and
+// the heatmap were the same query with different bounds and are now one query with the earlier of the
+// two starts, bucketed in Go -- so they are also known to agree about which day a work belongs to,
+// which two independent queries never guaranteed.
 func loadDashboardData(ctx context.Context, month time.Time) (dashboardData, error) {
 	group, groupCtx := errgroup.WithContext(ctx)
 	var total int
@@ -103,35 +122,29 @@ func loadDashboardData(ctx context.Context, month time.Time) (dashboardData, err
 	var days []templ.HeatmapDay
 	var lastPoem *templ.LastPoemSummary
 
+	// The days feed both the streak and the heatmap, so they are read once and shared. Everything the
+	// first goroutine writes happens before Wait returns, and every read of those variables is after
+	// it, so the race detector is what keeps that from being a promise rather than a fact.
 	group.Go(func() error {
-		value, err := services.TotalPoems(groupCtx)
+		value, err := services.ActivityDays(groupCtx, month)
 		if err != nil {
 			return err
 		}
-		total = value
+		currentStreak = services.StreakFromDays(value, clock.TodayUTC())
+		days = buildHeatmapDays(month, services.MonthDays(value, month))
 		return nil
 	})
 
 	group.Go(func() error {
-		value, err := services.CurrentStreak(groupCtx)
+		summary, err := services.DashboardSummary(groupCtx)
 		if err != nil {
 			return err
 		}
-		currentStreak = value
-		return nil
-	})
-
-	group.Go(func() error {
-		activeDates, err := services.MonthActivity(groupCtx, month)
-		if err != nil {
-			return err
+		total = summary.Total
+		if summary.Latest == nil {
+			return nil
 		}
-		days = buildHeatmapDays(month, activeDates)
-		return nil
-	})
-
-	group.Go(func() error {
-		value, err := loadLastPoem(groupCtx)
+		value, err := lastPoemSummary(*summary.Latest)
 		if err != nil {
 			return err
 		}
@@ -151,15 +164,8 @@ func loadDashboardData(ctx context.Context, month time.Time) (dashboardData, err
 	}, nil
 }
 
-func loadLastPoem(ctx context.Context) (*templ.LastPoemSummary, error) {
-	poem, err := services.LatestPoem(ctx)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
+// lastPoemSummary turns the most recent work into what the dashboard renders for it.
+func lastPoemSummary(poem models.Poem) (*templ.LastPoemSummary, error) {
 	title := presenters.FirstNonEmptyLine(poem.Content)
 	if title == "" {
 		title = "Untitled"

@@ -44,8 +44,8 @@ No algorithmic interference.
 * Version history — every superseded draft is retained, and a restore is itself undoable
 * Recycle — soft-deleted work is listed and can be brought back
 * Export — a lossless JSON copy of the whole library, plus a Markdown rendering for reading
-* Streak tracking
-* Calendar archive
+* Streak tracking, counted in UTC days
+* Monthly activity heatmap
 * `Caelum` (random prompt engine)
 * Private-first architecture
 
@@ -79,8 +79,6 @@ Primary stack:
 * HTMX (dynamic interactions)
 * TailwindCSS (styling)
 * PostgreSQL (data layer)
-* Dart + Jaspr (interactive UI islands)
-* Minimal Next.js (only where necessary)
 
 ---
 
@@ -88,11 +86,13 @@ Primary stack:
 
 ## Backend
 
-* Go 1.22+
+* Go 1.26 (pinned in `go.mod`)
 * Chi router
-* pgx (PostgreSQL driver)
-* sqlc or manual queries
-* Goose or Atlas for migrations
+* pgx v5 (PostgreSQL driver)
+* Hand-written SQL. There is no query generator: every statement is in `internal/services`, and
+  `tests/readme_schema_test.go` checks the schema block below against the live database
+* `internal/migrate`, which embeds the `.sql` files and applies them in filename order with a
+  recorded checksum per file. Not a migration framework — see `docs/RUNNING.md`
 
 Why Go:
 
@@ -109,8 +109,8 @@ Templ generates type-safe HTML components.
 Used for:
 
 * Editor page
-* Calendar page
-* Layout system
+* Library, dashboard, Caelum, share and recycle surfaces
+* Layout system, with the navigation rendered out of band on an HTMX swap
 * Reusable UI components
 
 ---
@@ -119,10 +119,10 @@ Used for:
 
 HTMX handles:
 
-* Save poem without full page reload
-* Load prompt dynamically
-* Update streak counter
-* Fetch calendar entries
+* Save a poem without a full page reload
+* Swap a surface without a full page reload
+* Replace the heatmap for a chosen month
+* Retain and restore a superseded revision
 
 Minimal JS.
 Declarative interactivity.
@@ -144,58 +144,42 @@ Provides:
 
 ---
 
-## Dart + Jaspr (Selective UI Islands)
-
-Used only where reactive UI is valuable.
-
-Planned use cases:
-
-* Mood selector animation
-* Future analytics dashboard
-* AI analysis visualizations
-
-Jaspr compiles to lightweight web components embedded in Templ layouts.
-
----
-
 # 📁 Project Structure
 
-```id="zkq92v"
+```
 verse/
-│
+|
 ├── cmd/
-│   └── server/
-│        └── main.go
-│
+|   ├── server/        the application, and the migration run at its boot
+|   └── migrate/       the standalone migration runner, same migrations
+|
 ├── internal/
-│   ├── handlers/
-│   ├── database/
-│   ├── models/
-│   ├── services/
-│   │    ├── streak.go
-│   │    ├── prompts.go
-│   │    └── mood.go
-│   └── middleware/
-│
-├── templ/
-│   ├── layout.templ
-│   ├── editor.templ
-│   ├── calendar.templ
-│   ├── components/
-│   │    ├── streak.templ
-│   │    ├── mood_selector.templ
-│   │    └── caelum_button.templ
-│
+|   ├── server/        routes, security headers, sessions, CSRF
+|   ├── handlers/      HTTP handlers; one file per surface
+|   ├── services/      the SQL. All of it. dashboard.go, library.go, prompts.go
+|   ├── database/      connection, pool configuration, schema assertion
+|   ├── migrate/       the migration runner: checksums, advisory lock, timeouts
+|   ├── models/        domain types
+|   ├── presenters/    content flattening and truncation for rendering
+|   ├── export/        the export writers, JSON and Markdown
+|   ├── clock/         the injectable clock
+|   └── testsupport/   disposable-DSN gate and scratch schemas
+|
+├── templ/             one .templ per surface, each with its generated Go counterpart
+|   ├── layout.templ   shell, navigation, and the CSP-relevant script tags
+|   ├── editor.templ   the editor and its Focus Mode
+|   ├── heatmap.templ  the month grid
+|   └── security.go    the CSRF field the mutating routes require
+|
 ├── static/
-│   ├── css/
-│   ├── js/
-│   └── wasm/
-│
-├── jaspr/
-│   └── mood_island/
-│
-├── migrations/
-│
+|   ├── css/input.css  Tailwind entry point, with its @source directives
+|   └── js/            navigation.js, editor.js, and vendored htmx
+|
+├── migrations/        001 through 006, embedded into both binaries
+|
+├── docs/RUNNING.md    operations, environment variables, the migration contract
+|
+├── Dockerfile         the second build path, exercised by CI
 ├── go.mod
 └── README.md
 ```

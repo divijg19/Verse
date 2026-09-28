@@ -14,7 +14,7 @@ import (
 )
 
 func TestSharedScreenLayoutLocksViewport(t *testing.T) {
-	body := renderComponent(t, views.LayoutWithSurface("share", views.Share()))
+	body := renderComponent(t, views.Layout("share", views.Share()))
 
 	assertContainsAll(t, body,
 		`<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">`,

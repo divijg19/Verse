@@ -565,7 +565,36 @@ jobs:
             docker logs verse-ci || true
             exit 1
           fi
-          echo "unauthenticated /library correctly rejected with $code"
+            echo "unauthenticated /library correctly rejected with $code"
+
+            # The image must serve a page, not merely start.
+            #
+            # Everything above is invisible to a missing asset. /health answers from the process, and
+            # /library is refused by the router before any handler runs, so an image with no
+            # JavaScript and no Tailwind utilities passed every one of them for as long as the two
+            # build paths disagreed. These four assertions are the difference: the image is asked for
+            # the files a browser requests, and the stylesheet is inspected for a class that can only
+            # be present if the templates were scanned when it was built.
+            for asset in /static/js/htmx.min.js /static/js/navigation.js /static/css/output.css; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080${asset}")
+              if [ "$code" != "200" ]; then
+                echo "::error::${asset} returned ${code} from the image; expected 200"
+                docker logs verse-ci || true
+                exit 1
+              fi
+            done
+            echo "image serves its JavaScript and stylesheet"
+
+            # A stylesheet carrying only theme variables and preflight returns 200 here, so the
+            # request above is not enough on its own. min-h-0 and overflow-hidden are both load-bearing
+            # in the editor and dashboard layouts, so a build that dropped them would still look
+            # correct to every other check in this job.
+            if ! curl -fsS http://localhost:8080/static/css/output.css | grep -q '\.min-h-0'; then
+              echo "::error::the image's stylesheet contains no utility classes; Tailwind found no source files, which is what a css stage without templ/ and internal/ produces"
+              exit 1
+            fi
+            echo "image stylesheet contains generated utility classes"
+
 
           # The application must refuse to start without its authentication configuration.
           echo "--- verifying fail-closed startup ---"

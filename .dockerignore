@@ -8,3 +8,13 @@ server.pid
 bin
 dist
 README.md
+
+# Local secrets. The build stage runs `COPY . .`, so without these a developer's DATABASE_URL and
+# VERSE_AUTH_SECRET are baked into a build layer, where they survive in the image's history even
+# though the final distroless stage copies only named paths and never ships them.
+#
+# The glob covers every .env variant rather than the file alone, because .env.local and .env.production
+# are the ones that actually hold real values, and forgetting one of them is the failure this is here
+# to prevent.
+.env
+.env.*
