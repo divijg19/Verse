@@ -160,6 +160,13 @@ different version of the repository than the code it ships with.
   and adding a new one, and the database has already absorbed the old one.
 - **A file that is blank after trimming is skipped and never recorded.** A file containing only
   comments is a valid no-op and is recorded like any other migration.
+- **A run is bounded, so a blocked migration fails instead of hanging.** An `ALTER TABLE` needs
+  `ACCESS EXCLUSIVE` on the table it rewrites, and the deploy is zero-downtime, so the outgoing
+  instance is still serving — and still querying — while the incoming one migrates. The run therefore
+  sets `lock_timeout` (5s) and `statement_timeout` (60s) on its own connection, and the caller bounds
+  the whole run at 5 minutes. A migration that cannot get what it needs in that time fails, naming the
+  file, and the next deploy retries against a quieter database. Both server-side settings are cleared
+  before the connection returns to the pool, so they never bound an ordinary request.
 
 Applied migrations are recorded in `schema_migrations` (`filename`, `checksum`, `applied_at`).
 
@@ -174,6 +181,29 @@ untouched. This is covered by a test rather than assumed.
 > **Take a backup before running migrations against production.** The runner is idempotent and will
 > not re-apply anything, but a new migration that has not been reviewed against real data is still a
 > new migration.
+
+### Before `006_timestamptz.sql`: one query worth running
+
+`006_timestamptz.sql` rewrites `poems.created_at`, `poems.deleted_at` and `poem_versions.recorded_at`
+as `timestamptz`. It carries an explicit `AT TIME ZONE 'UTC'` on each column, so the result is the
+same whatever time zone the database server is configured for. That is safe for a database that has
+always run in UTC, which this one has. If a database's history is *not* in UTC — a restored dump, a
+branch, an instance moved somewhere else — the zone was discarded on the way in, so the stored values
+look exactly like UTC wall clocks and no migration can detect the difference.
+
+Worth running before deploying rather than after wondering:
+
+```sql
+SELECT count(*) FILTER (WHERE created_at IS NULL) AS null_created_at,
+       min(created_at)                       AS earliest,
+       max(created_at)                       AS latest
+FROM poems;
+```
+
+A non-zero `null_created_at` is harmless and expected to be carried through unchanged. The `earliest`
+and `latest` values are the point: if they line up with when the work was actually written, the
+assumption holds. If they are shifted by a whole zone offset, correct the rows **before** converting
+them rather than after. Take the export first either way.
 
 ### Why migrations run at startup, and not as a deploy step
 
@@ -460,7 +490,7 @@ Recommended order:
 `/health` returns `200` and `ok` when the database is reachable, and `503` when it is not.
 `render.yaml` points the platform health check at it.
 
-This is a change of behaviour, and deliberately so. It previously answered `200` without touching the
+This is a change of behavior, and deliberately so. It previously answered `200` without touching the
 database, on the reasoning that a probe should not depend on database availability. The result was
 worse than the problem it avoided: a total Postgres outage left the platform polling a service that
 could not serve a single page, so nothing restarted, nothing alerted, and the log showed an unbroken
@@ -534,7 +564,7 @@ a review, whereas the application refuses to serve content without a valid sessi
   and its checksum. `static/js/VENDOR.sha256` is verified in CI; a modified vendored file fails the
   build.
 - **Health of the commit graph.** A change is validated when its pull request targets `main`, and
-  again when it merges into `main`. Superseded runs are cancelled automatically. See
+  again when it merges into `main`. Superseded runs are canceled automatically. See
   `.github/workflows/ci.yml`.
 
 ---

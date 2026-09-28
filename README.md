@@ -218,15 +218,15 @@ type is one the schema actually uses.
 table poems {
     id           uuid        -- primary key
     content      text        -- the work itself, stored verbatim
-    created_at   timestamp   -- nullable: the column has a default but is not declared NOT NULL
-    deleted_at   timestamp   -- nullable: set by a soft delete, NULL while the work is live
+    created_at   timestamptz -- nullable: the column has a default but is not declared NOT NULL
+    deleted_at   timestamptz -- nullable: set by a soft delete, NULL while the work is live
 }
 
 table poem_versions {
     id           uuid        -- primary key
     poem_id      uuid        -- references poems(id); the work this revision belongs to
     content      text        -- what the work said immediately before an edit
-    recorded_at  timestamp   -- when that edit happened; human-facing, not used for ordering
+    recorded_at  timestamptz -- when that edit happened; human-facing, not used for ordering
     seq          bigint      -- identity; the history is ordered by this, because recorded_at can tie
 }
 
@@ -247,10 +247,24 @@ table schema_migrations {
 
 Two notes worth reading rather than skimming:
 
-**`poems.created_at` is `timestamp`, not `timestamptz`.** Every other timestamp in the schema is
-`timestamptz`, so this is an inconsistency rather than a decision. Normalising it is a rewrite of
-the `poems` table — the one table holding the work — so it is deliberately not bundled into a
-release that also starts writing to it. Take an export first.
+**Every timestamp in the schema is `timestamptz` except one.** `schema_migrations.applied_at` is the
+exception, and it is left as `timestamp` on purpose: nothing reads it — the runner selects only
+`filename` and `checksum` — it records when a migration ran rather than anything the application
+interprets, and the runner creates that table with `IF NOT EXISTS` against databases that may predate
+it, so its column definitions are not ours to change incompatibly.
+
+**`poems.created_at` is nullable.** It has a default but was never declared `NOT NULL`, so a row
+inserted with an explicit `NULL` is representable. The conversion to `timestamptz` left such a row as a
+`NULL` rather than inventing a creation instant for it, and a work with no creation instant is
+absent from the heatmap and from the streak, which is visible and recoverable. Promoting the column to
+`NOT NULL` is a separate decision and is not done here.
+
+**A day is a UTC day.** `DATE(created_at)` would resolve in the session's time zone, so both dashboard
+queries say `AT TIME ZONE 'UTC'` and the connection pool pins every session to UTC as well. A poem
+written at 20:00 UTC is already the next calendar day at `+05:30`; without this it would be credited to
+the following day, and a real streak would read as broken. The clause and the pin are deliberately
+redundant — the clause states the intent for whoever reads the query, the pin covers a future query
+written without it.
 
 **`poem_versions` has no pruning.** Nothing updates or deletes a row, and there is no purge path.
 Restoring a revision is an ordinary edit, which records what it replaced, so the history is

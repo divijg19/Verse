@@ -63,7 +63,13 @@ func run() error {
 	//
 	// Migrations are idempotent, so this is a no-op on every start after the first. It does run on
 	// every start, because a free instance is recycled periodically and each new process repeats it.
-	result, err := migrate.Run(context.Background(), database.Pool)
+	// Bounded: the session timeouts inside the runner are enforced by the server and so cannot help
+	// when the client is the side that has stopped hearing back. A free instance is recycled often
+	// enough that this is the common path, and a boot that hangs here is a deploy that never
+	// completes.
+	migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), migrate.RunBudget)
+	defer cancelMigrate()
+	result, err := migrate.Run(migrateCtx, database.Pool)
 	if err != nil {
 		return errors.New("database migration failed: " + err.Error())
 	}

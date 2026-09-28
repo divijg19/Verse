@@ -612,3 +612,289 @@ func advisoryLockHolders(t *testing.T, pool *pgxpool.Pool, key int64) int {
 	}
 	return count
 }
+
+// TestMigrationBoundsAreScopedToTheRun pins both halves of the contract the migration timeouts have
+// to satisfy at once: they are in force while the run is executing, and they are gone from the
+// connection afterwards.
+//
+// Both halves are asserted through run() rather than by calling sessionBounds directly, because the
+// interesting half is the one that only the caller can get right. set_config is session-scoped, and
+// the session is a pooled connection the application will hand out again, so a runner that set the
+// bounds and forgot to clear them would pass a test of the helper while leaving every subsequent
+// request on that connection capped at 60s. That is a failure that appears under load and points
+// nowhere near the migration that caused it.
+//
+// The settings are observed from inside a migration rather than from a connection held open beside
+// it, so what is asserted is what a real migration would actually run under.
+func TestMigrationBoundsAreScopedToTheRun(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	// The probe migration records the settings in force at the moment its own statements run.
+	probe := fstest.MapFS{
+		"001_probe.sql": &fstest.MapFile{Data: []byte(`
+			CREATE TABLE bounds_seen (
+				lock      interval NOT NULL,
+				statement interval NOT NULL
+			);
+			INSERT INTO bounds_seen
+			SELECT current_setting('lock_timeout')::interval,
+			       current_setting('statement_timeout')::interval;
+		`)},
+	}
+	if _, err := run(ctx, pool, probe); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	// In force during the run, at exactly the shipped values.
+	var gotLock, gotStatement time.Duration
+	const readSeen = `SELECT lock, statement FROM bounds_seen`
+	if err := pool.QueryRow(ctx, readSeen).Scan(&gotLock, &gotStatement); err != nil {
+		t.Fatalf("read the observed bounds: %v", err)
+	}
+	if gotLock != tableLockTimeout {
+		t.Fatalf("lock_timeout in force was %v, want the shipped %v", gotLock, tableLockTimeout)
+	}
+	if gotStatement != statementTimeout {
+		t.Fatalf("statement_timeout in force was %v, want the shipped %v", gotStatement, statementTimeout)
+	}
+
+	// And gone afterwards. The default for both is 0, meaning disabled: wait as long as it takes.
+	//
+	// Every connection is checked, not just one. The pool may hand back the session that migrated or
+	// a different one, and a single sample would pass even if the bounds had been left on whichever
+	// connection the test happened to reacquire.
+	conns := pool.AcquireAllIdle(ctx)
+	if len(conns) == 0 {
+		t.Fatal("no idle connections to check; the pool returned none after a run")
+	}
+	defer func() {
+		for _, c := range conns {
+			c.Release()
+		}
+	}()
+
+	for i, c := range conns {
+		for _, setting := range []string{"lock_timeout", "statement_timeout"} {
+			var got float64
+			// current_setting normalises for display -- 60s comes back as '1min' -- so the value is
+			// converted to seconds and compared numerically. Comparing the text would make this test
+			// depend on Postgres's duration formatting rather than on the value actually in force.
+			const read = `SELECT EXTRACT(EPOCH FROM current_setting($1)::interval)`
+			if err := c.QueryRow(ctx, read, setting).Scan(&got); err != nil {
+				t.Fatalf("read %s on connection %d: %v", setting, i, err)
+			}
+			if got != 0 {
+				t.Fatalf("%s leaked onto pooled connection %d as %vs, want the 0 (disabled) default",
+					setting, i, got)
+			}
+		}
+	}
+}
+
+// TestRunFailsFastWhenAMigrationNeedsALockedTable is the case that motivated the bounds at all.
+//
+// An ALTER TABLE needs ACCESS EXCLUSIVE, and an ordinary request holds a weaker lock on the same
+// table for the length of its own query. The host performs zero-downtime deploys, so the outgoing
+// instance is still querying while the incoming one migrates. Unbounded, that ALTER waits inside
+// Postgres with no Go context and no output until the platform kills the process -- which surfaces
+// as an unrelated crash and can leave a half-rewritten table.
+//
+// This asserts three things: the run fails, it fails *naming the file* so the operator knows which
+// statement to retry, and it fails within a bound rather than never. The real tableLockTimeout is
+// used rather than a test-sized one on purpose: a shortened timeout would prove the mechanism works
+// without proving the shipped value is the one that rescues a deploy.
+func TestRunFailsFastWhenAMigrationNeedsALockedTable(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	const create = `
+		CREATE TABLE IF NOT EXISTS contended (
+			id int,
+			stamp timestamp
+		)`
+	if _, err := pool.Exec(ctx, create); err != nil {
+		t.Fatalf("create the contended table: %v", err)
+	}
+
+	// A separate connection holds ACCESS EXCLUSIVE, standing in for a long-running request against
+	// the live table. Released only after the assertion, so the lock is genuinely held throughout.
+	//
+	// The lock has to be taken inside an open transaction, because LOCK TABLE is only valid there
+	// and the lock lasts exactly as long as the transaction does. Rolling back rather than committing
+	// is deliberate: there is nothing to persist, and it keeps the table untouched.
+	hogger, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire the hogging connection: %v", err)
+	}
+	defer hogger.Release()
+	holder, err := hogger.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin the locking transaction: %v", err)
+	}
+	defer func() { discardHolderRollback(holder.Rollback(ctx)) }()
+	if _, err := holder.Exec(ctx, `LOCK TABLE contended IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatalf("take the lock: %v", err)
+	}
+
+	alter := fstest.MapFS{
+		"001_alter.sql": &fstest.MapFile{Data: []byte(`ALTER TABLE contended ALTER COLUMN stamp TYPE timestamptz;`)},
+	}
+
+	start := time.Now()
+	_, runErr := run(ctx, pool, alter)
+	elapsed := time.Since(start)
+
+	if runErr == nil {
+		t.Fatal("run succeeded while another session held ACCESS EXCLUSIVE on the table; the lock bound is not in force")
+	}
+	// The file name is the whole point: an operator reading a failed deploy needs to know which
+	// statement to retry, and apply() is what supplies it.
+	if !strings.Contains(runErr.Error(), "001_alter.sql") {
+		t.Fatalf("error does not name the migration file: %v", runErr)
+	}
+	// A generous ceiling rather than a tight one. The point is that it returned at all: with no
+	// bound this call does not return within the life of the test binary. Allow for a slow CI
+	// machine and the 5s the timeout itself costs, and fail only on the open-ended case.
+	if ceiling := 4 * tableLockTimeout; elapsed > ceiling {
+		t.Fatalf("run took %v, want it to give up within %v of failing on a held lock", elapsed, ceiling)
+	}
+
+	// And the failure must have left nothing behind. A migration that raised a lock timeout should
+	// not be recorded, or the next deploy would skip the very statement that never ran.
+	var recorded int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM schema_migrations WHERE filename = '001_alter.sql'`).Scan(&recorded); err != nil {
+		t.Fatalf("count applied: %v", err)
+	}
+	if recorded != 0 {
+		t.Fatal("a migration that could not take its lock was recorded as applied; the next deploy would skip it")
+	}
+}
+
+// discardHolderRollback consumes a Rollback error for the reasons given at its only call site.
+//
+// errcheck runs with check-blank, so an error assigned to the blank identifier is still reported.
+// Passing it to a function that returns nothing is the way to say "deliberately ignored" in a form
+// the linter accepts -- the same reasoning as discardRollback in the runner.
+func discardHolderRollback(error) {}
+
+// TestTimestampMigrationIsZoneIndependent is the test that earns the USING clause in 006.
+//
+// A bare `ALTER COLUMN ... TYPE TIMESTAMPTZ` reinterprets zone-less values in the *session's* zone,
+// so the same file would move every poem by a different amount depending on the host it ran on. This
+// runs the real migration against the real prior schema with the session deliberately set away from
+// UTC, and asserts the instants are untouched.
+//
+// The counterfactual at the end is not decoration. It applies the obvious bare form to an identical
+// table and asserts that it *does* shift the value, which pins down both that this test can detect a
+// regression and why the clause is there -- a test that only proves the good path cannot tell a
+// correct conversion from a correct-looking coincidence.
+func TestTimestampMigrationIsZoneIndependent(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	// The real 001-005, so the pre-migration shape is the one production actually has rather than a
+	// hand-written approximation that could drift from it.
+	all, err := load(migrations.FS)
+	if err != nil {
+		t.Fatalf("load the embedded migrations: %v", err)
+	}
+	prior := fstest.MapFS{}
+	var normalize migration
+	for _, m := range all {
+		if m.name == "006_timestamptz.sql" {
+			normalize = m
+			continue
+		}
+		prior[m.name] = &fstest.MapFile{Data: []byte(m.sql)}
+	}
+	if normalize.name == "" {
+		t.Fatal("006_timestamptz.sql is not embedded; the migration this test verifies is missing")
+	}
+	if _, err := run(ctx, pool, prior); err != nil {
+		t.Fatalf("apply 001-005: %v", err)
+	}
+
+	// A zone-less value, written the way the column was actually populated: now() cast into a
+	// TIMESTAMP by a database running in UTC.
+	const wrote = "2024-01-01 00:00:00"
+	const poemID = "11111111-1111-1111-1111-111111111111"
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO poems (id, content, created_at) VALUES ($1, $2, $3::timestamp)`,
+		poemID, "the work itself", wrote); err != nil {
+		t.Fatalf("insert the poem: %v", err)
+	}
+
+	// The session that runs the migration, moved away from UTC. This is the whole test: everything
+	// below happens with a non-UTC clock in force.
+	migrator, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire the migrating connection: %v", err)
+	}
+	defer migrator.Release()
+	if _, err := migrator.Exec(ctx, `SET TIME ZONE 'Asia/Kolkata'`); err != nil {
+		t.Fatalf("shift the session zone: %v", err)
+	}
+	if _, err := migrator.Exec(ctx, normalize.sql); err != nil {
+		t.Fatalf("apply 006 under a non-UTC session: %v", err)
+	}
+
+	// The types moved, and the instant did not. Equal compares instants rather than wall clocks,
+	// which is the only comparison that means anything across a zone change.
+	for _, tc := range []struct{ table, column string }{
+		{"poems", "created_at"},
+		{"poems", "deleted_at"},
+		{"poem_versions", "recorded_at"},
+	} {
+		var gotType string
+		const readType = `
+			SELECT format_type(a.atttypid, a.atttypmod)
+			FROM pg_attribute a
+			JOIN pg_class c ON c.oid = a.attrelid
+			WHERE c.relname = $1 AND a.attname = $2 AND a.attnum > 0`
+		if err := migrator.QueryRow(ctx, readType, tc.table, tc.column).Scan(&gotType); err != nil {
+			t.Fatalf("read the type of %s.%s: %v", tc.table, tc.column, err)
+		}
+		if gotType != "timestamp with time zone" {
+			t.Fatalf("%s.%s is %q, want timestamp with time zone", tc.table, tc.column, gotType)
+		}
+	}
+
+	var gotCreated time.Time
+	if err := migrator.QueryRow(ctx, `SELECT created_at FROM poems WHERE id = $1`, poemID).Scan(&gotCreated); err != nil {
+		t.Fatalf("read created_at: %v", err)
+	}
+	want, err := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
+	if err != nil {
+		t.Fatalf("parse the expected instant: %v", err)
+	}
+	if !gotCreated.Equal(want) {
+		t.Fatalf("created_at is %v, want the instant %v; the conversion shifted it",
+			gotCreated.UTC(), want.UTC())
+	}
+
+	// The counterfactual: the obvious bare form, on an identical column in the same session.
+	//
+	// Two separate Exec calls rather than one multi-statement string. A pool connection defaults to
+	// the extended protocol, which permits exactly one statement per execution -- the same limitation
+	// apply() works around with QueryExecModeSimpleProtocol, and worth respecting here too.
+	if _, err := migrator.Exec(ctx, `CREATE TABLE bare_form (stamp timestamp)`); err != nil {
+		t.Fatalf("create the counterfactual table: %v", err)
+	}
+	if _, err := migrator.Exec(ctx, `INSERT INTO bare_form (stamp) VALUES ($1::timestamp)`, wrote); err != nil {
+		t.Fatalf("populate the counterfactual table: %v", err)
+	}
+	if _, err := migrator.Exec(ctx, `ALTER TABLE bare_form ALTER COLUMN stamp TYPE TIMESTAMPTZ`); err != nil {
+		t.Fatalf("apply the bare form: %v", err)
+	}
+	var bare time.Time
+	if err := migrator.QueryRow(ctx, `SELECT stamp FROM bare_form`).Scan(&bare); err != nil {
+		t.Fatalf("read the counterfactual: %v", err)
+	}
+	if bare.Equal(want) {
+		t.Fatal("the bare form did not shift the value under this session zone, so this test cannot " +
+			"detect the regression it exists to prevent; check the session TimeZone is still non-UTC")
+	}
+	t.Logf("bare form shifted %v to %v; the USING clause holds it at %v",
+		want.UTC().Format(time.RFC3339), bare.UTC().Format(time.RFC3339), gotCreated.UTC().Format(time.RFC3339))
+}

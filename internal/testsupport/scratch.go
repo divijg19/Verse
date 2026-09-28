@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -107,8 +108,18 @@ func ConnectScratch(ctx context.Context, dsn, schema string) (*pgxpool.Pool, fun
 	}
 	scopedCfg, err := pgxpool.ParseConfig(scoped)
 	if err != nil {
+		admin.Close()
 		return nil, nil, fmt.Errorf("parse scoped dsn: %w", err)
 	}
+
+	// Mirrors the pool internal/database builds, so a test observes what production observes.
+	//
+	// This is not tidiness. With the default mode a scratch pool caches server-side prepared
+	// statements, and a test that alters a column's type then queries it fails with "cached plan must
+	// not change result type" -- a failure that belongs to the test's setup rather than to the code
+	// under test, and one that would hide the behavior the test exists to check. See the pool
+	// configuration in internal/database/db.go for what the production setting is and why.
+	scopedCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheDescribe
 
 	pool, err := pgxpool.NewWithConfig(ctx, scopedCfg)
 	if err != nil {
@@ -184,4 +195,65 @@ func checkSchemaName(schema string) error {
 		return fmt.Errorf("schema name %q must contain only lower-case letters, digits and underscores", schema)
 	}
 	return nil
+}
+
+// ConnectScratchInZone is ConnectScratch with every connection in the pool pinned to a time zone.
+//
+// It exists because the zone a session runs in changes results, and a test that cannot control it
+// proves nothing about zone-dependent behavior. Two cases here need opposite settings: a timestamptz
+// value serialized to JSON carries the session's UTC offset, so a test asserting that an export is
+// byte-identical across the timestamp migration must pin the zone or the assertion is vacuous on a
+// UTC host and fails on a non-UTC one; and a test asserting that a query buckets on the UTC day
+// regardless of the session must pin the zone away from UTC or it asserts nothing at all.
+//
+// The pin is applied by AfterConnect rather than by setting the zone on connections already in the
+// pool, because a pool creates connections lazily and a test cannot know when. An empty zone means
+// "leave it alone", which is what ConnectScratch does.
+func ConnectScratchInZone(ctx context.Context, dsn, schema, zone string) (*pgxpool.Pool, func() error, error) {
+	pool, cleanup, err := ConnectScratch(ctx, dsn, schema)
+	if err != nil {
+		return nil, nil, err
+	}
+	if zone == "" {
+		return pool, cleanup, nil
+	}
+
+	// The pool was already built, so its config is replaced and the pool rebuilt rather than patched:
+	// AfterConnect is only consulted at connection time, and a pool already in use would keep handing
+	// out sessions that were never pinned. The schema survives, because it lives in the database
+	// rather than in the connection.
+	cfg := pool.Config()
+	cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		// A parameter rather than an interpolated literal, so the zone cannot be anything but a value
+		// the server accepts. set_config with is_local false is session-scoped, which is what a pool
+		// connection needs.
+		if _, err := conn.Exec(ctx, `SELECT set_config('TimeZone', $1, false)`, zone); err != nil {
+			return fmt.Errorf("pin the session time zone to %q: %w", zone, err)
+		}
+		return nil
+	}
+
+	// MinConns is lowered first: a pool that has already opened its minimum would otherwise keep those
+	// connections alive across the Close below, and the rebuilt pool would not be the only user of the
+	// schema for the moment it takes over.
+	cfg.MinConns = 0
+	pool.Close()
+
+	rebuilt, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		// The schema is already created and the pool that would drop it has been closed, so a failure
+		// here leaves it behind. The error that caused this one is the one worth reporting, so the
+		// cleanup's is joined rather than replacing it.
+		if cerr := cleanup(); cerr != nil {
+			return nil, nil, fmt.Errorf("rebuild the scratch pool pinned to %q: %w (and the schema could not be dropped: %w)",
+				zone, err, cerr)
+		}
+		return nil, nil, fmt.Errorf("rebuild the scratch pool pinned to %q: %w", zone, err)
+	}
+
+	pinnedCleanup := func() error {
+		rebuilt.Close()
+		return cleanup()
+	}
+	return rebuilt, pinnedCleanup, nil
 }
