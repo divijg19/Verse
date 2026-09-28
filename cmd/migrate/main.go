@@ -30,7 +30,11 @@ func run() error {
 		}
 	}()
 
-	result, err := migrate.Run(context.Background(), database.Pool)
+	// Bounded, for the same reason as the server's boot: the runner's own timeouts are enforced by
+	// the database and cannot bound a client that has stopped hearing back.
+	migrateCtx, cancelMigrate := context.WithTimeout(context.Background(), migrate.RunBudget)
+	defer cancelMigrate()
+	result, err := migrate.Run(migrateCtx, database.Pool)
 	if err != nil {
 		return err
 	}

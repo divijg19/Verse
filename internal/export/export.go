@@ -95,15 +95,62 @@ type JSON struct{}
 //
 // bytes.Buffer is used because Encoder appends a trailing newline, and MarshalIndent is not
 // available with the escaping turned off.
+//
+// Every instant is rendered in UTC, and the reason is specific to migration 006. Before it,
+// created_at was a zone-less timestamp, which pgx decodes as UTC, so the file always carried a "Z".
+// A timestamptz is decoded into Go's *local* zone instead -- the Postgres session's zone is not
+// consulted, and SET TIME ZONE on the connection does not change it -- so on a host that is not UTC
+// the same work would come back as "2024-03-11T05:00:00+05:30". Same instant, different bytes.
+//
+// For a backup that is a real hazard: two exports of one library taken on two machines would differ,
+// and a diff between them would be full of timestamps that have not actually changed. Normalising
+// here rather than in Build keeps the guarantee with the format, so it holds for a Document assembled
+// anywhere rather than only for the one Build happens to produce. The Markdown writer already called
+// .UTC() at every site, and this is the same rule applied to the writer that had not.
 func (JSON) Write(d Document) ([]byte, error) {
+	normalised := d.normalisedToUTC()
+
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(d); err != nil {
+	if err := enc.Encode(normalised); err != nil {
 		return nil, err
 	}
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+}
+
+// normalisedToUTC returns a copy of the document with every timestamp expressed in UTC.
+//
+// A copy rather than an in-place fix, because the caller may still want the document it passed in and
+// mutating an argument is a poor default. Shallow on the slices: the poem and version values are
+// copied by value on the way through, so the caller's backing arrays are not written to.
+func (d Document) normalisedToUTC() Document {
+	out := d
+	out.ExportedAt = d.ExportedAt.UTC()
+
+	out.Poems = make([]Poem, len(d.Poems))
+	for i, p := range d.Poems {
+		p.CreatedAt = p.CreatedAt.UTC()
+		if p.DeletedAt != nil {
+			utc := p.DeletedAt.UTC()
+			p.DeletedAt = &utc
+		}
+		if len(p.Versions) > 0 {
+			// Built into a fresh slice and only then assigned. Assigning the new slice first and then
+			// ranging over p.Versions would range over the zeroed replacement rather than the source,
+			// silently discarding every version's content -- which is the one thing an export exists
+			// to preserve. The range reads p.Versions, the original, throughout.
+			versions := make([]Version, len(p.Versions))
+			for j, v := range p.Versions {
+				v.RecordedAt = v.RecordedAt.UTC()
+				versions[j] = v
+			}
+			p.Versions = versions
+		}
+		out.Poems[i] = p
+	}
+	return out
 }
 
 func (JSON) ContentType() string   { return "application/json" }

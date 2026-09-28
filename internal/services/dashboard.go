@@ -25,13 +25,21 @@ func TotalPoems(ctx context.Context) (int, error) {
 }
 
 // CurrentStreak returns the number of consecutive days with poems counting backwards from today.
+//
+// A day is a UTC day, and both halves of the query say so. The SQL carries AT TIME ZONE 'UTC' because
+// DATE() over a timestamptz resolves in the session's zone otherwise, and the consumer below formats
+// with .UTC() and counts back from clock.TodayUTC(). The two halves have to agree on which day a poem
+// belongs to, or a work written at 10:00 UTC lands on yesterday's square for a reader at +05:30 and a
+// real streak reads as broken. The pool also pins every session to UTC, so the clause is redundancy
+// with a purpose: it is the statement of intent for anyone reading the query, and the pin is the floor
+// for a future query written without it.
 func CurrentStreak(ctx context.Context) (int, error) {
 	if database.Pool == nil {
 		return 0, fmt.Errorf("database not initialized")
 	}
 
 	rows, err := database.Pool.Query(ctx, `
-		SELECT DISTINCT DATE(created_at)
+		SELECT DISTINCT DATE(created_at AT TIME ZONE 'UTC')
 		FROM poems
 		WHERE deleted_at IS NULL
 		AND created_at >= NOW() - INTERVAL '365 days'
@@ -77,7 +85,7 @@ func MonthActivity(ctx context.Context, month time.Time) ([]time.Time, error) {
 	monthEnd := monthStart.AddDate(0, 1, 0)
 
 	rows, err := database.Pool.Query(ctx, `
-		SELECT DISTINCT DATE(created_at)
+		SELECT DISTINCT DATE(created_at AT TIME ZONE 'UTC')
 		FROM poems
 		WHERE deleted_at IS NULL
 		AND created_at >= $1
@@ -104,6 +112,12 @@ func MonthActivity(ctx context.Context, month time.Time) ([]time.Time, error) {
 }
 
 // LatestPoem returns the most recent non-deleted poem.
+//
+// The id tiebreak is not cosmetic here, and this is the one place it changes what is shown rather than
+// just the order of a list. LIMIT 1 over a bare ORDER BY created_at DESC returns whichever tied row the
+// planner reaches first, so two works sharing a timestamp would make "the most recent" an arbitrary
+// choice that could differ between requests. now() is a transaction timestamp with microsecond
+// resolution, so a tie is unlikely, and UpdatePoem-style bursts make it not merely theoretical.
 func LatestPoem(ctx context.Context) (models.Poem, error) {
 	var poem models.Poem
 	if database.Pool == nil {
@@ -114,7 +128,7 @@ func LatestPoem(ctx context.Context) (models.Poem, error) {
 		SELECT id, content, created_at
 		FROM poems
 		WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 		LIMIT 1`)
 	if err := row.Scan(&poem.ID, &poem.Content, &poem.CreatedAt); err != nil {
 		return poem, err

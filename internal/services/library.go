@@ -32,6 +32,13 @@ func CreatePoem(ctx context.Context, content string) (string, error) {
 }
 
 // ListPoems returns the most recent poems (non-deleted) with limit/offset.
+//
+// The id tiebreak on created_at is load-bearing here, and the reason is the OFFSET rather than the
+// order. A query whose sort is not a total order returns tied rows in whatever order the plan happens
+// to produce, and that order need not be the same on the next execution. Paging through an unstable
+// sort therefore drops rows and repeats them: a work on the boundary between page one and page two can
+// appear on both, or on neither, and nothing reports it. Adding id makes the order total, so a given
+// page is the same page every time.
 func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
 	if database.Pool == nil {
 		return nil, fmt.Errorf("database not initialized")
@@ -43,7 +50,7 @@ func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
         SELECT id, content, created_at
         FROM poems
         WHERE deleted_at IS NULL
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return nil, err
@@ -79,9 +86,9 @@ func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models
         SELECT id, content, created_at
         FROM poems
         WHERE deleted_at IS NULL
-        AND content ILIKE '%' || $1 || '%'
-        ORDER BY created_at DESC
-        LIMIT $2 OFFSET $3`, q, limit, offset)
+          AND content ILIKE '%' || $1 || '%'
+          ORDER BY created_at DESC, id DESC
+          LIMIT $2 OFFSET $3`, q, limit, offset)
 	if err != nil {
 		return nil, err
 	}

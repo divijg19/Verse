@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,6 +66,46 @@ const lockWait = 30 * time.Second
 // lockPollInterval is how often a waiting run retries. Short enough that the common case of one
 // process waiting on another resolves promptly, long enough not to hammer the database.
 const lockPollInterval = 250 * time.Millisecond
+
+// tableLockTimeout bounds how long a migration waits for a conflicting lock on a table.
+//
+// lockWait above bounds migration runs against each other. It does nothing for the other direction,
+// and that is the direction that takes down a deploy. An ALTER TABLE needs ACCESS EXCLUSIVE on the
+// table it rewrites, while an ordinary request holds a weaker lock on that same table for the
+// length of its own query. The platform performs zero-downtime deploys, so the outgoing instance
+// is still serving -- and still querying -- while the incoming one migrates, and the two overlap by
+// design rather than by accident.
+//
+// Without a bound the ALTER waits inside Postgres holding no Go context and printing nothing, until
+// the platform kills the process. That is the worst available outcome: the failure surfaces as an
+// unrelated crash, and a migration interrupted mid-flight can leave a half-rewritten table. Failing
+// here instead, naming the file, is recoverable -- the next deploy retries against a quiet database.
+const tableLockTimeout = 5 * time.Second
+
+// statementTimeout bounds a single migration statement.
+//
+// Distinct from tableLockTimeout, which bounds waiting for a lock. This one bounds execution once
+// the statement already holds what it needs, so it catches the other way a run can hang: a query
+// that acquires its locks promptly and then never finishes.
+//
+// Deliberately not configurable from the environment, unlike the pool settings. A migration that
+// behaved differently depending on which instance happened to run it is a worse failure than a
+// uniform one. If a future migration legitimately needs longer -- a bulk backfill, say -- raise it
+// here, visibly, in the same commit as that migration.
+const statementTimeout = 60 * time.Second
+
+// RunBudget bounds a whole migration run, and is the deadline callers should put on the context
+// they pass to Run.
+//
+// tableLockTimeout and statementTimeout are both enforced by the server, so neither of them helps
+// when the client is the side that has stopped hearing back -- a connection that is established but
+// silent, a network that has gone away without a FIN. There the server is not in a position to
+// enforce anything, and the run would wait forever. A client-side deadline covers that case.
+//
+// Generous enough for a first run against a cold free-tier database, where every file is applied
+// rather than skipped, and short enough that a stuck boot fails with a message instead of being
+// left to the platform's own timeout.
+const RunBudget = 5 * time.Minute
 
 // migration is one SQL file, with the identity and integrity value derived from its contents.
 type migration struct {
@@ -141,6 +182,15 @@ func run(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) (Result, error) {
 	}
 	defer conn.Release()
 
+	// Before the advisory lock: every statement this run issues from here on is covered by the
+	// bounds, including the bookkeeping DDL below.
+	if err := sessionBounds(ctx, conn, tableLockTimeout, statementTimeout); err != nil {
+		return result, err
+	}
+	// Registered after the release above, so it runs before it: the connection must go back to the
+	// pool without this run's timeouts still attached to it.
+	defer func() { discardReset(resetSessionBounds(context.WithoutCancel(ctx), conn)) }()
+
 	unlock, err := acquireLock(ctx, conn, migrationLockKey, lockWait)
 	if err != nil {
 		return result, err
@@ -183,6 +233,57 @@ func run(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) (Result, error) {
 
 	return result, nil
 }
+
+// sessionBounds bounds the two ways a migration can block without end: waiting for a lock, and
+// executing without finishing.
+//
+// It is called on the acquired connection before the advisory lock is taken, so that every
+// statement the run issues afterwards is covered -- including the bookkeeping DDL, which is why it
+// belongs here rather than further down. SET is session-scoped and the runner holds one session for
+// the whole run, so these bounds cannot leak to whatever borrows the connection afterwards.
+//
+// set_config is used rather than a literal `SET lock_timeout = ...` because Postgres does not accept
+// a bind parameter in a SET statement, and interpolating a duration into SQL text is exactly the
+// kind of thing that goes wrong quietly.
+func sessionBounds(ctx context.Context, conn *pgxpool.Conn, tableLock, statement time.Duration) error {
+	const setBounds = `SELECT set_config('lock_timeout', $1, false), set_config('statement_timeout', $2, false)`
+	if _, err := conn.Exec(ctx, setBounds, pgSeconds(tableLock), pgSeconds(statement)); err != nil {
+		return fmt.Errorf("bound the migration session: %w", err)
+	}
+	return nil
+}
+
+// pgSeconds renders a duration as a Postgres interval literal.
+//
+// Always a whole number of seconds rather than Go's own formatting. time.Duration.String emits
+// forms such as "1m0s" and "500ms" that Postgres happens to accept but that are not worth
+// depending on; a count of seconds is unambiguous, and both bounds are whole seconds by design.
+func pgSeconds(d time.Duration) string {
+	return strconv.Itoa(int(d.Seconds())) + "s"
+}
+
+// resetSessionBounds returns both timeouts to the server default, which is 0 for each: disabled,
+// meaning wait as long as it takes.
+//
+// This is not tidiness. set_config is session-scoped, and the session is a pooled connection that the
+// application will hand out again afterwards. Without the reset, a connection that once ran a
+// migration would carry this release's 60s statement timeout into ordinary requests for the rest of
+// its life, turning a migration safeguard into a runtime failure that appears under load and points
+// nowhere near the migration that caused it. The test for this is
+// TestSessionBoundsAreSetOnTheMigratingSessionOnly, which is what found it.
+//
+// The context is not the run's: this is called while unwinding, and the original may already be
+// canceled, which would abort the very cleanup that makes the connection safe to reuse.
+func resetSessionBounds(ctx context.Context, conn *pgxpool.Conn) error {
+	const resetBounds = `SELECT set_config('lock_timeout', $1, false), set_config('statement_timeout', $1, false)`
+	if _, err := conn.Exec(ctx, resetBounds, "0"); err != nil {
+		return fmt.Errorf("restore the migration session's timeouts: %w", err)
+	}
+	return nil
+}
+
+// discardReset consumes a reset error for the reasons given at its only call site.
+func discardReset(error) {}
 
 // acquireLock takes the migration advisory lock, waiting up to wait, and returns the function that
 // releases it.

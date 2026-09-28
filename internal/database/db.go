@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -37,6 +38,26 @@ func Connect() error {
 			cancel()
 			return fmt.Errorf("failed to parse DATABASE_URL: %w", err)
 		}
+
+		// Re-plan rather than reuse a server-side prepared statement.
+		//
+		// The default mode caches named prepared statements, and Postgres refuses to re-execute one
+		// whose result type has since changed: "cached plan must not change result type" (SQLSTATE
+		// 0A000). That is not a theoretical hazard here, it is a direct consequence of migration 006
+		// and of how this application deploys.
+		//
+		// The host performs zero-downtime deploys, so the outgoing instance is still serving while
+		// the incoming one migrates. It has already prepared its statements. The incoming instance
+		// rewrites poems.created_at, poems.deleted_at and poem_versions.recorded_at, and every query
+		// selecting those columns in the outgoing instance -- the library, the poem view, the export,
+		// the dashboard, the recycle, the history -- now fails with 0A000 on its cached plan, for as
+		// long as that instance lives. A user pressing "export" during a deploy would get a 500.
+		//
+		// CacheDescribe keeps the description cache, so the common case still avoids a round trip, but
+		// re-plans the statement on each execution instead of executing a stale one. The cost is
+		// re-planning work Postgres would otherwise skip, on a pool of five connections serving one
+		// author; the alternative is a deploy-time failure whose cause is nowhere near its symptom.
+		cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheDescribe
 
 		// Apply sensible defaults for Neon/free-tier
 		if v := os.Getenv("DB_MAX_CONNS"); v != "" {
@@ -76,6 +97,31 @@ func Connect() error {
 			}
 		} else {
 			cfg.MaxConnIdleTime = 5 * time.Minute
+		}
+
+		// Pin every session to UTC, on every connection the pool opens.
+		//
+		// pgx does not read the TZ environment variable; only Postgres's own PGTZ sets the session
+		// zone, and that is a server-side setting no Go process can rely on being present. What
+		// configures the session is whatever the database server was started or configured with, so
+		// the same binary reads dates differently on two hosts with the same data.
+		//
+		// That matters more from this release on. Once created_at is a timestamptz, DATE(created_at)
+		// resolves in the session zone, and so does any comparison against a Go-supplied time. A
+		// streak counting 10:00 UTC as the previous day because the host is at +05:30 is not a
+		// cosmetic difference: it moves work to the wrong square of the heatmap and can break a
+		// streak that was real.
+		//
+		// The queries that depend on this also say AT TIME ZONE 'UTC' explicitly, and the duplication
+		// is intentional rather than redundant. Here is the floor, so that a future query written
+		// without the clause is still correct; there is the statement of intent, so a reader of the
+		// query does not have to know the connection is configured at all. A test asserts the
+		// behavior survives even if this hook is removed.
+		cfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+			if _, err := conn.Exec(ctx, `SET TIME ZONE 'UTC'`); err != nil {
+				return fmt.Errorf("pin the session time zone: %w", err)
+			}
+			return nil
 		}
 
 		pool, err := pgxpool.NewWithConfig(ctx, cfg)
