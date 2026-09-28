@@ -16,17 +16,11 @@ type securityCtxKey int
 
 const (
 	securityCtxKeyCSRF securityCtxKey = iota
-	securityCtxKeyExpiry
 )
 
 // WithCSRFToken returns a context carrying the CSRF token for template rendering.
 func WithCSRFToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, securityCtxKeyCSRF, token)
-}
-
-// WithSessionExpiry returns a context carrying the session expiry for display.
-func WithSessionExpiry(ctx context.Context, expiry any) context.Context {
-	return context.WithValue(ctx, securityCtxKeyExpiry, expiry)
 }
 
 // CSRFToken returns the CSRF token carried by ctx, or an empty string.
@@ -39,12 +33,6 @@ func CSRFToken(ctx context.Context) string {
 		return ""
 	}
 	return token
-}
-
-// SessionExpiry returns the session expiry carried by ctx, if present.
-func SessionExpiry(ctx context.Context) (any, bool) {
-	expiry := ctx.Value(securityCtxKeyExpiry)
-	return expiry, expiry != nil
 }
 
 // hasError reports whether an error message should be displayed.

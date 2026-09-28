@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,17 +23,34 @@ import (
 // Extracting them into a stylesheet is tracked for v0.4.0-B, at which point 'unsafe-inline' can be
 // dropped from style-src.
 //
+// script-src does NOT permit unsafe-inline, and there is no nonce and no hash anywhere in this
+// application. That is a deliberate policy and it stays: an inline <script> or an on*= attribute in
+// the markup would be blocked.
+//
+// It was also, until v0.4.8, a policy the application violated on every page it served. The previous
+// version of this comment claimed that the policy meant "the vendored htmx and the single vendored
+// navigation script remain the only executable sources", which is how the violation was read as
+// intended behavior for eleven releases. The editor shipped a 75-line inline <script> and six
+// inline on*= attributes; the mobile navigation shipped two more. All of them were blocked in every
+// browser, so the editor's Focus Mode never opened and the mobile navigation -- the only route to
+// the nav below 1024px -- did nothing. Nothing in the test suite related the policy to the markup, so
+// the contradiction was invisible: one test asserted the header string and another asserted the
+// markup, and no assertion joined them.
+//
+// The code moved rather than the policy loosening. Adding 'unsafe-inline' would have made the header
+// true by making it useless. TestContentSecurityPolicyMatchesTheMarkup is the assertion that was
+// missing, and it is the reason this cannot recur.
+//
 // The line count is deliberately not quoted here. It was quoted once, drifted, and correcting it
 // produced a second wrong number: three different counting methods gave three different answers for
 // the same tree. A figure in a security rationale that nobody recomputes is worse than none, because
-// it reads as a measurement. The claim that matters is the causal one above, and it is asserted by
-// TestSecurityHeaders. script-src does NOT permit unsafe-inline, so the
-// vendored htmx and the single vendored navigation script remain the only executable sources.
-// RequestTimeout bounds any single request, whatever it is doing.
+// it reads as a measurement. The claims that matter are the causal one above and the violation that
+// followed from it, and both are now asserted.
 //
-// It is the ceiling on how long anything in this service can hold a scarce resource, so it is a named
-// constant rather than a literal: HealthPingTimeout exists to stay well under it, and that
-// relationship is asserted by a test.
+// RequestTimeout bounds any single request, whatever it is doing. It is the ceiling on how long
+// anything in this service can hold a scarce resource, so it is a named constant rather than a
+// literal: HealthPingTimeout exists to stay well under it, and that relationship is asserted by a
+// test.
 const RequestTimeout = 30 * time.Second
 
 const securityHeaders = "default-src 'self'; " +
@@ -290,7 +309,37 @@ func NewRouter() (*chi.Mux, error) {
 	// session, and the login page needs the stylesheet. Neither exposes content.
 	r.MethodFunc(http.MethodGet, "/health", healthHandler)
 	r.MethodFunc(http.MethodHead, "/health", healthHandler)
-	r.Handle("/static/*", staticHandler())
+
+	// An explicitly configured root is validated here, so a deployment that points the variable at
+	// something unusable stops with a message naming it rather than serving a 404 for every asset.
+	//
+	// The default is deliberately not validated, and the asymmetry is worth stating. "static" is
+	// resolved against the working directory, so its absence means the process was started from
+	// somewhere other than the project root -- which is a normal thing to do with a built binary, and
+	// one the allowlist already handles correctly, since an unmatched path 404s whatever the root
+	// happens to be. Failing on it would make NewRouter depend on the filesystem for a reason that has
+	// nothing to do with routing, which is exactly the coupling several callers here do not expect.
+	assetRoot := "static"
+	if configured := os.Getenv("VERSE_STATIC_DIR"); configured != "" {
+		assetRoot = configured
+		// #nosec G703 -- the value is the operator's own configuration, read once at startup, and this
+		// stat is the validation rather than a use. It is not request-derived: nothing a client sends
+		// reaches this line, and the handler below never concatenates a request path onto a root --
+		// it looks the request up in a map built from staticAssets, whose values are joined here.
+		//
+		// The check is worth its own failure modes, which are the two a misconfigured deployment
+		// actually produces: a path that does not exist, and a path that is a file. Both are reported
+		// by name, because a running service whose every asset 404s is a silent failure and a message
+		// naming the variable is the whole value of checking.
+		info, err := os.Stat(assetRoot)
+		switch {
+		case err != nil:
+			return nil, fmt.Errorf("VERSE_STATIC_DIR %q is not readable: %w", assetRoot, err)
+		case !info.IsDir():
+			return nil, fmt.Errorf("VERSE_STATIC_DIR %q is not a directory", assetRoot)
+		}
+	}
+	r.Handle("/static/*", staticHandler(assetRoot))
 
 	// Authentication surface. Reachable without a session, and rate-limited only by the edge.
 	r.Get("/login", loginPageHandler(authCfg))
@@ -343,24 +392,81 @@ func NewRouter() (*chi.Mux, error) {
 	return r, nil
 }
 
-// staticHandler serves the asset directory.
+// staticAssets is every file this application serves, and the completeness of the list is the point.
 //
-// The path is resolved against the process working directory, which the Dockerfile pins explicitly
-// to /app. Embedding with go:embed was rejected: it would force the generated stylesheet to exist
-// at compile time, coupling "go build" to the Tailwind step and breaking "go run" when the artifact
-// is absent.
-func staticHandler() http.Handler {
-	root := os.Getenv("VERSE_STATIC_DIR")
-	if root == "" {
-		root = "static"
+// It replaces an http.FileServer over the asset directory, which had three exposures and no test
+// could see them:
+//
+//   - A request for a directory returned a listing, so an unauthenticated visitor was told the exact
+//     asset layout by asking for /static/, /static/js/ or /static/css/.
+//   - /static/js/VENDOR.md and /static/js/VENDOR.sha256 were served, disclosing the vendored library's
+//     version, license and digest to anyone.
+//   - VERSE_STATIC_DIR was honored as given. Pointed at "." -- a plausible mistake -- the same
+//     handler would have served /static/.env.
+//
+// An allowlist removes all three at once, and it removes the third structurally rather than by
+// checking: a request is either one of these exact strings or it is not served, so no traversal,
+// no symlink and no misconfigured root can reach a file that is not named here. The path is never
+// joined onto the root and then validated afterwards; it is matched, and only then opened.
+//
+// Two files in the asset directory are deliberately absent. input.css is a build input, not an
+// asset, and publishing it tells a reader which stylesheet framework and version produced the page.
+// VENDOR.md and VENDOR.sha256 exist to be read by a human doing a supply-chain check, which is not
+// the same thing as being served to a browser.
+//
+// Adding an asset means adding it here, and the test in tests/static_files_test.go fails on any file
+// under static/ that is neither listed nor explicitly excluded, so this list cannot drift from the
+// directory without someone being told.
+//
+// The values are relative to the asset root and are resolved against it once, at router
+// construction, into the map the handler consults. The handler therefore never concatenates anything
+// from a request with anything from the filesystem: a request supplies a key, and the value that
+// comes back was written in this file. That is what makes traversal impossible rather than unlikely,
+// and it is also why the linter's path-traversal analysis has nothing to follow.
+var staticAssets = map[string]string{
+	"css/output.css":   "css/output.css",
+	"js/editor.js":     "js/editor.js",
+	"js/htmx.min.js":   "js/htmx.min.js",
+	"js/navigation.js": "js/navigation.js",
+}
+
+// staticHandler serves the asset directory, and only the assets named in staticAssets.
+//
+// The path is resolved against the process working directory, which the Dockerfile pins explicitly to
+// /app. Embedding with go:embed was rejected: it would force the generated stylesheet to exist at
+// compile time, coupling "go build" to the Tailwind step and breaking "go run" when the artifact is
+// absent.
+func staticHandler(root string) http.Handler {
+	allowed := make(map[string]string, len(staticAssets))
+	for name, rel := range staticAssets {
+		allowed[name] = filepath.Join(root, rel)
 	}
 
-	fs := http.FileServer(http.Dir(root))
-
 	return http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only reads are meaningful. A static asset has no side effect, and refusing the rest keeps
+		// the surface exactly as small as the allowlist already makes it.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// StripPrefix has already removed the mount point. Leading slashes are trimmed so that the
+		// comparison is against the same form staticAssets uses, and the result is matched against a
+		// fixed set -- not cleaned, not joined and then checked. Nothing derived from the request
+		// reaches the filesystem unless it is one of these strings.
+		name := strings.TrimPrefix(r.URL.Path, "/")
+		file, ok := allowed[name]
+		if !ok {
+			// Not 403: the caller is not forbidden from a thing that exists, and saying so would
+			// confirm which assets are deployed.
+			http.NotFound(w, r)
+			return
+		}
+
 		if r.Method == http.MethodGet {
 			w.Header().Set("Cache-Control", "public, max-age=86400")
 		}
-		fs.ServeHTTP(w, r)
+		http.ServeFile(w, r, file)
 	}))
 }

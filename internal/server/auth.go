@@ -331,8 +331,13 @@ func requireAuth(cfg *authConfig) func(http.Handler) http.Handler {
 				return
 			}
 
+			// Only the CSRF token is threaded into the templates. A session expiry was carried here
+			// as well, through WithSessionExpiry, and nothing ever read it back: SessionExpiry had no
+			// callers, and the field was typed `any` so no template could have used it meaningfully
+			// either. It looked like a half-built feature and it was -- an unread value in a request
+			// context is a reader's dead end, and the next person would reasonably assume something
+			// downstream depended on it.
 			ctx := views.WithCSRFToken(r.Context(), cfg.csrf(s))
-			ctx = views.WithSessionExpiry(ctx, s.expires)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

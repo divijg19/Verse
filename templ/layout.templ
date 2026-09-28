@@ -335,6 +335,74 @@ templ Layout(surface string, content templ.Component) {
 			overflow-wrap: anywhere;
 		}
 
+		.verse-mobile-nav-actions {
+			display: grid;
+			gap: 0.5rem;
+			margin-top: 0.85rem;
+			padding-top: 0.85rem;
+			border-top: 1px solid rgb(38 38 38);
+		}
+
+		.verse-signout-form {
+			display: flex;
+			margin: 0;
+		}
+
+		.verse-signout-button {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: 100%;
+			min-height: 2.85rem;
+			padding: 0.75rem 0.9rem;
+			border: 1px solid rgb(38 38 38);
+			border-radius: 0.9rem;
+			background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.28) 100%);
+			color: rgb(212 212 212);
+			font-size: 0.98rem;
+			line-height: 1.2;
+			cursor: pointer;
+			transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+		}
+
+		.verse-signout-button:hover {
+			border-color: rgb(82 82 82);
+			background: linear-gradient(180deg, rgba(31, 31, 31, 0.88) 0%, rgba(10, 10, 10, 0.4) 100%);
+			color: rgb(245 245 245);
+		}
+
+		.verse-signout-button:focus-visible {
+			outline: none;
+			box-shadow: 0 0 0 2px rgb(212 212 212);
+		}
+
+		/* The only control in this application that is not navigation, kept out of the directional
+		   rail on purpose. Every rail button means "go to another surface", and an irreversible action
+		   sitting among them would be a claim the layout cannot make. Hidden by default because below
+		   1024px the mobile sheet's copy is the reachable one, and two controls for one irreversible
+		   action on one screen invites a misclick. */
+		#nav-signout {
+			display: none;
+		}
+
+		@media (min-width: 1024px) {
+			#nav-signout {
+				display: flex;
+				justify-content: center;
+				padding: 0 0.5rem;
+			}
+
+			#nav-signout .verse-signout-button {
+				width: auto;
+				min-height: 2.4rem;
+				padding: 0.5rem 1rem;
+				font-size: 0.7rem;
+				letter-spacing: 0.24em;
+				text-transform: uppercase;
+				border-radius: 9999px;
+			}
+		}
+
 		.verse-desktop-nav-button {
 			width: min(100%, 7rem);
 			min-height: 4.25rem;

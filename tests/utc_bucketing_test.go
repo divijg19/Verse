@@ -86,11 +86,12 @@ func TestActivityBucketsOnTheUTCDayUnderANonUTCSession(t *testing.T) {
 	}
 	insertPoemAt(t, "Evening work", written)
 
-	dates, err := services.MonthActivity(context.Background(),
-		time.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC))
+	month := time.Date(2026, time.March, 1, 0, 0, 0, 0, time.UTC)
+	window, err := services.ActivityDays(context.Background(), month)
 	if err != nil {
-		t.Fatalf("services.MonthActivity: %v", err)
+		t.Fatalf("services.ActivityDays: %v", err)
 	}
+	dates := services.MonthDays(window, month)
 
 	if len(dates) != 1 {
 		t.Fatalf("MonthActivity returned %d date(s), want 1: the work belongs to %s UTC and to "+
@@ -115,10 +116,11 @@ func TestStreakCountsTheUTCDayUnderANonUTCSession(t *testing.T) {
 	// Late in the UTC day, so at +05:30 it is already tomorrow.
 	insertPoemAt(t, "Tonight", time.Date(today.Year(), today.Month(), today.Day(), 20, 0, 0, 0, time.UTC))
 
-	streak, err := services.CurrentStreak(context.Background())
+	days, err := services.ActivityDays(context.Background(), today)
 	if err != nil {
-		t.Fatalf("services.CurrentStreak: %v", err)
+		t.Fatalf("services.ActivityDays: %v", err)
 	}
+	streak := services.StreakFromDays(days, today)
 	if streak != 1 {
 		t.Fatalf("CurrentStreak = %d, want 1; a poem written at 20:00 UTC was read as belonging to "+
 			"the following day because the session zone decided which day it was on", streak)

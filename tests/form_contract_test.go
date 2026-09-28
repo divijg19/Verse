@@ -275,3 +275,99 @@ func probeTarget(t *testing.T, endpoint, method string) int {
 	_ = body
 	return status
 }
+
+// TestEveryMutatingFormCarriesASynchroniserToken is the generalisation, and it is the assertion whose
+// absence let the editor's create form ship for eleven releases.
+//
+// The sweep above checks that a control's *target* reaches a route. It cannot see a form that posts
+// to a perfectly valid route and is still refused, because the refusal comes from the middleware
+// rather than the router. That is exactly what happened: /poem exists, /poem/undelete exists, every
+// target resolved, every probe passed, and a new poem still could not be saved because @CSRFField was
+// nested inside the poemID != "" guard and never rendered.
+//
+// This is the check that closes it, and it needs no table of routes to do so. internal/server/router.go
+// applies requireCSRF to the whole authenticated group and exempts only GET, HEAD, OPTIONS and TRACE,
+// so the rule is a single fact about the middleware rather than a per-handler list: every form that
+// submits a non-GET method must carry a synchroniser token. A table would have been a second source of
+// truth that drifts, which is the reason this file deliberately probes instead of enumerating.
+//
+// Non-mutating, by construction. Nothing is submitted; the rendered markup is only read.
+//
+// What this does not cover, stated plainly: fields a handler reads beyond the token, such as content,
+// id and version. There is no general way to know those without either executing the form -- which
+// would delete poems and sign the author out -- or maintaining a table of each handler's requirements,
+// which is the thing this file exists to avoid. Those stay as specific assertions:
+// TestTheRecycleRestoreButtonUndeletes for the recycle, and TestANewWorkCanBeSavedFromTheRenderedForm
+// for the editor. If a handler gains a new required field, the honest place to catch it is a test for
+// that handler, and this file is where the reasoning about why lives.
+func TestEveryMutatingFormCarriesASynchroniserToken(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	live := insertPoem(t, "a live work")
+	if err := services.UpdatePoem(context.Background(), live, "a live work, edited"); err != nil {
+		t.Fatalf("edit the live poem so it has history: %v", err)
+	}
+	deleted := insertPoem(t, "a deleted work")
+	if err := services.SoftDeletePoem(context.Background(), deleted); err != nil {
+		t.Fatalf("delete a poem so the recycle is not empty: %v", err)
+	}
+
+	srv := newTestServer(t)
+
+	surfaces := []string{
+		"/login",
+		"/",
+		"/dashboard",
+		"/editor",
+		"/editor/" + live,
+		"/library",
+		"/caelum",
+		"/share",
+		"/poem/" + live,
+		"/poem/" + live + "/history",
+		"/recycle",
+		"/prompt",
+	}
+
+	mutatingForms := 0
+	for _, surface := range surfaces {
+		status, body, _ := get(t, srv.URL+surface, nil)
+		if status != http.StatusOK {
+			// The reachability sweep above already reports surfaces it cannot load, and reporting it
+			// twice would add noise rather than coverage.
+			continue
+		}
+
+		for _, form := range parseForms(t, body) {
+			if !form.mutating {
+				continue
+			}
+			mutatingForms++
+
+			if _, ok := form.fields["csrf"]; ok {
+				continue
+			}
+			t.Errorf("%s renders a form that submits %s with no synchroniser token, so requireCSRF "+
+				"refuses it with 403. htmx does not swap a non-2xx response, so the control does "+
+				"nothing and says nothing. Form %d posts to %q and carries: %v",
+				surface, form.method, form.ordinal, firstNonEmpty(form.hxPost, form.action), form.fields)
+		}
+	}
+
+	if mutatingForms == 0 {
+		t.Fatal("no mutating forms were found; the extraction is broken and this test proves nothing")
+	}
+	t.Logf("checked %d mutating form(s) across %d surface(s)", mutatingForms, len(surfaces))
+}
+
+// firstNonEmpty returns the first non-empty string, for naming a form's destination when it has both
+// an htmx target and a plain action.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return "(the current URL)"
+}

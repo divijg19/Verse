@@ -389,8 +389,18 @@ func get(t *testing.T, endpoint string, headers map[string]string) (int, string,
 func postForm(t *testing.T, endpoint string, values url.Values, headers map[string]string) (int, string, http.Header) {
 	t.Helper()
 
-	// Attach the session-bound CSRF token, exactly as the rendered form does. Without it the
-	// mutating endpoints correctly reject the request.
+	// Attach the session-bound CSRF token.
+	//
+	// This used to carry the comment "exactly as the rendered form does", and that was the belief
+	// which let a broken editor ship for eleven releases. For a new work the rendered form carried no
+	// token at all -- @CSRFField was nested inside the poemID != "" guard -- so this helper was
+	// manufacturing the one field the browser could never send. Every test of the create path passed
+	// against a request no browser would make.
+	//
+	// The token is still added here, because most tests are about the handler and not about the
+	// markup. But it means this helper cannot detect a missing form field, by construction, and a
+	// test that is *about* the form must not use it. Those tests parse the rendered page and submit
+	// exactly the fields it contains; see tests/editor_create_test.go.
 	if values.Get("csrf") == "" {
 		if token := csrfFromJar(t, endpointOrigin(endpoint)); token != "" {
 			values = cloneValues(values)
