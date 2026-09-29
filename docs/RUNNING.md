@@ -284,10 +284,16 @@ Four properties worth knowing before changing any of it:
   header therefore cannot move a caller into someone else's bucket.
 
 **The cost, stated plainly:** anyone who learns your address can lock you out of your own authoring
-room for up to fifteen minutes. That is accepted. The mitigation is the IP allowlist below, which is
-the outer gate; the rate limit is the inner one. If a second proxy is ever placed in front, every
-caller through it shares a bucket — the right-side rule cannot be forged, so the answer is to narrow
-who can reach the service rather than to widen what is trusted.
+room for up to fifteen minutes. That is accepted for now, and the honest reason is that **there is no
+outer gate**. This section previously named "the IP allowlist below" as the mitigation; no such
+control exists in this repository, and the section below this one describes Cloudflare Access, which
+is an identity layer rather than an address range. Access is planned for v0.6.0 and is the control
+that will actually narrow who can reach the service — see issue #72, which also covers the
+`onrender.com` origin bypass that would otherwise make it decorative.
+
+Until then the rate limiter is the only defence, and it is an inner one. If a second proxy is ever
+placed in front, every caller through it shares a bucket; the right-side rule cannot be forged, so the
+answer is to narrow who can reach the service rather than to widen what is trusted.
 
 ### When a login is refused
 

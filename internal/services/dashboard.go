@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/divijg19/Verse/internal/database"
@@ -33,8 +32,8 @@ func NormalizeMonth(t time.Time) time.Time {
 // returned and the bucketing happens in Go. That is a deliberate trade: a little more transferred to
 // save a round trip and a pool connection, on a table holding one author's work.
 func ActivityDays(ctx context.Context, month time.Time) ([]time.Time, error) {
-	if database.Pool == nil {
-		return nil, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return nil, err
 	}
 
 	rows, err := database.Pool.Query(ctx, `
@@ -133,8 +132,8 @@ type Summary struct {
 // up multi-statement support to a query that does not need it.
 func DashboardSummary(ctx context.Context) (Summary, error) {
 	var summary Summary
-	if database.Pool == nil {
-		return summary, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return summary, err
 	}
 
 	row := database.Pool.QueryRow(ctx, `
@@ -145,7 +144,7 @@ func DashboardSummary(ctx context.Context) (Summary, error) {
 			latest.created_at
 		FROM (SELECT 1) AS anchor
 		LEFT JOIN (
-			SELECT id, content, created_at
+			SELECT `+models.PoemColumns+`
 			FROM poems
 			WHERE deleted_at IS NULL
 			ORDER BY created_at DESC, id DESC

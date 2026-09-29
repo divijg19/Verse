@@ -15,7 +15,7 @@ import (
 // Reachable for a poem that is itself deleted, which is the point: the recovery path has to be
 // reachable at the moment it is wanted, and a deleted work is hidden from the library by definition.
 func PoemTrashHandler(w http.ResponseWriter, r *http.Request) {
-	trash, err := buildPoemTrash(r, "", "")
+	trash, err := buildPoemTrash(r, "")
 	if err != nil {
 		writeTrashError(w, r, err)
 		return
@@ -46,7 +46,7 @@ func RestoreDeletedPoemHandler(w http.ResponseWriter, r *http.Request) {
 	// Re-render the recycle rather than redirecting to the library: seeing the entry disappear is
 	// the confirmation, and the restored work's history is one click away if the wrong thing came
 	// back.
-	trash, err := buildPoemTrash(r, "Restored to your library.", id)
+	trash, err := buildPoemTrash(r, "Restored to your library.")
 	if err != nil {
 		writeTrashError(w, r, err)
 		return
@@ -54,7 +54,7 @@ func RestoreDeletedPoemHandler(w http.ResponseWriter, r *http.Request) {
 	renderSurface(w, r, "library", templ.PoemTrashScreen(r.Context(), trash))
 }
 
-func buildPoemTrash(r *http.Request, restored, restoredID string) (templ.PoemTrash, error) {
+func buildPoemTrash(r *http.Request, restored string) (templ.PoemTrash, error) {
 	poems, err := services.ListDeletedPoems(r.Context(), 100, 0)
 	if err != nil {
 		return templ.PoemTrash{}, err
@@ -81,10 +81,9 @@ func buildPoemTrash(r *http.Request, restored, restoredID string) (templ.PoemTra
 	}
 
 	return templ.PoemTrash{
-		Poems:     entries,
-		Restored:  restored,
-		RestoredI: restoredID,
-		Total:     total,
+		Poems:    entries,
+		Restored: restored,
+		Total:    total,
 	}, nil
 }
 

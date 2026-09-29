@@ -16,6 +16,31 @@ import (
 // Pool is the global database connection pool.
 var Pool *pgxpool.Pool
 
+// ErrNotInitialized is returned when a query is attempted before Connect has succeeded.
+var ErrNotInitialized = errors.New("database not initialized")
+
+// Require reports whether the pool is ready to be queried, returning ErrNotInitialized if not.
+//
+// Every read and write in internal/services and internal/export began with the same three lines:
+//
+//	if database.Pool == nil {
+//	    return nil, fmt.Errorf("database not initialized")
+//	}
+//
+// Eighteen copies of that is eighteen places to keep the message identical, and the message is the
+// only thing a user sees when a deploy races its own migrations. This makes it one place, and gives
+// the condition a name so callers can test for it with errors.Is rather than by matching a string.
+//
+// It exists because the failure is reachable in a running process and not only in a broken one:
+// /health is registered before the pool is connected, and the tests swap the pool to measure it. A
+// nil dereference in either case is a panic that reads as a crash rather than as "not ready yet".
+func Require() error {
+	if Pool == nil {
+		return ErrNotInitialized
+	}
+	return nil
+}
+
 // Connect initializes the global pgxpool using DATABASE_URL.
 // It returns an error if DATABASE_URL is missing or the pool cannot be created/pinged.
 func Connect() error {
@@ -167,8 +192,8 @@ func Connect() error {
 // exists but is only partly migrated is therefore not detected here; the runner is responsible for
 // applying migrations completely or failing.
 func RequireSchema(ctx context.Context) error {
-	if Pool == nil {
-		return errors.New("database not initialized")
+	if err := Require(); err != nil {
+		return err
 	}
 
 	var table *string
@@ -196,8 +221,8 @@ func RequireSchema(ctx context.Context) error {
 // pool is connected during boot, and a probe that panics takes the process down instead of reporting
 // that it is not ready.
 func Ping(ctx context.Context) error {
-	if Pool == nil {
-		return errors.New("database not initialized")
+	if err := Require(); err != nil {
+		return err
 	}
 	return Pool.Ping(ctx)
 }

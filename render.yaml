@@ -4,11 +4,18 @@
 # (see docs/RUNNING.md), and this service must never hold a Cloudflare credential.
 #
 # Note the health check. Without an explicit path, Render probes "/", which is the dashboard: a full
-# private page render issuing four database queries on every probe. /health is a real readiness check
-# instead, so the probe means something.
+  # private page render issuing two database queries on every probe, which is two of the pool's five
+  # connections. /health is a real readiness check instead, issues no query at all, and so the probe
+  # means something. The figure is not a guess --
+  # TestRenderYamlDashboardQueryCountMatchesTheMeasurement fails if this number stops agreeing with the
+  # acquisition count that TestDashboardLoadLeavesTheHealthProbeAConnection measures.
+  # /health is a real readiness check instead, issues no query at all, and so the probe means
+  # something. The figure is not a guess -- TestRenderYamlDashboardQueryCountMatchesTheMeasurement
+  # fails if this number stops agreeing with the acquisition count that
+  # TestDashboardLoadLeavesTheHealthProbeAConnection measures.
 #
 # It was documented here as touching no database, and that was true when written. It stopped being true
-# in v0.4.5, which made /health ping the database so that a Neon outage would fail the probe rather
+  # in v0.4.4, which made /health ping the database so that a Neon outage would fail the probe rather
 # than produce a stream of reassuring 200s. The consequence for uptime is the opposite of what this
 # comment used to claim: a database outage now takes the service out of rotation until it recovers.
 # That is the intended trade and it is documented in docs/RUNNING.md, but the two are not

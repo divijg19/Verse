@@ -7,9 +7,8 @@ import "context"
 // deleted_at used to be a one-way trip with no listing and no restore, so an accidental deletion was
 // unrecoverable through the application even though the row was still there.
 type PoemTrash struct {
-	Poems     []TrashEntry
-	Restored  string
-	RestoredI string
+	Poems    []TrashEntry
+	Restored string
 
 	// Total is how many works are in the recycle, which is not the number listed.
 	//

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/models"
 )
 
 // Format is the version tag written into every export.
@@ -282,13 +283,13 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 		Poems:      []Poem{},
 	}
 
-	p := database.Pool
-	if p == nil {
-		return doc, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return doc, err
 	}
+	p := database.Pool
 
 	rows, err := p.Query(ctx, `
-        SELECT id, content, created_at, deleted_at
+        SELECT `+models.PoemColumnsIncludingDeleted+`
         FROM poems
         ORDER BY created_at, id`)
 	if err != nil {
@@ -313,9 +314,11 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 	// Versions for every retained poem, in one query.
 	//
 	// This was one query per poem, which for a library of any size meant thousands of round trips
-	// inside a single 30s request timeout. A LEFT JOIN over the same tables returns exactly the same
-	// rows: poems with no revisions produce a NULL version row, which the scan turns back into the
-	// empty slice it was before.
+	// inside a single 30s request timeout. It is now a second scan of poem_versions with no join at
+	// all, grouped into a map below. The comment here used to describe a LEFT JOIN over both tables
+	// that returned the same rows, which described an approach this code does not use and would be a
+	// poor guide to anyone following it: the join is unnecessary when the versions are grouped in
+	// Go anyway, and joining poems to versions would re-read every poem body.
 	versionRows, err := p.Query(ctx, `
         SELECT pv.poem_id, pv.id, pv.content, pv.recorded_at
         FROM poem_versions pv
