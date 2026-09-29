@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/models"
@@ -19,8 +18,8 @@ var ErrNotFound = errors.New("not found")
 
 // CreatePoem inserts a new poem and returns its id.
 func CreatePoem(ctx context.Context, content string) (string, error) {
-	if database.Pool == nil {
-		return "", fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return "", err
 	}
 
 	id := uuid.NewString()
@@ -40,14 +39,17 @@ func CreatePoem(ctx context.Context, content string) (string, error) {
 // appear on both, or on neither, and nothing reports it. Adding id makes the order total, so a given
 // page is the same page every time.
 func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
-	if database.Pool == nil {
-		return nil, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return nil, err
 	}
 	if limit <= 0 {
 		limit = 100
 	}
+	if offset < 0 {
+		offset = 0
+	}
 	rows, err := database.Pool.Query(ctx, `
-        SELECT id, content, created_at
+        SELECT `+models.PoemColumns+`
         FROM poems
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC, id DESC
@@ -73,8 +75,8 @@ func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
 
 // SearchPoems returns poems matching q (ILIKE), limited with optional offset.
 func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models.Poem, error) {
-	if database.Pool == nil {
-		return nil, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return nil, err
 	}
 	if limit <= 0 {
 		limit = 100
@@ -83,7 +85,7 @@ func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models
 		offset = 0
 	}
 	rows, err := database.Pool.Query(ctx, `
-        SELECT id, content, created_at
+        SELECT `+models.PoemColumns+`
         FROM poems
         WHERE deleted_at IS NULL
           AND content ILIKE '%' || $1 || '%'
@@ -111,11 +113,11 @@ func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models
 // GetPoem returns a single poem by id if not deleted.
 func GetPoem(ctx context.Context, id string) (models.Poem, error) {
 	var p models.Poem
-	if database.Pool == nil {
-		return p, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return p, err
 	}
 	row := database.Pool.QueryRow(ctx, `
-        SELECT id, content, created_at
+        SELECT `+models.PoemColumns+`
         FROM poems
         WHERE id = $1
         AND deleted_at IS NULL`, id)
@@ -133,14 +135,14 @@ func GetPoem(ctx context.Context, id string) (models.Poem, error) {
 // boolean parameter there would invite a caller to pass the wrong answer without meaning to.
 func GetPoemIncludingDeleted(ctx context.Context, id string) (models.Poem, error) {
 	var p models.Poem
-	if database.Pool == nil {
-		return p, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return p, err
 	}
 	// deleted_at is selected because the caller needs to know whether the work is in the recycle: the
 	// history screen offers different controls depending on it, and v0.4.4 offered the wrong ones to
 	// everyone because nothing carried this value.
 	row := database.Pool.QueryRow(ctx, `
-        SELECT id, content, created_at, deleted_at
+        SELECT `+models.PoemColumnsIncludingDeleted+`
         FROM poems
         WHERE id = $1`, id)
 	if err := row.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.DeletedAt); err != nil {
@@ -168,8 +170,8 @@ func GetPoemIncludingDeleted(ctx context.Context, id string) (models.Poem, error
 // The deleted_at guard matters: without it a soft-deleted work could be silently edited, and the
 // edit would appear to succeed while remaining hidden.
 func UpdatePoem(ctx context.Context, id string, content string) error {
-	if database.Pool == nil {
-		return fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return err
 	}
 
 	tx, err := database.Pool.Begin(ctx)
@@ -214,8 +216,8 @@ func UpdatePoem(ctx context.Context, id string, content string) error {
 // in Postgres, so the work was technically recoverable by hand, but the application offered no
 // listing, no restore and no purge -- the author had no way back to a poem they deleted by accident.
 func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
-	if database.Pool == nil {
-		return nil, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return nil, err
 	}
 	if limit <= 0 {
 		limit = 100
@@ -226,7 +228,7 @@ func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, er
 	// Ordered by when it was deleted rather than when it was written, because the question this
 	// screen answers is "what did I just lose".
 	rows, err := database.Pool.Query(ctx, `
-        SELECT id, content, created_at
+        SELECT `+models.PoemColumns+`
         FROM poems
         WHERE deleted_at IS NOT NULL
         ORDER BY deleted_at DESC, id DESC
@@ -256,8 +258,8 @@ func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, er
 // Exists so the recycle can say "100 of 143" instead of quietly truncating. A screen whose entire
 // purpose is answering "did I lose it?" cannot hide 43 answers.
 func CountDeletedPoems(ctx context.Context) (int, error) {
-	if database.Pool == nil {
-		return 0, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return 0, err
 	}
 	var n int
 	if err := database.Pool.QueryRow(ctx,
@@ -274,8 +276,8 @@ func CountDeletedPoems(ctx context.Context) (int, error) {
 // looking like a fresh success, and it is the same reason a restore of an active poem cannot
 // silently rewrite anything.
 func RestorePoem(ctx context.Context, id string) error {
-	if database.Pool == nil {
-		return fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return err
 	}
 
 	tag, err := database.Pool.Exec(ctx,
@@ -295,8 +297,8 @@ func RestorePoem(ctx context.Context, id string) error {
 // Deleted poems are included: their history is exactly what someone restoring an accidentally
 // deleted work needs, and a soft-deleted poem is still a row that exists.
 func ListPoemVersions(ctx context.Context, poemID string) ([]models.PoemVersion, error) {
-	if database.Pool == nil {
-		return nil, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return nil, err
 	}
 	rows, err := database.Pool.Query(ctx, `
         SELECT id, poem_id, content, recorded_at
@@ -329,8 +331,8 @@ func ListPoemVersions(ctx context.Context, poemID string) ([]models.PoemVersion,
 // bug reachable by a mistyped id.
 func GetPoemVersion(ctx context.Context, poemID, versionID string) (models.PoemVersion, error) {
 	var v models.PoemVersion
-	if database.Pool == nil {
-		return v, fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return v, err
 	}
 	row := database.Pool.QueryRow(ctx, `
         SELECT id, poem_id, content, recorded_at
@@ -373,8 +375,8 @@ func RestorePoemVersion(ctx context.Context, poemID, versionID string) error {
 		return err
 	}
 
-	if database.Pool == nil {
-		return fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return err
 	}
 
 	tx, err := database.Pool.Begin(ctx)
@@ -417,8 +419,8 @@ func RestorePoemVersion(ctx context.Context, poemID, versionID string) error {
 // Already-deleted rows report ErrNotFound rather than succeeding silently, so a repeated delete is
 // visible to the caller instead of looking like a fresh success.
 func SoftDeletePoem(ctx context.Context, id string) error {
-	if database.Pool == nil {
-		return fmt.Errorf("database not initialized")
+	if err := database.Require(); err != nil {
+		return err
 	}
 
 	tag, err := database.Pool.Exec(ctx,

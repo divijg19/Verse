@@ -56,15 +56,17 @@ never been a `mood` column.
 
 ## 🌌 `Caelum`
 
-`Caelum` is the inspiration engine within `Verse`.
+`Caelum` is the inspiration surface within `Verse`.
 
-It provides:
+It provides exactly one thing: a button that returns one of ten conceptual, non-imperative
+prompts, held as a static list in `internal/services/prompts.go` and served as an HTML fragment
+by `handlers.PromptHandler`. There is no generation, no model, and no network call — the whole
+feature is ten strings and `math/rand/v2`.
 
-* Random poetic prompts
-* Constraint-based writing seeds
-* Emotional triggers
-
-Future versions will integrate AI-assisted generation.
+This section previously claimed "constraint-based writing seeds" and "emotional triggers". Neither
+has ever existed. It also promised AI-assisted generation, which would have needed a credential in
+an application whose design is that it holds no third-party secret. Both claims are removed rather
+than turned into roadmap, because the honest description of the feature is short.
 
 ---
 
@@ -156,7 +158,7 @@ verse/
 ├── internal/
 |   ├── server/        routes, security headers, sessions, CSRF
 |   ├── handlers/      HTTP handlers; one file per surface
-|   ├── services/      the SQL. All of it. dashboard.go, library.go, prompts.go
+│   ├── services/      the application-domain SQL: dashboard.go, library.go, prompts.go
 |   ├── database/      connection, pool configuration, schema assertion
 |   ├── migrate/       the migration runner: checksums, advisory lock, timeouts
 |   ├── models/        domain types
@@ -175,7 +177,7 @@ verse/
 |   ├── css/input.css  Tailwind entry point, with its @source directives
 |   └── js/            navigation.js, editor.js, and vendored htmx
 |
-├── migrations/        001 through 006, embedded into both binaries
+├── migrations/        001 through 006, embedded into both the server and cmd/migrate
 |
 ├── docs/RUNNING.md    operations, environment variables, the migration contract
 |
@@ -183,6 +185,13 @@ verse/
 ├── go.mod
 └── README.md
 ```
+
+The tree above said `internal/services` held "the SQL. All of it." That was never true. Four other
+packages issue queries, each putting the SQL next to the thing that owns it: `internal/server/ratelimit.go`
+(the `login_attempts` limiter is middleware), `internal/export` (the dump *is* the product),
+`internal/migrate` (the runner queries its own bookkeeping), and `internal/database` (one `to_regclass`
+assertion at boot). The claim that holds is that **`internal/services` holds all the application-domain
+SQL** — poems, versions, and the dashboard aggregates — which is the boundary that matters.
 
 ---
 
@@ -301,7 +310,8 @@ export DATABASE_URL="postgres://verse:verse@localhost:5432/verse?sslmode=disable
 export VERSE_AUTHORIZATION="choose-a-passphrase"
 export VERSE_AUTH_SECRET="at-least-32-characters-of-entropy"
 
-  # 4. Apply the migrations — required before the service will start
+  # 4. Apply the migrations — optional; cmd/server runs the same runner at boot.
+  #    Use this step to migrate without starting the service (deploy scripts, CI).
   go run ./cmd/migrate
 
 # 5. Run

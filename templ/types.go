@@ -22,12 +22,11 @@ type PoemVersionView struct {
 
 // PoemHistory is a poem's history screen: the work itself, and what it used to say.
 type PoemHistory struct {
-	PoemID     string
-	Title      string
-	Current    string
-	Versions   []PoemVersionView
-	Restored   string
-	RestoredID string
+	PoemID   string
+	Title    string
+	Current  string
+	Versions []PoemVersionView
+	Restored string
 
 	// DeletedAt reports whether the work is currently in the recycle.
 	//

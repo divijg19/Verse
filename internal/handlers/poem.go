@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"html"
 	"log"
 	"net/http"
 	"strings"
@@ -58,29 +59,27 @@ func writeValidationError(w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(ve.status)
-	writeHTML(w, []byte(`<span class="text-red-400 italic">`+escapeHTML(ve.message)+`</span>`))
-}
-
-// escapeHTML is a minimal guard for the small set of literal responses below. templ handles
-// escaping for rendered components; these handlers emit hand-written HTML fragments.
-func escapeHTML(s string) string {
-	r := strings.NewReplacer(
-		"&", "&amp;",
-		"<", "&lt;",
-		">", "&gt;",
-		`"`, "&#34;",
-		"'", "&#39;",
-	)
-	return r.Replace(s)
+	writeHTML(w, []byte(`<span class="text-red-400 italic">`+html.EscapeString(ve.message)+`</span>`))
 }
 
 // formWorkID extracts and validates the work identifier from a request form.
-//
-// The value is attacker-supplied, so it is parsed as a UUID rather than trimmed and passed on.
-// That bounds what can reach the database, and it bounds what can reach the log: an unvalidated
-// string containing newlines would let a caller forge log lines.
 func formWorkID(r *http.Request) (string, bool) {
-	raw := strings.TrimSpace(r.FormValue("id"))
+	return parseWorkID(r.FormValue("id"))
+}
+
+// parseWorkID validates a work identifier that came from an untrusted source.
+//
+// The value is attacker-supplied, so it is parsed as a UUID rather than trimmed and passed on. That
+// bounds what can reach the database, and it bounds what can reach the log: an unvalidated string
+// containing newlines would let a caller forge log lines.
+//
+// Shared by formWorkID, which reads the "id" form field, and pathWorkID, which reads the {id} route
+// parameter. They were two copies of this function, and the two differed in one respect that mattered
+// only by accident: formWorkID trimmed the raw value and pathWorkID did not, so a path parameter
+// carrying a stray space was rejected while the same value in a form was accepted. Whether a UUID may
+// arrive padded is not a question the call site should be deciding.
+func parseWorkID(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return "", false
 	}

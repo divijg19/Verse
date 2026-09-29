@@ -4,10 +4,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/divijg19/Verse/internal/presenters"
@@ -27,9 +25,9 @@ func PoemHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	history, err := buildPoemHistory(r, poemID, "", "")
+	history, err := buildPoemHistory(r, poemID, "")
 	if err != nil {
-		writeHistoryError(w, r, poemID, err)
+		writeHistoryError(w, poemID, err)
 		return
 	}
 
@@ -49,23 +47,22 @@ func RestorePoemVersionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rawVersion := strings.TrimSpace(r.FormValue("version"))
-	versionID, err := uuid.Parse(rawVersion)
-	if err != nil {
+	versionID, ok := parseWorkID(r.FormValue("version"))
+	if !ok {
 		http.Error(w, "missing or malformed version", http.StatusBadRequest)
 		return
 	}
 
-	if err := services.RestorePoemVersion(r.Context(), poemID, versionID.String()); err != nil {
-		writeHistoryError(w, r, poemID, err)
+	if err := services.RestorePoemVersion(r.Context(), poemID, versionID); err != nil {
+		writeHistoryError(w, poemID, err)
 		return
 	}
 
 	// Re-render the history rather than redirecting to the work: the confirmation that the restore
 	// happened, and the new entry at the top proving it is undoable, are both worth seeing.
-	history, err := buildPoemHistory(r, poemID, "Draft restored.", versionID.String())
+	history, err := buildPoemHistory(r, poemID, "Draft restored.")
 	if err != nil {
-		writeHistoryError(w, r, poemID, err)
+		writeHistoryError(w, poemID, err)
 		return
 	}
 	renderSurface(w, r, "library", templ.PoemHistoryScreen(r.Context(), history))
@@ -75,7 +72,7 @@ func RestorePoemVersionHandler(w http.ResponseWriter, r *http.Request) {
 //
 // A soft-deleted poem is loaded without the deleted_at filter that GetPoem applies, because its
 // history has to stay reachable while the work itself is hidden from the library.
-func buildPoemHistory(r *http.Request, poemID, restored, restoredID string) (templ.PoemHistory, error) {
+func buildPoemHistory(r *http.Request, poemID, restored string) (templ.PoemHistory, error) {
 	// GetPoemIncludingDeleted, not GetPoem: a soft-deleted work's history has to stay reachable
 	// while the work itself is hidden from the library.
 	poem, err := services.GetPoemIncludingDeleted(r.Context(), poemID)
@@ -100,13 +97,12 @@ func buildPoemHistory(r *http.Request, poemID, restored, restoredID string) (tem
 	}
 
 	return templ.PoemHistory{
-		PoemID:     poem.ID,
-		Title:      presenters.TruncateRunes(presenters.FirstNonEmptyLine(poem.Content), 80),
-		Current:    poem.Content,
-		Versions:   views,
-		Restored:   restored,
-		RestoredID: restoredID,
-		DeletedAt:  poem.DeletedAt,
+		PoemID:    poem.ID,
+		Title:     presenters.TruncateRunes(presenters.FirstNonEmptyLine(poem.Content), 80),
+		Current:   poem.Content,
+		Versions:  views,
+		Restored:  restored,
+		DeletedAt: poem.DeletedAt,
 	}, nil
 }
 
@@ -114,7 +110,7 @@ func buildPoemHistory(r *http.Request, poemID, restored, restoredID string) (tem
 //
 // pgx.ErrNoRows reaches here as a miss rather than a 500: a mistyped or stale id is an ordinary thing
 // for the author to do, and reporting it as a server error would be both wrong and alarming.
-func writeHistoryError(w http.ResponseWriter, r *http.Request, poemID string, err error) {
+func writeHistoryError(w http.ResponseWriter, poemID string, err error) {
 	if errors.Is(err, services.ErrNotFound) || errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "poem not found", http.StatusNotFound)
 		return
@@ -127,13 +123,5 @@ func writeHistoryError(w http.ResponseWriter, r *http.Request, poemID string, er
 
 // pathWorkID validates the {id} route parameter as a UUID.
 func pathWorkID(r *http.Request) (string, bool) {
-	raw := strings.TrimSpace(chi.URLParam(r, "id"))
-	if raw == "" {
-		return "", false
-	}
-	parsed, err := uuid.Parse(raw)
-	if err != nil {
-		return "", false
-	}
-	return parsed.String(), true
+	return parseWorkID(chi.URLParam(r, "id"))
 }
