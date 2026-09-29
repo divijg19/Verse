@@ -88,3 +88,49 @@ func TestPagingArgumentsAreClampedByTheService(t *testing.T) {
 		})
 	}
 }
+
+// TestSearchAndListShareOneQueryContract pins the non-obvious part of listLivePoems.
+//
+// ListPoems and SearchPoems were one function written twice; they are now two lines over a shared
+// helper whose contract includes "an empty needle means no predicate". That is the kind of thing a
+// later reader would otherwise guess the other way round -- an empty search matching nothing is the
+// more intuitive reading -- and the guess would silently turn a blank search box into an empty
+// library.
+//
+// The HTTP path never sends an empty needle: handlers.fetchGroupedPoems routes an empty q to
+// ListPoems instead. So this is a property of the shared helper, not of any route, and it needs a
+// direct assertion because nothing else reaches it.
+func TestSearchAndListShareOneQueryContract(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	now := time.Now().UTC()
+	for i := 0; i < 3; i++ {
+		insertPoemAt(t, "a work for the contract", now.AddDate(0, 0, -i))
+	}
+
+	all, err := services.ListPoems(t.Context(), 10, 0)
+	if err != nil {
+		t.Fatalf("ListPoems: %v", err)
+	}
+
+	empty, err := services.SearchPoems(t.Context(), "", 10, 0)
+	if err != nil {
+		t.Fatalf("SearchPoems with an empty needle: %v", err)
+	}
+	if len(empty) != len(all) {
+		t.Errorf("SearchPoems with an empty needle returned %d works, ListPoems returned %d.\n"+
+			"  The shared helper treats an empty needle as \"no predicate\". If this is ever changed to\n"+
+			"  match nothing, a blank search box becomes an empty library rather than an error.",
+			len(empty), len(all))
+	}
+
+	// A needle that matches nothing must still be a successful empty result, not everything.
+	none, err := services.SearchPoems(t.Context(), "no-such-text-anywhere", 10, 0)
+	if err != nil {
+		t.Fatalf("SearchPoems with a non-matching needle: %v", err)
+	}
+	if len(none) != 0 {
+		t.Errorf("SearchPoems with a non-matching needle returned %d works, want 0", len(none))
+	}
+}

@@ -28,13 +28,13 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	// silently omitted the deleted works would be a partial copy of the thing it claims to preserve.
 	doc, err := export.Build(r.Context(), true)
 	if err != nil {
-		http.Error(w, "failed to build the export", http.StatusInternalServerError)
+		fail500(w, r, "failed to build the export", err)
 		return
 	}
 
 	body, err := writer.Write(doc)
 	if err != nil {
-		http.Error(w, "failed to write the export", http.StatusInternalServerError)
+		fail500(w, r, "failed to write the export", err)
 		return
 	}
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/divijg19/Verse/internal/models"
 	"github.com/divijg19/Verse/internal/services"
 )
 
@@ -343,4 +344,98 @@ func TestCountDeletedPoems(t *testing.T) {
 	if total != 3 {
 		t.Fatalf("count after a restore = %d, want 3", total)
 	}
+}
+
+// TestARecycledWorkCarriesItsDeleteInstant is the test for the trap models.Poem documents.
+//
+// Five reads return a Poem and only two populate DeletedAt. Four of them filter deleted_at IS NULL,
+// so nil is correct. The fifth is this one -- ListDeletedPoems -- which filters deleted_at IS NOT
+// NULL, so a nil field on its result is a statement that the work is live when it is deleted.
+//
+// It was latent rather than live: nothing read DeletedAt on this path, so no user-visible bug
+// resulted. That is exactly what makes it dangerous. The field was not unused, it was *wrong*, and
+// the next caller that read it would have received the inverted answer with no compile error and no
+// failing test to stop them.
+//
+// Asserted per read, not once, because the two nil readings are opposite claims about the same
+// field. A test that only checked "the live list has nil" would pass while the recycle returned
+// garbage.
+func TestARecycledWorkCarriesItsDeleteInstant(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	liveID := insertPoem(t, "a live work")
+	goneID := insertPoem(t, "a deleted work")
+	if err := services.SoftDeletePoem(t.Context(), goneID); err != nil {
+		t.Fatalf("soft delete: %v", err)
+	}
+
+	// The live reads. nil here is the correct value and must stay that way.
+	for _, tc := range []struct {
+		name string
+		got  func() (models.Poem, error)
+	}{
+		{"ListPoems", func() (models.Poem, error) {
+			all, err := services.ListPoems(t.Context(), 10, 0)
+			if err != nil {
+				return models.Poem{}, err
+			}
+			return pick(t, all, liveID), nil
+		}},
+		{"GetPoem", func() (models.Poem, error) { return services.GetPoem(t.Context(), liveID) }},
+		{"GetPoemIncludingDeleted", func() (models.Poem, error) {
+			return services.GetPoemIncludingDeleted(t.Context(), liveID)
+		}},
+	} {
+		t.Run(tc.name+" on a live work", func(t *testing.T) {
+			p, err := tc.got()
+			if err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			if p.DeletedAt != nil {
+				t.Errorf("%s returned DeletedAt = %v for a live work, want nil.\n"+
+					"  These reads filter deleted_at IS NULL, so a non-nil value here means the filter "+
+					"or the scan has changed.", tc.name, p.DeletedAt)
+			}
+		})
+	}
+
+	// The recycle. This is the assertion that had no test.
+	t.Run("ListDeletedPoems on a deleted work", func(t *testing.T) {
+		all, err := services.ListDeletedPoems(t.Context(), 10, 0)
+		if err != nil {
+			t.Fatalf("ListDeletedPoems: %v", err)
+		}
+		p := pick(t, all, goneID)
+		if p.DeletedAt == nil {
+			t.Fatalf("ListDeletedPoems returned a deleted work with DeletedAt = nil.\n" +
+				"  This read filters deleted_at IS NOT NULL, so nil is a claim that the work is live " +
+				"about a row that is deleted. The column is selected and scanned for exactly this " +
+				"reason; if this fails, the query or the Scan has drifted apart again.")
+		}
+	})
+
+	// And the recovery path, which populates the field for the same reason.
+	t.Run("GetPoemIncludingDeleted on a deleted work", func(t *testing.T) {
+		p, err := services.GetPoemIncludingDeleted(t.Context(), goneID)
+		if err != nil {
+			t.Fatalf("GetPoemIncludingDeleted: %v", err)
+		}
+		if p.DeletedAt == nil {
+			t.Error("GetPoemIncludingDeleted returned a deleted work with DeletedAt = nil; " +
+				"the history screen decides which controls to render from this field")
+		}
+	})
+}
+
+// pick finds a poem by id in a listing, failing the test if it is absent.
+func pick(t *testing.T, poems []models.Poem, id string) models.Poem {
+	t.Helper()
+	for _, p := range poems {
+		if p.ID == id {
+			return p
+		}
+	}
+	t.Fatalf("poem %s is not in the listing of %d works", id, len(poems))
+	return models.Poem{}
 }

@@ -5,12 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"strings"
+
 	"github.com/divijg19/Verse/internal/clock"
 	"github.com/divijg19/Verse/internal/models"
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
-	"strings"
 )
 
 // LibraryHandler renders the Library surface and supports HTMX partial responses.
@@ -18,7 +19,7 @@ func LibraryHandler(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	groups, err := fetchGroupedPoems(r, query)
 	if err != nil {
-		http.Error(w, "failed to load library", http.StatusInternalServerError)
+		fail500(w, r, "failed to load library", err)
 		return
 	}
 
@@ -30,13 +31,13 @@ func PoemsHandler(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	groups, err := fetchGroupedPoems(r, query)
 	if err != nil {
-		http.Error(w, "failed to load poems", http.StatusInternalServerError)
+		fail500(w, r, "failed to load poems", err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := templ.LibraryResults(query, groups).Render(r.Context(), w); err != nil {
-		http.Error(w, "failed to render poems", http.StatusInternalServerError)
+		fail500(w, r, "failed to render poems", err)
 		return
 	}
 }

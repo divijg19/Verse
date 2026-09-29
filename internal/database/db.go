@@ -27,13 +27,20 @@ var ErrNotInitialized = errors.New("database not initialized")
 //	    return nil, fmt.Errorf("database not initialized")
 //	}
 //
-// Eighteen copies of that is eighteen places to keep the message identical, and the message is the
+// Sixteen copies of that is sixteen places to keep the message identical, and the message is the
 // only thing a user sees when a deploy races its own migrations. This makes it one place, and gives
 // the condition a name so callers can test for it with errors.Is rather than by matching a string.
 //
-// It exists because the failure is reachable in a running process and not only in a broken one:
-// /health is registered before the pool is connected, and the tests swap the pool to measure it. A
-// nil dereference in either case is a panic that reads as a crash rather than as "not ready yet".
+// It exists because the failure is reachable in a running process and not only in a broken one.
+// The pool is swapped at runtime by the pool-footprint test, and it is nil for the whole of a boot
+// that fails before Connect returns. A nil dereference in either case is a panic that reads as a
+// crash rather than as "not ready yet".
+//
+// It is not reachable from the platform health probe, which is a claim this comment used to make and
+// which was false. /health is registered by newRouter, and main.go calls that only after Connect,
+// the migrations and RequireSchema have all succeeded -- so the server does not listen at all until
+// the pool exists. Ping's nil check is a belt-and-braces guard for the test paths, not a boot
+// scenario.
 func Require() error {
 	if Pool == nil {
 		return ErrNotInitialized
@@ -41,12 +48,33 @@ func Require() error {
 	return nil
 }
 
-// Connect initializes the global pgxpool using DATABASE_URL.
-// It returns an error if DATABASE_URL is missing or the pool cannot be created/pinged.
+// Connect opens a pool for DATABASE_URL and installs it as the global Pool.
+//
+// It returns an error if DATABASE_URL is missing or the pool cannot be created/pinged. The caller
+// owns the returned pool's lifetime, which is why ClosePool exists alongside this.
 func Connect() error {
-	url := os.Getenv("DATABASE_URL")
+	pool, err := Open("DATABASE_URL")
+	if err != nil {
+		return err
+	}
+	Pool = pool
+	return nil
+}
+
+// Open creates a pool for the given environment variable, retrying while the database is asleep.
+//
+// The environment variable is named rather than the DSN passed in, so that the two credential
+// sources this application has -- DATABASE_URL for serving, MIGRATION_DATABASE_URL for the startup
+// migration -- are read in one place and cannot drift apart. The variable's name appears in every
+// error, which is the difference between "failed to connect to database after 10 attempts" and
+// knowing which of the two credentials ran out of attempts.
+//
+// Split out of Connect so a caller can hold a second pool with different rights without disturbing
+// the global. The migration runner needs exactly that: DDL for the length of a boot, then gone.
+func Open(envVar string) (*pgxpool.Pool, error) {
+	url := os.Getenv(envVar)
 	if url == "" {
-		return fmt.Errorf("DATABASE_URL environment variable not set")
+		return nil, fmt.Errorf("%s environment variable not set", envVar)
 	}
 
 	// Retry strategy for transient sleep/wakeup (e.g., Neon free tier)
@@ -61,7 +89,7 @@ func Connect() error {
 		cfg, err := pgxpool.ParseConfig(url)
 		if err != nil {
 			cancel()
-			return fmt.Errorf("failed to parse DATABASE_URL: %w", err)
+			return nil, fmt.Errorf("failed to parse %s: %w", envVar, err)
 		}
 
 		// Re-plan rather than reuse a server-side prepared statement.
@@ -154,8 +182,7 @@ func Connect() error {
 			// Ping to verify connectivity
 			if perr := pool.Ping(ctx); perr == nil {
 				cancel()
-				Pool = pool
-				return nil
+				return pool, nil
 			} else {
 				pool.Close()
 				lastErr = perr
@@ -172,7 +199,19 @@ func Connect() error {
 		}
 	}
 
-	return fmt.Errorf("failed to connect to database after %d attempts: %w", attempts, lastErr)
+	return nil, fmt.Errorf("failed to connect to %s after %d attempts: %w", envVar, attempts, lastErr)
+}
+
+// ClosePool releases the global pool, tolerating a nil one.
+//
+// Used by the startup migration to hand back the short-lived privileged pool it opened. The nil
+// case is not defensive padding: a boot that failed before Connect succeeded has no pool, and the
+// cleanup runs on that path too.
+func ClosePool() {
+	if Pool != nil {
+		Pool.Close()
+		Pool = nil
+	}
 }
 
 // RequireSchema verifies that the schema the application needs already exists.
@@ -217,9 +256,10 @@ func RequireSchema(ctx context.Context) error {
 // every page behind it is returning errors, so the platform neither restarts nor alerts, and the log
 // shows an unbroken stream of 200s for the whole outage.
 //
-// A nil pool is reported as unreachable rather than dereferenced. /health is registered before the
-// pool is connected during boot, and a probe that panics takes the process down instead of reporting
-// that it is not ready.
+// A nil pool is reported as unreachable rather than dereferenced. The probe cannot currently arrive
+// before the pool exists -- newRouter runs after Connect, so there is no listening socket yet -- but
+// answering rather than panicking costs one line and keeps the property if the boot order ever
+// changes. See Require, which records the same reasoning.
 func Ping(ctx context.Context) error {
 	if err := Require(); err != nil {
 		return err

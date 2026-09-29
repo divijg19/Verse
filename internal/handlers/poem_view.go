@@ -1,11 +1,8 @@
 package handlers
 
 import (
-	"errors"
-	"log"
+	"fmt"
 	"net/http"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
@@ -13,15 +10,14 @@ import (
 
 // PoemViewHandler shows a single poem by id.
 func PoemViewHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathWorkID(r)
+	id, ok := requirePathWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
 	p, err := services.GetPoem(r.Context(), id)
 	if err != nil {
-		writePoemFetchError(w, id, err)
+		writePoemFetchError(w, r, id, err)
 		return
 	}
 
@@ -30,15 +26,14 @@ func PoemViewHandler(w http.ResponseWriter, r *http.Request) {
 
 // EditorEditHandler loads a poem into the editor for editing (GET /editor/{id}).
 func EditorEditHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathWorkID(r)
+	id, ok := requirePathWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
 	p, err := services.GetPoem(r.Context(), id)
 	if err != nil {
-		writePoemFetchError(w, id, err)
+		writePoemFetchError(w, r, id, err)
 		return
 	}
 
@@ -59,13 +54,6 @@ func EditorEditHandler(w http.ResponseWriter, r *http.Request) {
 //
 // The error text is not returned either way. What a caller learns is the status code, and the status
 // code is the claim the service can actually support.
-func writePoemFetchError(w http.ResponseWriter, id string, err error) {
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "poem not found", http.StatusNotFound)
-		return
-	}
-
-	// #nosec G706 -- id is a UUID validated by pathWorkID above; the sanitization is the mitigation.
-	log.Printf("fetch poem %s: %v", id, err) // #nosec G706
-	http.Error(w, "failed to load poem", http.StatusInternalServerError)
+func writePoemFetchError(w http.ResponseWriter, r *http.Request, id string, err error) {
+	writeMissingWork(w, r, id, "failed to load poem", fmt.Errorf("fetch poem: %w", err))
 }

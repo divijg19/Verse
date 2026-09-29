@@ -65,7 +65,7 @@ Then open <http://localhost:8080> and enter your passphrase.
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | PostgreSQL connection string. The application will not start without a reachable database |
+| `DATABASE_URL` | PostgreSQL connection string for the serving credential. The application will not start without a reachable database |
 | `VERSE_AUTHORIZATION` | The authoring passphrase, compared against the submitted value in constant time. **Minimum 16 characters** |
 | `VERSE_AUTH_SECRET` | Key used to sign session and CSRF tokens. **Minimum 32 characters.** Treat it as a secret: changing it invalidates every active session |
 
@@ -86,6 +86,7 @@ have forgotten `VERSE_AUTH_SECRET`, set a new one; all sessions end, and you sig
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `MIGRATION_DATABASE_URL` | Connection string for the startup migration, which is then discarded. Unset, the migration falls back to `DATABASE_URL` and the boot log says so. Set it to drop DDL rights from the serving credential — see [Dropping DDL rights](#dropping-ddl-rights-from-the-serving-credential) |
 | `PORT` | `8080` | Listen port. Platforms such as Render inject this |
 | `DB_MAX_CONNS` | `5` | Maximum pooled connections |
 | `DB_MIN_CONNS` | `1` | Minimum pooled connections |
@@ -156,6 +157,13 @@ different version of the repository than the code it ships with.
 - **Editing an applied migration is an error.** The recorded checksum will not match, and the runner
   stops rather than applying one version of a file to a database that already has another. Write a
   new migration instead.
+- **A consequence worth knowing: applied migration files are frozen, comments included.** The checksum
+  covers the whole file, so fixing a typo or a stale path inside one will stop the next boot with
+  "migration N was modified after it was applied". This is not theoretical — it happened during
+  v0.4.11, when a reference to this file was updated inside `006_timestamptz.sql` and the very next
+  test run refused to migrate. The fix is to leave it: the file records what was applied at the time
+  it was applied, and a comment in it describes the world as it was. `006` still refers to this
+  document as `docs/RUNNING.md`, from before it moved to the repository root.
 - **Deleting or renaming an applied migration is an error.** Renaming looks exactly like deleting one
   and adding a new one, and the database has already absorbed the old one.
 - **A file that is blank after trimming is skipped and never recorded.** A file containing only
@@ -207,23 +215,92 @@ them rather than after. Take the export first either way.
 
 ### Why migrations run at startup, and not as a deploy step
 
-The right shape is a step between the build and the deploy: the service would need no DDL rights,
-and the schema could never be ahead of the code that expects it.
+The ideal shape is a step between the build and the deploy: the serving credential would then need no
+DDL rights at all.
 
 Render provides that hook only for "paid web services, private services, and background workers". A
 pre-deploy command needs a **paid compute plan**, not merely a paid workspace, and this service runs
-on a free instance. The setting would be accepted by `render.yaml` and then silently never run —
-the worst possible failure mode for the step everything else depends on. An earlier draft of this
-change had exactly that, and it was removed.
+on a free instance. The setting would be accepted by `render.yaml` and then silently never run — the
+worst possible failure mode for the step everything else depends on. An earlier draft of this change
+had exactly that, and it was removed.
 
-So the service applies its own migrations at startup. Two things follow, and they are worth stating
-plainly:
+So the service applies its own migrations at startup. One thing follows, and it is worth stating
+plainly: **the schema can never be ahead of the code.** Both come from the same binary, and the `.sql`
+files are embedded in it.
 
-- **The schema can never be ahead of the code.** Both come from the same binary, and the `.sql`
-  files are embedded in it.
-- **The runtime credential holds DDL rights** for the life of the process, and every start touches
-  the database. Applied migrations are verified and skipped, so the touch is a query, not a schema
-  change — but the rights are real, and any credential rotation must preserve them.
+That is a reason for the migration to run here. It is **not** a reason for the serving credential to
+hold DDL rights, and this section previously said so — it concluded that the runtime credential must
+keep them "for the life of the process". That conclusion was wrong, and it went unexamined for eleven
+releases because the two facts were treated as one. The migration needs `CREATE` and `ALTER`; nothing
+that answers a request needs either.
+
+### Dropping DDL rights from the serving credential
+
+This is available on a **free plan**. It does not need `preDeployCommand`, because it is not a deploy
+step — the migration still runs at boot, it just runs over a *different connection*:
+
+| Variable | Used for | Rights needed |
+|---|---|---|
+| `MIGRATION_DATABASE_URL` | the startup migration, then discarded | `CREATE`, `ALTER`, ownership of the tables |
+| `DATABASE_URL` | every request, for the life of the process | `SELECT`, `INSERT`, `UPDATE` — and `DELETE` on `login_attempts` only |
+
+The migration pool is opened, used, and closed before the first request is served, so the privileged
+credential is not held once the service is up.
+
+**`MIGRATION_DATABASE_URL` is optional.** Unset, the migration falls back to `DATABASE_URL` — the
+behavior of every release before this one, and the only arrangement that works against a single-role
+database such as the one in `compose.yaml`. While it is unset the boot log says so on every start, so
+the weaker arrangement is never silent:
+
+```
+MIGRATION_DATABASE_URL is not set; migrating with DATABASE_URL, which means the serving
+credential still holds DDL rights.
+```
+
+A service that refused to start because an optional variable was absent would be a worse outcome than
+a service that still holds DDL rights, so the fallback exists on purpose. The split is opt-in and
+self-announcing rather than a new requirement.
+
+#### Setting it up
+
+1. Run [`db/roles.sql`](../db/roles.sql) once, as an owner or superuser. It creates `verse_runtime`,
+   which holds the grants, and documents the `verse_app` login role. It is deliberately **not** a
+   migration: migrations are applied at every boot by the service, and this needs a credential the
+   service should not hold.
+2. Add `ALTER DEFAULT PRIVILEGES FOR ROLE <your migration role> ... GRANT ... TO verse_runtime` as
+   described in that file, or the first future migration will create a table the service cannot read.
+3. On Render, set `MIGRATION_DATABASE_URL` to the current credential — the same value `DATABASE_URL`
+   has today — and change `DATABASE_URL` to the `verse_app` one.
+
+**Order matters only in one direction.** Do not revoke the owner credential from `DATABASE_URL` before
+`MIGRATION_DATABASE_URL` is set, or the service has nothing to migrate with and will not start.
+
+#### What the serving credential cannot do
+
+This is checked on every pull request by the `Least privilege` CI job, which boots the service on a
+restricted role and asserts fourteen properties. It cannot `CREATE`, `ALTER` or `DROP`; it cannot
+`DELETE` or `TRUNCATE` a work; it cannot modify a retained revision; and **it cannot read
+`schema_migrations`** — the boot log reports which migrations ran, but the serving process cannot
+query the table that records it.
+
+Two of those are worth a moment:
+
+- **No `DELETE` on `poems`.** Every delete in this application is a soft delete written as an `UPDATE`
+  of `deleted_at`, which is why that column exists. The one copy of the work that must never be lost
+  cannot be destroyed through the serving credential.
+- **No `UPDATE` on `poem_versions`.** A retained revision is immutable by design; restoring one is an
+  ordinary edit, which records the displaced text as a new version in turn.
+
+The full suite still runs as the owner, and deliberately is *not* run against the restricted role: it
+truncates, and `TRUNCATE` is not in the grant set. Granting it would make the job claim a
+least-privilege role it does not have.
+
+#### A note on what this does not fix
+
+Nothing here reduces the blast radius of a compromised **migration** credential, which still owns the
+tables. The improvement is that the credential which is reachable by every request in the world no
+longer does.
+
 
 ### If this service moves to a paid compute plan
 
@@ -232,11 +309,16 @@ the tests are identical:
 
 1. Add `go build -tags netgo -ldflags="-s -w" -o migrate ./cmd/migrate` to `buildCommand`.
 2. Add `preDeployCommand: ./migrate` to `render.yaml`.
-3. Drop DDL rights from the credential the service runs with.
 
-Step 3 is safe only once step 2 is in place. Until then the startup migration still needs them, so
-revoking first would leave the service unable to start. The startup migration becomes a no-op the
-moment the pre-deploy step exists, so there is no window in which both matter.
+**Step 2 is now optional rather than a prerequisite.** The list above used to carry a third step —
+"drop DDL rights from the credential the service runs with" — gated on step 2 being in place first. That
+gate was the wrong conclusion drawn from a correct observation, and it cost the DDL rights eleven
+releases: see the section above. The rights are dropped by setting `MIGRATION_DATABASE_URL`, which works
+on a free plan and does not involve a deploy hook at all.
+
+What the paid plan buys on top of that is narrower: the migration stops running at boot, so the
+privileged credential is not used at all during a normal start, and a slow or lock-contending
+migration cannot delay one. Worth having, and not worth waiting for.
 
 The container image already ships `/app/migrate` for applying a migration by hand without deploying:
 

@@ -6,7 +6,7 @@ This is a private, single-author application, so the constraints that matter are
 work must not be lost, it must not leak, and the deployment has to keep working on the platform's
 free tier.
 
-Read `docs/RUNNING.md` before changing anything operational. It is the reference for the deployment,
+Read `RUNNING.md` before changing anything operational. It is the reference for the deployment,
 the environment variables, and the constraints that are not obvious from the code.
 
 ## Running the tests
@@ -48,10 +48,32 @@ CI regenerates and fails if the result differs, so this cannot be forgotten. The
 - **Correctness before features.** A test that proves a property is worth more than a feature that
   could break one. When a change is subtle, write the test that would fail if it were wrong, and
   confirm it fails first.
-- **`golangci-lint run` must be clean.** The `misspell` and `gosec` rules are not advisory. Where a
-  `gosec` finding is a false positive, suppress it narrowly with `#nosec` and a comment explaining
-  what the actual mitigation is — the pattern is already used throughout.
-- **Spellings are US.** `behavior`, `defense`, `recognize`. The linter enforces it.
+  - **The three gates below must all be clean.** CI runs all three, and this guide used to name only
+    the first — which is the exact substitution CI warns about in a comment of its own: `golangci-lint
+    run` does not enforce the formatters section, so the formatting gate is load-bearing and must not
+    be dropped in favor of relying on the linter.
+
+    ```
+    golangci-lint fmt          # formatting; the linter's run does not check this
+    golangci-lint run ./...    # lint, including misspell and gosec
+    staticcheck ./...          # whole-program analysis
+    ```
+
+    `staticcheck` is a separate gate deliberately. `golangci-lint`'s staticcheck is per-package; the
+    standalone binary also catches unused identifiers across package boundaries, which is how two
+    genuinely dead symbols were found here.
+
+    CI additionally runs `govulncheck`, which needs no local counterpart to keep the tree mergeable.
+
+    Where a `gosec` finding is a false positive, suppress it narrowly with `#nosec` and a comment
+    explaining what the actual mitigation is — the pattern is already used throughout.
+  - **Spellings are US.** `behavior`, `defense`, `recognize`. The linter enforces it.
+  - **Three test suites govern files you would not expect them to.** `render.yaml` is read by
+    `TestRenderYamlDashboardQueryCountMatchesTheMeasurement`; `README.md` is read by the `TestReadme*`
+    suite; and `internal/handlers` is parsed by `TestEveryInternalErrorResponseIsLogged`, which fails
+    if any handler writes a 500 anywhere except `fail500`. Editing any of the three is a change with a
+    test suite attached, and the failure names the file. That last one is why adding an error response
+    is now one line rather than a decision about whether to log.
 
 ## Branches and releases
 
