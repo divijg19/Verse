@@ -94,7 +94,7 @@ Primary stack:
 * Hand-written SQL. There is no query generator: every statement is in `internal/services`, and
   `tests/readme_schema_test.go` checks the schema block below against the live database
 * `internal/migrate`, which embeds the `.sql` files and applies them in filename order with a
-  recorded checksum per file. Not a migration framework — see `docs/RUNNING.md`
+  recorded checksum per file. Not a migration framework — see `RUNNING.md`
 
 Why Go:
 
@@ -179,10 +179,13 @@ verse/
 |
 ├── migrations/        001 through 006, embedded into both the server and cmd/migrate
 |
-├── docs/RUNNING.md    operations, environment variables, the migration contract
+├── db/                role bootstrap: the least-privilege grants, applied once by an operator
+|                     and deliberately not a migration, because it needs a credential the
+|                     service should not hold
 |
 ├── Dockerfile         the second build path, exercised by CI
 ├── go.mod
+├── RUNNING.md         operations, environment variables, the migration contract
 └── README.md
 ```
 
@@ -331,7 +334,7 @@ bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --wat
 ```
 
 Full operational reference — environment variables, migrations, tests, deployment, and
-troubleshooting — is in [`docs/RUNNING.md`](docs/RUNNING.md).
+troubleshooting — is in [`RUNNING.md`](RUNNING.md).
 
 ---
 

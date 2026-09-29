@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
@@ -19,15 +18,14 @@ import (
 // its history is exactly what someone trying to recover an accidental deletion needs; requiring the
 // poem to be active would make the recovery path unreachable at the moment it is wanted.
 func PoemHistoryHandler(w http.ResponseWriter, r *http.Request) {
-	poemID, ok := pathWorkID(r)
+	poemID, ok := requirePathWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
 	history, err := buildPoemHistory(r, poemID, "")
 	if err != nil {
-		writeHistoryError(w, poemID, err)
+		writeHistoryError(w, r, poemID, err)
 		return
 	}
 
@@ -41,9 +39,8 @@ func PoemHistoryHandler(w http.ResponseWriter, r *http.Request) {
 // there is no separate "purge history" path here: nothing in the application edits or deletes a
 // retained version.
 func RestorePoemVersionHandler(w http.ResponseWriter, r *http.Request) {
-	poemID, ok := formWorkID(r)
+	poemID, ok := requireFormWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
@@ -54,7 +51,7 @@ func RestorePoemVersionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := services.RestorePoemVersion(r.Context(), poemID, versionID); err != nil {
-		writeHistoryError(w, poemID, err)
+		writeHistoryError(w, r, poemID, err)
 		return
 	}
 
@@ -62,7 +59,7 @@ func RestorePoemVersionHandler(w http.ResponseWriter, r *http.Request) {
 	// happened, and the new entry at the top proving it is undoable, are both worth seeing.
 	history, err := buildPoemHistory(r, poemID, "Draft restored.")
 	if err != nil {
-		writeHistoryError(w, poemID, err)
+		writeHistoryError(w, r, poemID, err)
 		return
 	}
 	renderSurface(w, r, "library", templ.PoemHistoryScreen(r.Context(), history))
@@ -110,15 +107,31 @@ func buildPoemHistory(r *http.Request, poemID, restored string) (templ.PoemHisto
 //
 // pgx.ErrNoRows reaches here as a miss rather than a 500: a mistyped or stale id is an ordinary thing
 // for the author to do, and reporting it as a server error would be both wrong and alarming.
-func writeHistoryError(w http.ResponseWriter, poemID string, err error) {
-	if errors.Is(err, services.ErrNotFound) || errors.Is(err, pgx.ErrNoRows) {
+func writeHistoryError(w http.ResponseWriter, r *http.Request, poemID string, err error) {
+	writeMissingWork(w, r, poemID, "failed to load history", fmt.Errorf("poem history: %w", err))
+}
+
+// writeMissingWork answers a failure about one named work: a miss is a 404, a fault is a logged 500.
+//
+// Four sites were writing this block, with the same shape and the same two outcomes. The rule is
+// worth stating once because the distinction is not cosmetic: a mistyped or stale id is an ordinary
+// thing for the author to do, and reporting it as a server error is both wrong and alarming, while a
+// genuine fault reported as a 404 reads as "this does not exist" when in fact the service could not
+// ask.
+//
+// One condition, because every read and mutation in services now reports a missing row as
+// services.ErrNotFound. Two of these sites used to test for pgx.ErrNoRows as well, which was only
+// necessary because the single-work reads returned the driver error unwrapped -- so a caller had to
+// know which read it had called to know what to test for.
+func writeMissingWork(w http.ResponseWriter, r *http.Request, id, what string, err error) {
+	if errors.Is(err, services.ErrNotFound) {
 		http.Error(w, "poem not found", http.StatusNotFound)
 		return
 	}
-	// #nosec G706 -- the id is a UUID validated by pathWorkID or formWorkID above, and the
-	// sanitization is the actual mitigation.
-	log.Printf("poem history for %s: %v", poemID, err) // #nosec G706
-	http.Error(w, "failed to load history", http.StatusInternalServerError)
+	// The id is a UUID validated by requirePathWorkID or requireFormWorkID above, so it cannot carry
+	// a newline and forge a log line. fail500 additionally logs the request id, which
+	// inboundRequestIDMiddleware has already bounded and stripped.
+	fail500(w, r, what, fmt.Errorf("%s for %s: %w", what, id, err))
 }
 
 // pathWorkID validates the {id} route parameter as a UUID.

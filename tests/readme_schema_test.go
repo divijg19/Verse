@@ -260,7 +260,7 @@ func TestReadmeProjectTreeNamesOnlyRealPaths(t *testing.T) {
 	// A hand-drawn tree is hierarchical: it writes "cmd/" on one line and an indented "server/" on the
 	// next, so the string "cmd/server" never appears in it. A first attempt at this test searched the
 	// tree for each full path and matched only the four flat entries at the bottom -- migrations, the
-	// Dockerfile, go.mod, docs/RUNNING.md -- and passed. It was checking a fifth of what it appeared
+	// Dockerfile, go.mod, RUNNING.md -- and passed. It was checking a fifth of what it appeared
 	// to, which is the failure mode this file exists to prevent, arrived at from the other direction.
 	//
 	// So the claim is stated as what it is: every path below must exist, and its leaf name must appear
@@ -277,7 +277,7 @@ func TestReadmeProjectTreeNamesOnlyRealPaths(t *testing.T) {
 		"internal/presenters", "internal/export", "internal/clock", "internal/testsupport",
 		"templ/layout.templ", "templ/editor.templ", "templ/heatmap.templ", "templ/security.go",
 		"static/css/input.css", "static/js",
-		"migrations", "docs/RUNNING.md", "Dockerfile", "go.mod",
+		"migrations", "RUNNING.md", "Dockerfile", "go.mod",
 	}
 
 	// A path must be *populated*, not merely present, and that distinction is the whole reason this

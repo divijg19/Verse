@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"html"
-	"log"
 	"net/http"
 	"strings"
 
@@ -67,6 +67,31 @@ func formWorkID(r *http.Request) (string, bool) {
 	return parseWorkID(r.FormValue("id"))
 }
 
+// requireFormWorkID returns the work id from the "id" form field, or answers 400 and reports false.
+//
+// The bool-and-early-return shape every caller was already writing by hand, seven times. Folding the
+// error response in is safe because the response is identical at every site: same status, same
+// message, no leak either way -- a malformed id is the caller's own fault and saying so tells them
+// nothing about the database.
+func requireFormWorkID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id, ok := formWorkID(r)
+	if !ok {
+		http.Error(w, "missing or malformed id", http.StatusBadRequest)
+		return "", false
+	}
+	return id, true
+}
+
+// requirePathWorkID is requireFormWorkID for the {id} route parameter.
+func requirePathWorkID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id, ok := pathWorkID(r)
+	if !ok {
+		http.Error(w, "missing or malformed id", http.StatusBadRequest)
+		return "", false
+	}
+	return id, true
+}
+
 // parseWorkID validates a work identifier that came from an untrusted source.
 //
 // The value is attacker-supplied, so it is parsed as a UUID rather than trimmed and passed on. That
@@ -104,8 +129,7 @@ func SavePoemHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := services.CreatePoem(r.Context(), content); err != nil {
-		log.Printf("create poem: %v", err)
-		http.Error(w, "failed to save poem", http.StatusInternalServerError)
+		fail500(w, r, "failed to save poem", fmt.Errorf("create poem: %w", err))
 		return
 	}
 
@@ -114,9 +138,8 @@ func SavePoemHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdatePoemHandler updates an existing work's content.
 func UpdatePoemHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := formWorkID(r)
+	id, ok := requireFormWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
@@ -127,15 +150,7 @@ func UpdatePoemHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := services.UpdatePoem(r.Context(), id, content); err != nil {
-		if errors.Is(err, services.ErrNotFound) {
-			http.Error(w, "poem not found", http.StatusNotFound)
-			return
-		}
-		// #nosec G706 -- id is not raw request input here. formWorkID parsed it as a UUID and
-		// returned the canonical string form, so it cannot contain a newline or any other
-		// character that would let a caller forge a log line.
-		log.Printf("update poem %s: %v", id, err) // #nosec G706
-		http.Error(w, "failed to update poem", http.StatusInternalServerError)
+		writeMissingWork(w, r, id, "failed to update poem", fmt.Errorf("update poem: %w", err))
 		return
 	}
 
@@ -144,22 +159,15 @@ func UpdatePoemHandler(w http.ResponseWriter, r *http.Request) {
 
 // DeletePoemHandler performs a soft-delete of a work.
 func DeletePoemHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := formWorkID(r)
+	id, ok := requireFormWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
+	// A false success on a destructive action is worse than an error, so a nonexistent id is a 404.
+	// It was previously a success, because the affected-row count was discarded.
 	if err := services.SoftDeletePoem(r.Context(), id); err != nil {
-		if errors.Is(err, services.ErrNotFound) {
-			// Previously this reported success for a nonexistent id, because the affected-row count
-			// was discarded. A false success on a destructive action is worse than an error.
-			http.Error(w, "poem not found", http.StatusNotFound)
-			return
-		}
-		// #nosec G706 -- validated UUID, as above.
-		log.Printf("soft delete poem %s: %v", id, err) // #nosec G706
-		http.Error(w, "failed to delete poem", http.StatusInternalServerError)
+		writeMissingWork(w, r, id, "failed to delete poem", fmt.Errorf("soft delete poem: %w", err))
 		return
 	}
 

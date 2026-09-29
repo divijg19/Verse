@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/models"
@@ -10,11 +11,89 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ErrNotFound reports that a mutation matched no row.
+// ErrNotFound reports that a read or a mutation named no row.
 //
 // Previously UpdatePoem and SoftDeletePoem discarded the affected-row count, so a request naming a
 // nonexistent id returned success. Callers need to distinguish "changed" from "no such thing".
+//
+// It is also what the single-work reads return, which they did not used to: they passed
+// pgx.ErrNoRows straight up, so a caller had to know which read it had called to know what to test
+// for. Every read and every mutation in this package now reports the same condition the same way,
+// and a handler that maps it to a 404 is correct for all of them.
 var ErrNotFound = errors.New("not found")
+
+// replaceContent is the shared body of the two functions that overwrite a work's text.
+//
+// UpdatePoem and RestorePoemVersion each did this in about thirty identical lines: begin, defer a
+// rollback, lock the row and read what was there, record the displaced text as a retained version if
+// it differed, write the new text, commit. RestorePoemVersion's extra step -- clearing deleted_at --
+// is now expressed in the update statement it passes, and its deliberate lack of a deleted_at filter
+// in the guard it passes.
+//
+// The two parameters are SQL fragments, and that is the point of the split. library.go's own
+// reasoning for keeping these two functions separate in the first place was that a boolean
+// parameterising UpdatePoem's `deleted_at IS NULL` guard would put one careless caller away from
+// editing a deleted work invisibly. That reasoning is unchanged and still binds: the guard is
+// visible as a literal at each call site, where a flag would have hidden it behind a `true`. Only the
+// twenty-five lines that are genuinely the same were shared, and the comment on RestorePoemVersion
+// records why the two differ.
+func replaceContent(ctx context.Context, id, content, lockWhere, update string) error {
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Committed explicitly on the success path; the deferred rollback is then a no-op, which is
+	// preferable to deferring a commit whose error would have to be checked after the response has
+	// already been written.
+	//
+	// The closure is load-bearing, not stylistic. `defer discardRollback(tx.Rollback(ctx))` would
+	// evaluate tx.Rollback(ctx) at the defer statement rather than at return, closing the transaction
+	// before the work below had run -- which is exactly what happened the first time this was written
+	// that way, and it presented as "tx is closed" on every update. migrate.go's own rollback uses
+	// the closure form for the same reason.
+	//
+	// Rollback after a successful Commit returns ErrTxClosed, which is not worth reporting.
+	// discardRollback is the same shape migrate.go uses, and for the same reason: errcheck runs with
+	// check-blank, so an error assigned to the blank identifier is still reported. Passing it to a
+	// function that returns nothing is the way to say "deliberately ignored" in a form the linter
+	// accepts, which is better than a suppression that documents the safety but not the mechanism.
+	defer func() { discardRollback(tx.Rollback(ctx)) }()
+
+	// FOR UPDATE in both callers, and load-bearing: a concurrent edit between the read and the write
+	// would leave the history describing a change that did not happen, because the version retained
+	// below would be the text the other writer replaced rather than the text this one did.
+	var previous string
+	err = tx.QueryRow(ctx,
+		`SELECT content FROM poems `+lockWhere, id).Scan(&previous)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if previous != content {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO poem_versions (id, poem_id, content) VALUES ($1, $2, $3)`,
+			uuid.NewString(), id, previous); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(ctx, update, content, id); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// discardRollback swallows a rollback error that is deliberately not reported.
+//
+// Not a general-purpose error sink. It exists so that a deferred rollback reads as intentional to
+// both the reader and errcheck, instead of carrying a //nolint that explains why the error is safe to
+// drop but not why a suppression is needed.
+func discardRollback(error) {}
 
 // CreatePoem inserts a new poem and returns its id.
 func CreatePoem(ctx context.Context, content string) (string, error) {
@@ -31,50 +110,35 @@ func CreatePoem(ctx context.Context, content string) (string, error) {
 }
 
 // ListPoems returns the most recent poems (non-deleted) with limit/offset.
-//
-// The id tiebreak on created_at is load-bearing here, and the reason is the OFFSET rather than the
-// order. A query whose sort is not a total order returns tied rows in whatever order the plan happens
-// to produce, and that order need not be the same on the next execution. Paging through an unstable
-// sort therefore drops rows and repeats them: a work on the boundary between page one and page two can
-// appear on both, or on neither, and nothing reports it. Adding id makes the order total, so a given
-// page is the same page every time.
 func ListPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
-	if err := database.Require(); err != nil {
-		return nil, err
-	}
-	if limit <= 0 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	rows, err := database.Pool.Query(ctx, `
-        SELECT `+models.PoemColumns+`
-        FROM poems
-        WHERE deleted_at IS NULL
-        ORDER BY created_at DESC, id DESC
-        LIMIT $1 OFFSET $2`, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []models.Poem
-	for rows.Next() {
-		var p models.Poem
-		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return listLivePoems(ctx, "", limit, offset)
 }
 
 // SearchPoems returns poems matching q (ILIKE), limited with optional offset.
 func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models.Poem, error) {
+	return listLivePoems(ctx, q, limit, offset)
+}
+
+// listLivePoems is the one query behind both the library and its search box.
+//
+// They were the same function written twice, 25 of 34 lines identical, and the differences were the
+// ILIKE predicate, the parameter numbering, and a doc comment. A shared helper was worth doing for
+// the obvious reason -- one place to change the paging, one place to get the ORDER BY right -- and
+// for a less obvious one: the argument below is a string, so a caller cannot accidentally pass a
+// value into the SQL text.
+//
+// An empty needle means "no predicate", which is how ListPoems uses it. That is a deliberate
+// non-obvious contract, so it is stated here rather than left to be discovered: an empty q lists
+// everything rather than matching nothing. SearchPoems only ever receives what the author typed.
+//
+// The id tiebreak on created_at is load-bearing, and the reason is the OFFSET rather than the order.
+// A query whose sort is not a total order returns tied rows in whatever order the plan happens to
+// produce, and that order need not be the same on the next execution. Paging through an unstable
+// sort therefore drops rows and repeats them: a work on the boundary between page one and page two
+// can appear on both, or on neither, and nothing reports it. Adding id makes the order total, so a
+// given page is the same page every time. Search inherited the same ordering for the same reason, and
+// before this change carried none of this explanation.
+func listLivePoems(ctx context.Context, needle string, limit, offset int) ([]models.Poem, error) {
 	if err := database.Require(); err != nil {
 		return nil, err
 	}
@@ -84,13 +148,28 @@ func SearchPoems(ctx context.Context, q string, limit int, offset int) ([]models
 	if offset < 0 {
 		offset = 0
 	}
-	rows, err := database.Pool.Query(ctx, `
-        SELECT `+models.PoemColumns+`
+
+	// Composed rather than written twice, so the filter that excludes soft-deleted works is one
+	// literal. It is not parameterised, deliberately: a caller cannot turn it off, and the query
+	// plan is unaffected by whether the predicate text happens to be present.
+	query := `
+        SELECT ` + models.PoemColumns + `
         FROM poems
-        WHERE deleted_at IS NULL
-          AND content ILIKE '%' || $1 || '%'
-          ORDER BY created_at DESC, id DESC
-          LIMIT $2 OFFSET $3`, q, limit, offset)
+        WHERE deleted_at IS NULL`
+	args := []any{}
+
+	if needle != "" {
+		query += `
+            AND content ILIKE '%' || $1 || '%'`
+		args = append(args, needle)
+	}
+
+	query += `
+        ORDER BY created_at DESC, id DESC
+        LIMIT $` + strconv.Itoa(len(args)+1) + ` OFFSET $` + strconv.Itoa(len(args)+2)
+	args = append(args, limit, offset)
+
+	rows, err := database.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -122,13 +201,19 @@ func GetPoem(ctx context.Context, id string) (models.Poem, error) {
         WHERE id = $1
         AND deleted_at IS NULL`, id)
 	if err := row.Scan(&p.ID, &p.Content, &p.CreatedAt); err != nil {
+		// Translated rather than returned raw, so that "no such work" is the same condition
+		// everywhere in this package. It was not: the mutating reads return ErrNotFound, and these
+		// two returned pgx.ErrNoRows, so a caller had to know which read it had called. That is not
+		// a theoretical inconvenience -- a handler that checked for the sentinel only reported a
+		// missing poem as a 500.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return p, ErrNotFound
+		}
 		return p, err
 	}
 	return p, nil
 }
 
-// GetPoemIncludingDeleted returns a poem by id whether or not it is soft-deleted.
-//
 // The counterpart to GetPoem, and deliberately separate rather than a flag on it. Every read that
 // feeds the library, search, dashboard or editor wants the deleted_at filter; the one caller that
 // does not is the recovery path, where the whole point is the work that is currently hidden. A
@@ -146,6 +231,10 @@ func GetPoemIncludingDeleted(ctx context.Context, id string) (models.Poem, error
         FROM poems
         WHERE id = $1`, id)
 	if err := row.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.DeletedAt); err != nil {
+		// As in GetPoem: one condition for "no such work" across the package.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return p, ErrNotFound
+		}
 		return p, err
 	}
 	return p, nil
@@ -174,40 +263,9 @@ func UpdatePoem(ctx context.Context, id string, content string) error {
 		return err
 	}
 
-	tx, err := database.Pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	// Committed explicitly on the success path; the deferred rollback is then a no-op, which is
-	// preferable to deferring a commit whose error would have to be checked after the response has
-	// already been written.
-	// Rollback after a successful Commit is a no-op that returns ErrTxClosed, which is not worth
-	// reporting. The error is discarded explicitly rather than ignored.
-	defer func() { _ = tx.Rollback(ctx) }() //nolint:errcheck // documented above
-
-	var previous string
-	err = tx.QueryRow(ctx,
-		`SELECT content FROM poems WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, id).Scan(&previous)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-
-	if previous != content {
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO poem_versions (id, poem_id, content) VALUES ($1, $2, $3)`,
-			uuid.NewString(), id, previous); err != nil {
-			return err
-		}
-	}
-
-	if _, err := tx.Exec(ctx, `UPDATE poems SET content = $1 WHERE id = $2`, content, id); err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	return replaceContent(ctx, id, content,
+		`WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+		`UPDATE poems SET content = $1 WHERE id = $2`)
 }
 
 // ListDeletedPoems returns soft-deleted poems, most recently deleted first.
@@ -215,6 +273,14 @@ func UpdatePoem(ctx context.Context, id string, content string) error {
 // This is the recovery path made visible. deleted_at was previously a one-way trip: the row survived
 // in Postgres, so the work was technically recoverable by hand, but the application offered no
 // listing, no restore and no purge -- the author had no way back to a poem they deleted by accident.
+//
+// deleted_at is selected, and scanned, where the two live reads omit it. That is not redundancy: it
+// is the difference between a field that is correct and a field that is inverted. Every other read
+// filters on deleted_at IS NULL, so a nil DeletedAt there means "not deleted" -- the correct value.
+// This one filters on deleted_at IS NOT NULL, so with the column omitted a nil meant "not deleted"
+// about a row that *is* deleted. Nothing read the field on this path, so it was latent rather than
+// live, but the next caller that did would have received the opposite of the truth with no compile
+// error and no test failure to warn them.
 func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, error) {
 	if err := database.Require(); err != nil {
 		return nil, err
@@ -228,7 +294,7 @@ func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, er
 	// Ordered by when it was deleted rather than when it was written, because the question this
 	// screen answers is "what did I just lose".
 	rows, err := database.Pool.Query(ctx, `
-        SELECT `+models.PoemColumns+`
+        SELECT `+models.PoemColumnsIncludingDeleted+`
         FROM poems
         WHERE deleted_at IS NOT NULL
         ORDER BY deleted_at DESC, id DESC
@@ -241,7 +307,7 @@ func ListDeletedPoems(ctx context.Context, limit, offset int) ([]models.Poem, er
 	var out []models.Poem
 	for rows.Next() {
 		var p models.Poem
-		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.DeletedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -379,39 +445,9 @@ func RestorePoemVersion(ctx context.Context, poemID, versionID string) error {
 		return err
 	}
 
-	tx, err := database.Pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }() //nolint:errcheck // after Commit this is ErrTxClosed
-
-	// No deleted_at filter, and FOR UPDATE for the same reason UpdatePoem locks: a concurrent edit
-	// between the read and the write would leave the history describing a change that did not happen.
-	var previous string
-	err = tx.QueryRow(ctx,
-		`SELECT content FROM poems WHERE id = $1 FOR UPDATE`, poemID).Scan(&previous)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-
-	if previous != version.Content {
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO poem_versions (id, poem_id, content) VALUES ($1, $2, $3)`,
-			uuid.NewString(), poemID, previous); err != nil {
-			return err
-		}
-	}
-
-	if _, err := tx.Exec(ctx,
-		`UPDATE poems SET content = $1, deleted_at = NULL WHERE id = $2`,
-		version.Content, poemID); err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	return replaceContent(ctx, poemID, version.Content,
+		`WHERE id = $1 FOR UPDATE`,
+		`UPDATE poems SET content = $1, deleted_at = NULL WHERE id = $2`)
 }
 
 // SoftDeletePoem marks an active poem as deleted by setting deleted_at.

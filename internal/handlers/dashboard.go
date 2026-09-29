@@ -30,21 +30,21 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 		// request a user makes by clicking a month arrow, and buys a single definition of a day.
 		activeDates, err := services.ActivityDays(ctx, month)
 		if err != nil {
-			http.Error(w, "failed to load heatmap", http.StatusInternalServerError)
+			fail500(w, r, "failed to load heatmap", err)
 			return
 		}
 
 		days := buildHeatmapDays(month, services.MonthDays(activeDates, month))
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if err := templ.Heatmap(month, days).Render(ctx, w); err != nil {
-			http.Error(w, "failed to render heatmap", http.StatusInternalServerError)
+			fail500(w, r, "failed to render heatmap", err)
 		}
 		return
 	}
 
 	data, err := loadDashboardData(ctx, month)
 	if err != nil {
-		http.Error(w, "failed to load dashboard", http.StatusInternalServerError)
+		fail500(w, r, "failed to load dashboard", err)
 		return
 	}
 

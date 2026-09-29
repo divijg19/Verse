@@ -1,24 +1,27 @@
 # Verse — private authoring service.
 #
 # Responsibilities: authoring only. The public reading site is a static artifact served separately
-# (see docs/RUNNING.md), and this service must never hold a Cloudflare credential.
+# (see RUNNING.md), and this service must never hold a Cloudflare credential.
 #
 # Note the health check. Without an explicit path, Render probes "/", which is the dashboard: a full
   # private page render issuing two database queries on every probe, which is two of the pool's five
-  # connections. /health is a real readiness check instead, issues no query at all, and so the probe
-  # means something. The figure is not a guess --
-  # TestRenderYamlDashboardQueryCountMatchesTheMeasurement fails if this number stops agreeing with the
-  # acquisition count that TestDashboardLoadLeavesTheHealthProbeAConnection measures.
-  # /health is a real readiness check instead, issues no query at all, and so the probe means
-  # something. The figure is not a guess -- TestRenderYamlDashboardQueryCountMatchesTheMeasurement
-  # fails if this number stops agreeing with the acquisition count that
+  # connections. /health is a real readiness check instead, and so the probe means something.
+  #
+  # The figure is not a guess -- TestRenderYamlDashboardQueryCountMatchesTheMeasurement fails if this
+  # number stops agreeing with the acquisition count that
   # TestDashboardLoadLeavesTheHealthProbeAConnection measures.
+  #
+  # /health does issue one query, and that is deliberate. An earlier revision of this comment said it
+  # issued none, twice over, which was false: v0.4.4 made it ping the database so a Neon outage fails
+  # the probe rather than producing a stream of reassuring 200s. It runs under HealthPingTimeout,
+  # far shorter than Render's five-second window, so a slow database fails the check quickly instead
+  # of holding a pool connection for the life of the request.
 #
 # It was documented here as touching no database, and that was true when written. It stopped being true
   # in v0.4.4, which made /health ping the database so that a Neon outage would fail the probe rather
 # than produce a stream of reassuring 200s. The consequence for uptime is the opposite of what this
 # comment used to claim: a database outage now takes the service out of rotation until it recovers.
-# That is the intended trade and it is documented in docs/RUNNING.md, but the two are not
+# That is the intended trade and it is documented in RUNNING.md, but the two are not
 # equivalent -- one is "uptime no longer depends on Neon" and the other is "a Neon outage is now
 # visible" -- and only the second is true.
 #
@@ -42,24 +45,32 @@ services:
     healthCheckPath: /health
       # There is deliberately no preDeployCommand here, and an earlier draft of this change had one.
       #
-      # Migrations ought to run as a step between the build and the deploy, so that the service needs
+      # Migrations run as a step between the build and the deploy on a paid plan, so the service needs
       # no DDL rights and the schema is never ahead of the code. Render provides that hook only for
       # "paid web services, private services, and background workers": a pre-deploy command needs a
       # paid compute plan, not merely a paid workspace. This service runs on a free instance, so the
       # setting would have been accepted by this blueprint and then silently never run -- which is the
       # worst possible failure mode for the step that everything else depends on.
       #
-      # So the service applies its own pending migrations at startup instead. The .sql files are
-      # embedded in the binary, which means the schema and the code that expects it can never come
-      # from different versions, and there is no step that can be forgotten. The cost is that the
-      # runtime credential holds DDL rights for the life of the process, and that every start touches
-      # the database -- cheap, because applied migrations are verified and skipped.
+      # So the service applies its own pending migrations at startup. The .sql files are embedded in the
+      # binary, which means the schema and the code that expects it can never come from different
+      # versions, and there is no step that can be forgotten.
       #
-      # If this service ever moves to a paid compute plan, the better arrangement becomes available:
-      # build -o migrate ./cmd/migrate in buildCommand, plus preDeployCommand: ./migrate. The startup
-      # migration then becomes a no-op and DDL rights can be dropped from the runtime credential.
-      # Nothing else changes -- the runner, the bookkeeping and the tests are identical either way.
-      # See docs/RUNNING.md.
+      # This comment used to end here: "The cost is that the runtime credential holds DDL rights for
+      # the life of the process." That was a true observation about the arrangement and a wrong
+      # conclusion about it. Running the migration at boot is not the same as the serving credential
+      # needing DDL -- the migration can run over a different connection, which is what MIGRATION_DATABASE_URL
+      # below is for. Conflating the two kept the DDL rights in place for eleven releases.
+      #
+      # On a free plan the split is available now. Set MIGRATION_DATABASE_URL to the owner credential
+      # and point DATABASE_URL at a role holding only SELECT, INSERT, UPDATE (and DELETE on
+      # login_attempts); db/roles.sql creates it. Unset, the service falls back to DATABASE_URL for the
+      # migration and says so in the boot log, so the weaker arrangement is never silent.
+      #
+      # On a paid plan the startup migration also stops running, so the owner credential is not used
+      # during a normal start: add -o migrate ./cmd/migrate to buildCommand plus preDeployCommand:
+      # ./migrate. That is a narrower improvement and it is not a prerequisite for the credential
+      # split. The runner, the bookkeeping and the tests are identical either way. See RUNNING.md.
 
 
     # Fail closed. The application refuses to start without these, by design: serving the authoring
@@ -67,7 +78,7 @@ services:
     # passphrase is to rotate VERSE_AUTHORIZATION and redeploy.
     #
     # Set these in the Render dashboard BEFORE the first deploy of v0.3.7, or the service will not
-    # start. See docs/RUNNING.md.
+    # start. See RUNNING.md.
     # Toolchain pins, and what cannot be pinned.
     #
     # Bun is pinned to the same version CI uses and the Dockerfile uses. Render's default depends on
@@ -86,6 +97,18 @@ services:
         value: '1.4.2'
 
       - key: DATABASE_URL
+        # The serving credential. After the split below, a role holding only SELECT, INSERT, UPDATE
+        # and DELETE on login_attempts -- see db/roles.sql.
+        sync: false
+
+      - key: MIGRATION_DATABASE_URL
+        # The credential the startup migration runs over, then discards. Optional: unset, the
+        # migration falls back to DATABASE_URL, which is the arrangement of every release before
+        # v0.4.11 and the only one that works against a single-role database such as the one in
+        # compose.yaml. Set it to the owner credential to drop DDL rights from the serving one.
+        #
+        # Set it to the *current* value of DATABASE_URL first, then narrow DATABASE_URL. The other
+        # order leaves the service with nothing to migrate with, and it will not start.
         sync: false
 
       - key: VERSE_AUTHORIZATION

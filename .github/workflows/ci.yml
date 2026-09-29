@@ -177,7 +177,15 @@ jobs:
         run: staticcheck ./cmd/... ./internal/... ./templ/... ./tests/...
 
       - name: Build
-        run: go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
+        # All three commands, not just the one the service runs. cmd/verse-export was built by
+        # nothing here: the Verify job built only ./cmd/server, the Container job built cmd/migrate,
+        # and a compile break in the export CLI would therefore have merged green and failed only
+        # for an author who reached for it. It is the tool that holds the copy of the work this
+        # project exists to preserve, so it was the worst candidate for the gap.
+        run: |
+          go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
+          go build -tags netgo -ldflags="-s -w" -o migrate ./cmd/migrate
+          go build -tags netgo -ldflags="-s -w" -o verse-export ./cmd/verse-export
 
       - name: Create the disposable test database
         # The truncating tests must target a database whose name marks it disposable, so they can
@@ -240,6 +248,195 @@ jobs:
         # Pinned rather than @latest, so a new advisory database cannot change the result of a run
         # without a deliberate commit.
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+  # The serving credential holds no capability the application does not use.
+  #
+  # A separate job rather than a step in Verify because it needs a database in a different state from
+  # the one the suite runs against, and because it is a claim about *privileges* that no Go test can
+  # make: the tests all connect as the owner, and a Go test asserting its own rights is a test that
+  # would pass identically under any role.
+  #
+  # The release plan made this the hard blocker for the whole author/viewer split -- "a read-only
+  # publisher credential is impossible while the app mutates its own schema at boot" -- and it was
+  # unmet for eleven releases because the belief was that dropping DDL required a pre-deploy hook,
+  # which needs a paid compute plan. It does not. The migration runs at boot either way; giving it a
+  # *different* connection is all that is required, and this job is what proves the result.
+  least-privilege:
+    name: Least privilege
+    runs-on: ubuntu-latest
+    needs: verify
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: verse
+          POSTGRES_PASSWORD: verse
+          POSTGRES_DB: verse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U verse"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Migrations run as the owner, which is what MIGRATION_DATABASE_URL will name. Applied here
+      # rather than by the service below, so the privilege assertions test a schema that already
+      # exists -- and so a failure to migrate is reported as a migration failure rather than as a
+      # confusing permission error later.
+      - name: Migrate as the owner
+        env:
+          DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
+        run: go run ./cmd/migrate
+
+      - name: Create the roles and grants
+        # db/roles.sql is a one-time operator script, not a migration, so it is applied here rather
+        # than by the service. That is the same reason it does not live in migrations/: a service
+        # without CREATEROLE must be able to boot against a database where the roles already exist.
+        #
+        # The password is a fixed constant rather than a secret. It exists only inside this job's
+        # throwaway container, it authenticates a role that holds less than the job's own service
+        # account, and a random value would make the connection string in the next step unreadable in
+        # a failure message.
+        run: |
+          psql "postgres://verse:verse@localhost:5432/verse" -v ON_ERROR_STOP=1 <<'SQL'
+          -- IF NOT EXISTS so a re-run against a persistent database is a no-op rather than a
+          -- half-applied grant set. The service container is fresh per job, so this is belt and
+          -- braces; it costs nothing and it makes the step safe to run by hand.
+          DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verse_runtime') THEN
+              CREATE ROLE verse_runtime NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verse_app') THEN
+              CREATE ROLE verse_app LOGIN PASSWORD 'ci-throwaway-password';
+            END IF;
+          END $$;
+          GRANT CONNECT ON DATABASE verse TO verse_runtime;
+          GRANT USAGE ON SCHEMA public TO verse_runtime;
+          GRANT SELECT, INSERT, UPDATE ON poems TO verse_runtime;
+          GRANT SELECT, INSERT ON poem_versions TO verse_runtime;
+          GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO verse_runtime;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON login_attempts TO verse_runtime;
+          -- Deliberately absent: schema_migrations. The serving credential must not be able to
+          -- read the table that records which migrations it believes are applied.
+          GRANT verse_runtime TO verse_app;
+          SQL
+
+      - name: Assert the serving credential's privileges
+        # Fourteen properties, seven of which are the important ones: what the credential must not be
+        # able to do. A check that only confirmed the happy path would pass against a role holding
+        # every privilege in the database, so the denials are asserted too, and a denial that
+        # succeeds fails the job.
+        #
+        # Inlined rather than kept in a script under ci/ for one reason: a directory holding a
+        # single file that only this workflow runs is a directory someone has to discover. The
+        # statements are the documentation, and the reason each denial matters is a comment.
+        #
+        # The `|| true` is load-bearing. Under `set -e` with `pipefail`, a statement that fails is
+        # what most of these checks expect, and without it the shell aborts on the first deliberate
+        # error -- before any assertion has run, reporting an exit that reads as a script bug rather
+        # than as a passing denial. The status is inspected explicitly instead.
+        run: |
+          set -euo pipefail
+          DSN="postgres://verse_app:ci-throwaway-password@localhost:5432/verse?sslmode=disable"
+
+          as_app() { { PGOPTIONS='-c role=verse_app' psql "$DSN" -tAc "$1" 2>&1 || true; } | head -1; }
+
+          allowed() {
+            local out; out="$(as_app "$1")"
+            if printf '%s' "$out" | grep -q 'ERROR:'; then
+              echo "::error::the serving credential cannot $2, which it must be able to do: $out"
+              echo "::error::a missing grant is a runtime failure during normal use, not at deploy time."
+              exit 1
+            fi
+            echo "  ok  may $2"
+          }
+
+          denied() {
+            local out; out="$(as_app "$1")"
+            if ! printf '%s' "$out" | grep -q 'ERROR:'; then
+              echo "::error::the serving credential CAN $2, which it must not be able to do."
+              echo "::error::statement succeeded: $1"
+              echo "::error::This is the property this job exists to hold. If the grant is genuinely"
+              echo "::error::required, add it to db/roles.sql with a reason, and a test that needs it."
+              exit 1
+            fi
+            echo "  ok  may not $2"
+          }
+
+          echo "the serving credential may do:"
+          allowed "SELECT count(*) FROM poems"                            "read poems"
+          allowed "INSERT INTO poems (id, content) VALUES (gen_random_uuid(), 'a work')" "insert a work"
+          allowed "UPDATE poems SET content = 'edited' WHERE id = (SELECT id FROM poems LIMIT 1)" "edit a work"
+          allowed "SELECT count(*) FROM poem_versions"                   "read retained revisions"
+          # The one table the service deletes from, and correctly so: ratelimit.go clears a caller's
+          # row on a successful login. It holds an HMAC of an address and counters, never work.
+          allowed "INSERT INTO login_attempts (subject, failures, first_failure) VALUES ('\\x00'::bytea, 1, now())" "record a login attempt"
+          allowed "DELETE FROM login_attempts"                           "clear a login attempt"
+          allowed "SELECT to_regclass('poems')"                         "check the schema is there"
+
+          echo "the serving credential may not:"
+          # No CREATE/ALTER/DROP: the migration runs over the other credential.
+          denied "CREATE TABLE verse_privilege_probe (id int)"          "create a table"
+          denied "ALTER TABLE poems ADD COLUMN verse_privilege_probe int" "alter a table"
+          denied "DROP TABLE poems"                                      "drop a table"
+          # No DELETE or TRUNCATE on poems: every delete here is a soft delete written as an UPDATE
+          # of deleted_at, so the one copy of the work that must never be lost cannot be destroyed
+          # through the serving credential.
+          denied "DELETE FROM poems"                                     "hard-delete a work"
+          denied "TRUNCATE poems"                                       "truncate the library"
+          # No UPDATE on poem_versions: a retained revision is immutable by design, and restoring
+          # one is an ordinary edit that records the displaced text as a new version in turn.
+          denied "UPDATE poem_versions SET content = 'rewritten' WHERE false" "edit a retained revision"
+          # Deliberately not granted. The boot log reports which migrations ran; the serving process
+          # cannot query the table that records it.
+          denied "SELECT count(*) FROM schema_migrations"               "read the migration log"
+
+      # The assertions above are static: they check the grants, not that the application works with
+      # them. This boots the real service on the restricted credential and confirms it comes up
+      # healthy, so a missing grant surfaces as a failed start rather than as a passing permission
+      # check nobody exercised.
+      #
+      # The full suite is deliberately NOT run here. It truncates, and TRUNCATE is not in the grant
+      # set -- granting it would make this job claim a least-privilege role it does not have. That
+      # is why the old plan wording, "the suite passes on a SELECT-only role", was never a gate that
+      # could be met honestly.
+      - name: The service works on the restricted credential
+        env:
+          DATABASE_URL: postgres://verse_app:ci-throwaway-password@localhost:5432/verse?sslmode=disable
+          MIGRATION_DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
+          VERSE_AUTHORIZATION: a-ci-passphrase-long-enough
+          VERSE_AUTH_SECRET: 0123456789abcdef0123456789abcdef
+          PORT: '8080'
+        run: |
+          set -euo pipefail
+          go run ./cmd/server > /tmp/verse-lp.log 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8080/health; then break; fi
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:8080/health
+          echo "the service started and reported healthy on the restricted credential"
+
+          # The boot log must not report the fallback. If MIGRATION_DATABASE_URL were ignored the
+          # service would still start here -- the schema already exists, so the migration is a no-op
+          # that needs no rights -- which is exactly why this assertion exists.
+          if grep -q 'MIGRATION_DATABASE_URL is not set' /tmp/verse-lp.log; then
+            echo "::error::the service fell back to DATABASE_URL for the migration"
+            cat /tmp/verse-lp.log
+            exit 1
+          fi
+          echo "the migration used its own credential, not the serving one"
 
   container:
     name: Container
@@ -311,7 +508,7 @@ jobs:
           #
           # Go is deliberately absent. Render's native Go runtime always tracks the latest stable 1.x
           # and cannot be pinned without deploying a Docker image, so asserting it here would be a
-          # check that cannot pass. docs/RUNNING.md records the difference instead.
+          # check that cannot pass. RUNNING.md records the difference instead.
           docker_bun=$(grep -oE '^FROM oven/bun:[0-9.]+' Dockerfile | head -1 | cut -d: -f2)
           if [ -z "$docker_bun" ]; then
             echo "::error::could not determine the Bun version from the Dockerfile"; exit 1

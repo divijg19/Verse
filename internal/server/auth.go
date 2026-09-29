@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/divijg19/Verse/internal/htmx"
 	views "github.com/divijg19/Verse/templ"
 )
 
@@ -449,8 +450,13 @@ func originIsCrossSite(origin string, r *http.Request) bool {
 }
 
 // wantsHTMLRedirect reports whether the client expects a browser-style navigation.
+//
+// The one definition is in internal/htmx. This and handlers.isHXRequest used to be two byte-identical
+// copies, and the two answer the same question on the same request: this one chooses between a 303
+// to the login page and a bare 401, that one chooses between a full page and a fragment. Disagreeing
+// about a header would answer an htmx request with a redirect it did not ask for.
 func wantsHTMLRedirect(r *http.Request) bool {
-	return r.Header.Get("HX-Request") == "true" || r.Header.Get("Hx-Request") == "true"
+	return htmx.IsRequest(r)
 }
 
 // parsePositiveInt reads a positive integer environment value, returning a default when absent or

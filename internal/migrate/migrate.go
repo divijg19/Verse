@@ -141,7 +141,7 @@ type Result struct {
 //
 // The caller must hold a credential permitted to create and alter tables. The application applies
 // migrations at startup rather than as a separate deploy step, so that credential is the runtime
-// credential. See docs/RUNNING.md for why, and for what would change it.
+// credential. See RUNNING.md for why, and for what would change it.
 func Run(ctx context.Context, pool *pgxpool.Pool) (Result, error) {
 	return run(ctx, pool, migrations.FS)
 }

@@ -8,12 +8,26 @@ type Poem struct {
 	Content   string
 	CreatedAt time.Time
 
-	// DeletedAt is set only by GetPoemIncludingDeleted.
+	// DeletedAt is the soft-delete instant, or nil while the work is live.
 	//
-	// The other reads -- ListPoems, SearchPoems, GetPoem -- all filter on deleted_at IS NULL, so they
-	// leave it nil, and nil is the correct value for them. That asymmetry is the trap: a nil here
-	// means "not deleted" for those three and "not populated" for this one, and the two are only
-	// distinguishable because the queries differ. It is worth knowing before adding a fifth read.
+	// Five reads in this repository return a Poem, and only two of them populate this field. The
+	// asymmetry is the trap, so here is all five rather than the three this comment used to name:
+	//
+	//	populated    GetPoemIncludingDeleted  -- no filter; the recovery path, where the instant is
+	//	                                       the answer being sought
+	//	nil, "live"  ListPoems, SearchPoems, GetPoem, DashboardSummary
+	//	                                       -- all filter deleted_at IS NULL, so nil is the
+	//	                                          correct value and always will be
+	//	nil, "dead"  ListDeletedPoems
+	//	                                       -- filters deleted_at IS NOT NULL. The column is
+	//	                                          selected and scanned here precisely so that this
+	//	                                          last row is a contradiction rather than a silent
+	//	                                          inversion; it previously omitted deleted_at and
+	//	                                          returned deleted works with a nil field.
+	//
+	// The two meanings are only distinguishable by the query, and nothing at the type level says
+	// which one a given Poem carries. Before adding a sixth read, decide which row of that list it
+	// belongs in.
 	DeletedAt *time.Time
 }
 
@@ -31,7 +45,7 @@ type PoemVersion struct {
 
 // PoemColumns is the column list for a live work, in the order the scan functions expect.
 //
-// Seven queries in this repository read a poem, and six of them wrote the same three columns out by
+// Seven queries in this repository read a poem, and five of them wrote the same three columns out by
 // hand. That is not duplication in the harmless sense: the column list and the Scan that follows it
 // must agree, and nothing tied them together. Adding a column to the table meant finding the scans
 // by eye, and a scan that gained a column in the SQL but not in the destination would have been a

@@ -1,8 +1,7 @@
 package handlers
 
 import (
-	"errors"
-	"log"
+	"fmt"
 	"net/http"
 
 	"github.com/divijg19/Verse/internal/presenters"
@@ -25,21 +24,15 @@ func PoemTrashHandler(w http.ResponseWriter, r *http.Request) {
 
 // RestoreDeletedPoemHandler returns a soft-deleted work to the library.
 func RestoreDeletedPoemHandler(w http.ResponseWriter, r *http.Request) {
-	id, ok := formWorkID(r)
+	id, ok := requireFormWorkID(w, r)
 	if !ok {
-		http.Error(w, "missing or malformed id", http.StatusBadRequest)
 		return
 	}
 
+	// A repeated restore, or an id for something not deleted. A clean miss rather than a false
+	// success, matching SoftDeletePoem's treatment of an already-deleted row.
 	if err := services.RestorePoem(r.Context(), id); err != nil {
-		if errors.Is(err, services.ErrNotFound) {
-			// A repeated restore, or an id for something not deleted. A clean miss rather than a
-			// false success, matching SoftDeletePoem's treatment of an already-deleted row.
-			http.Error(w, "poem not found in the recycle", http.StatusNotFound)
-			return
-		}
-		log.Printf("restore poem %s: %v", id, err) // #nosec G706 -- validated UUID
-		http.Error(w, "failed to restore poem", http.StatusInternalServerError)
+		writeMissingWork(w, r, id, "failed to restore poem", fmt.Errorf("restore poem: %w", err))
 		return
 	}
 
@@ -93,6 +86,5 @@ func writeTrashError(w http.ResponseWriter, r *http.Request, err error) {
 	// all -- never "no such row". The branch was a misconception about what this function returns, and
 	// a reader would reasonably have trusted it.
 	_ = r
-	log.Printf("list recycle: %v", err)
-	http.Error(w, "failed to load the recycle", http.StatusInternalServerError)
+	fail500(w, r, "failed to load the recycle", fmt.Errorf("list recycle: %w", err))
 }
