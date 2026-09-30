@@ -166,16 +166,11 @@ func loadDashboardData(ctx context.Context, month time.Time) (dashboardData, err
 
 // lastPoemSummary turns the most recent work into what the dashboard renders for it.
 func lastPoemSummary(poem models.Poem) (*templ.LastPoemSummary, error) {
-	title := presenters.FirstNonEmptyLine(poem.Content)
-	if title == "" {
-		title = "Untitled"
-	}
-
 	flat := presenters.FlattenContent(poem.Content)
 
 	return &templ.LastPoemSummary{
 		ID:        poem.ID,
-		Title:     presenters.TruncateRunes(title, 72),
+		Title:     presenters.WorkTitle(poem.Content, presenters.TitleWidthNarrow),
 		Snippet:   presenters.TruncateRunes(flat, 120),
 		CreatedAt: poem.CreatedAt,
 	}, nil

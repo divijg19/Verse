@@ -55,13 +55,9 @@ func buildPoemTrash(r *http.Request, restored string) (templ.PoemTrash, error) {
 
 	entries := make([]templ.TrashEntry, 0, len(poems))
 	for _, p := range poems {
-		title := presenters.FirstNonEmptyLine(p.Content)
-		if title == "" {
-			title = "Untitled"
-		}
 		entries = append(entries, templ.TrashEntry{
 			ID:      p.ID,
-			Title:   presenters.TruncateRunes(title, 80),
+			Title:   presenters.WorkTitle(p.Content, presenters.TitleWidthWide),
 			Snippet: presenters.TruncateRunes(presenters.FlattenContent(p.Content), 120),
 		})
 	}

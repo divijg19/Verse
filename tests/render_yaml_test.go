@@ -99,3 +99,122 @@ func readRenderYAML(t *testing.T) string {
 	}
 	return string(body)
 }
+
+// TestRenderYamlBuildCommandStampsTheVersion holds the production build to cmd/server's real variable
+// name.
+//
+// v0.4.11 added `var version` to cmd/server so an operator could tell which commit was running, and
+// stamped it in the Dockerfile. The code comment in main.go then asserted that "the Dockerfile and
+// render.yaml both pass -X main.version". render.yaml did not. The production build has therefore
+// logged "version dev" on every boot since, and nothing noticed: no test read `buildCommand` at all,
+// and the CI Container job tests the Dockerfile, not the blueprint Render actually uses.
+//
+// So this reads the blueprint and checks the flag. The variable name is not hardcoded in the
+// expectation -- it is read from the Go source -- because hardcoding it is how the two drifted in the
+// first place: a rename would leave a test asserting a name that no longer exists, and the build would
+// quietly stop stamping.
+func TestRenderYamlBuildCommandStampsTheVersion(t *testing.T) {
+	body := readRenderYAML(t)
+
+	// The build command is a YAML block scalar spanning several lines, so the substring that matters
+	// is the `go build` line, not the whole script.
+	var buildLine string
+	for _, line := range strings.Split(body, "\n") {
+		if strings.Contains(line, "go build") && strings.Contains(line, "cmd/server") {
+			buildLine = line
+			break
+		}
+	}
+	if buildLine == "" {
+		t.Fatal("render.yaml's buildCommand no longer contains a `go build` of ./cmd/server.\n" +
+			"  The service is built here, so a build that does not appear in this file is a service\n" +
+			"  that cannot be built the way it is deployed.")
+	}
+
+	// Read the symbol from the source rather than assuming it.
+	source, err := os.ReadFile(filepath.Join(repoRoot(t), "cmd", "server", "main.go"))
+	if err != nil {
+		t.Fatalf("read cmd/server/main.go: %v", err)
+	}
+	varName := "version"
+	if !regexp.MustCompile(`(?m)^var ` + regexp.QuoteMeta(varName) + ` = `).Match(source) {
+		t.Fatalf("cmd/server/main.go no longer declares `var %s`.\n"+
+			"  The -X flag stamps a package-level variable by name. If that variable was renamed or\n"+
+			"  removed, the ldflag in render.yaml is stamping nothing and the boot log will say so\n"+
+			"  without anyone reading it. Update both together, or drop the flag from both.", varName)
+	}
+
+	if !strings.Contains(buildLine, "-X main."+varName+"=") {
+		t.Errorf("render.yaml builds cmd/server without stamping the version:\n  %s\n"+
+			"  Expected a -X main.%s= flag. The deployed binary will report its version as \"dev\",\n"+
+			"  which is indistinguishable from a local build in the one log an operator reads first.",
+			strings.TrimSpace(buildLine), varName)
+	}
+}
+
+// repoRoot resolves the repository root from a test file's own location, the same way
+// readRenderYAML does.
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine this file's path")
+	}
+	return filepath.Join(filepath.Dir(thisFile), "..")
+}
+
+// TestDocumentedRoleSetupMatchesCI holds db/roles.sql to being the one privilege model.
+//
+// db/roles.sql and the Least privilege job were two independent copies of the same grant set: the
+// operator ran the file, CI ran its own inline SQL, and the two were free to diverge. They did. The
+// file required a psql variable the documented command never passed, so the operator step failed on
+// its first statement -- while CI stayed green for the whole of v0.4.11, because CI was never running
+// the file it was supposed to be checking.
+//
+// CI now executes db/roles.sql directly, so the copies are gone. What this test protects is the
+// remaining seam: the variable name. If RUNNING.md and ci.yml pass differently-named variables, the
+// documented procedure fails exactly as it did before, and nothing else would notice -- because the
+// only automated check applies the file with CI's own spelling.
+func TestDocumentedRoleSetupMatchesCI(t *testing.T) {
+	roles, err := os.ReadFile(filepath.Join(repoRoot(t), "db", "roles.sql"))
+	if err != nil {
+		t.Fatalf("read db/roles.sql: %v", err)
+	}
+	ciBytes, err := os.ReadFile(filepath.Join(repoRoot(t), ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatalf("read ci.yml: %v", err)
+	}
+	docs, err := os.ReadFile(filepath.Join(repoRoot(t), "RUNNING.md"))
+	if err != nil {
+		t.Fatalf("read RUNNING.md: %v", err)
+	}
+
+	const variable = "app_password"
+
+	if !strings.Contains(string(roles), variable) {
+		t.Fatalf("db/roles.sql no longer references %q, so the documented -v argument is wrong.", variable)
+	}
+	if !strings.Contains(string(ciBytes), "-v "+variable+"=") {
+		t.Errorf("the Least privilege job does not pass -v %s= to db/roles.sql.\n"+
+			"  The job runs the file directly, so a mismatch here means CI cannot execute it at all.",
+			variable)
+	}
+	if !strings.Contains(string(docs), "-v "+variable+"=") {
+		t.Errorf("RUNNING.md does not document -v %s= in the db/roles.sql command.\n"+
+			"  The documented operator step is the one that failed before, because the file needed a\n"+
+			"  variable the documentation never mentioned. It is the seam CI cannot check for you.", variable)
+	}
+
+	// The reverse direction: CI must run the file, not a copy of it. A reintroduced inline grant
+	// block would be invisible to the three checks above.
+	ci := string(ciBytes)
+	ciStep := ci[strings.Index(ci, "Create the roles and grants"):]
+	if !strings.Contains(ciStep, "db/roles.sql") {
+		t.Error("the Least privilege job does not appear to run db/roles.sql.\n" +
+			"  If it has gone back to an inline copy of the grants, the operator's file is untested again.")
+	}
+	if strings.Contains(ciStep, "GRANT SELECT, INSERT, UPDATE ON poems") {
+		t.Error("the Least privilege job contains its own copy of the poems grant.\n" +
+			"  Two copies of the privilege model is the condition this test exists to prevent.")
+	}
+}

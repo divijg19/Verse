@@ -147,6 +147,34 @@ Migrations live in `migrations/`, run in filename order, and are **embedded into
 the runner needs nothing from disk. A deployed `./migrate` therefore cannot apply SQL from a
 different version of the repository than the code it ships with.
 
+### `007_published_at.sql` and what it did to your library
+
+**Nothing, and that is the point.** The migration added a nullable `published_at` column to `poems` and
+left every existing row `NULL`. Your library is byte-for-byte what it was: the same works, the same
+timestamps, the same soft-deleted rows, and a full `verse-export` produces an identical file. If you
+take a backup after upgrading, the only difference is the backup's own `exported_at`.
+
+There is deliberately no `DEFAULT` on the column. A `DEFAULT now()` would have published your entire
+library — every draft, every unfinished piece, anything you deleted and kept — the moment the next
+deploy ran, with no way to tell from the outside. **Every work is a draft until you publish it, and
+nothing in this repository publishes anything yet.**
+
+| | |
+|---|---|
+| What a draft is | A work with `published_at` set to `NULL`. Nothing else. |
+| What you can see | Everything, as before. The library, the search box, the dashboard and `/poem/<id>` are unchanged — they filter on `deleted_at`, not on publication. |
+| What a publisher can see | Nothing yet. There is no public site in this release. |
+| What to run | Nothing. There is no publish command. |
+
+**If you want a backup anyway**, it is the command you already have:
+
+```bash
+go run ./cmd/verse-export --out verse-backup.json --include-deleted
+```
+
+`--include-deleted` matters: a complete archival copy includes the soft-deleted works, which the default
+excludes. This is the copy that matters if the column ever needed removing.
+
 ### What the runner guarantees
 
 - **Each file runs in its own transaction, and its bookkeeping row is written in that same
@@ -166,6 +194,11 @@ different version of the repository than the code it ships with.
   document as `docs/RUNNING.md`, from before it moved to the repository root.
 - **Deleting or renaming an applied migration is an error.** Renaming looks exactly like deleting one
   and adding a new one, and the database has already absorbed the old one.
+
+- **A migration that adds a column with a `DEFAULT` is rewritten, not merely slow.** `ADD COLUMN ...
+DEFAULT <value>` that is not a constant takes `ACCESS EXCLUSIVE` for the whole rewrite, on a live
+table the service is querying. v0.4.7's `006_timestamptz.sql` shows the shape this project uses
+instead: add the column, backfill in bounded batches, then add the constraint.
 - **A file that is blank after trimming is skipped and never recorded.** A file containing only
   comments is a valid no-op and is recorded like any other migration.
 - **A run is bounded, so a blocked migration fails instead of hanging.** An `ALTER TABLE` needs
@@ -263,10 +296,29 @@ self-announcing rather than a new requirement.
 
 #### Setting it up
 
-1. Run [`db/roles.sql`](../db/roles.sql) once, as an owner or superuser. It creates `verse_runtime`,
-   which holds the grants, and documents the `verse_app` login role. It is deliberately **not** a
-   migration: migrations are applied at every boot by the service, and this needs a credential the
-   service should not hold.
+1. Run [`db/roles.sql`](db/roles.sql) once, as an owner or superuser, **connected to the
+   application database**:
+
+   ```bash
+   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v app_password='choose-something-long' -f db/roles.sql
+   ```
+
+   `-v app_password=...` is required, and the script refuses to run without it rather than creating a
+   role with an empty password. It is safe to re-run: it creates the roles if they are absent and
+   resets the password if they are not, so it doubles as the rotation procedure.
+
+   **`ON_ERROR_STOP=1` is part of the command, not decoration.** The script signals a missing password
+   by raising an exception, and that only produces a non-zero exit status when this flag is set —
+   without it, `psql` prints the error, carries on, and exits `0`. (The obvious alternative does not
+   work either: psql's `\quit` takes no argument, so `\quit 1` prints a warning and still exits `0`.)
+   The flag is also what makes a genuine failure in the middle of the script stop it rather than
+   continuing with half the grants applied.
+
+   It is deliberately **not** a migration: migrations are applied at every boot by the service, and
+   this needs a credential the service should not hold.
+
+   This exact command is what the `Least privilege` CI job runs on every pull request, so the file is
+   exercised rather than merely described.
 2. Add `ALTER DEFAULT PRIVILEGES FOR ROLE <your migration role> ... GRANT ... TO verse_runtime` as
    described in that file, or the first future migration will create a table the service cannot read.
 3. On Render, set `MIGRATION_DATABASE_URL` to the current credential — the same value `DATABASE_URL`

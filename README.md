@@ -216,6 +216,7 @@ table poems {
     content      text        -- the work itself, stored verbatim
     created_at   timestamptz -- nullable: the column has a default but is not declared NOT NULL
     deleted_at   timestamptz -- nullable: set by a soft delete, NULL while the work is live
+    published_at timestamptz -- nullable: set by an explicit publish, NULL while the work is a draft
 }
 
 table poem_versions {
@@ -261,6 +262,26 @@ written at 20:00 UTC is already the next calendar day at `+05:30`; without this 
 the following day, and a real streak would read as broken. The clause and the pin are deliberately
 redundant — the clause states the intent for whoever reads the query, the pin covers a future query
 written without it.
+
+**`poems.published_at` is how a work becomes public, and it is `NULL` on every existing row.**
+`007_published_at.sql` added it for the author/viewer split, and it has no `DEFAULT` — deliberately, and
+this is the one place in the schema where the absence of a default is load-bearing rather than
+incidental. `ADD COLUMN ... NULL` with no default backfills every existing row to `NULL` without a
+rewrite; a `DEFAULT now()` would publish the whole library on the next deploy, and would publish every
+future insert that omitted the column. Publication is an explicit act by the author, so the column stays
+`NULL` until they perform it, and the migration publishes nothing.
+
+It follows `deleted_at` rather than introducing a `status` enum, because twelve query sites already read
+`deleted_at IS NULL` and a second idiom for the same kind of fact is a second thing to get wrong. The
+publisher's filter is `published_at IS NOT NULL AND deleted_at IS NULL` — both halves load-bearing,
+since a work can be published and then deleted — and it lives in exactly one place,
+`models.PublishedFilter`.
+
+**The authoring app is unaffected by it.** Every read in the author's library filters `deleted_at IS
+NULL` only, so a draft is a row the author sees, opens, and can search for exactly as before, and no
+status badge or filter was needed anywhere in the interface. Nothing in the repository writes to
+`published_at` yet, and no public site exists; the dry-run that reports what publishing *would* expose
+is the only consumer. See `internal/publish` and D4 in the project's decision record.
 
 **`poem_versions` has no pruning.** Nothing updates or deletes a row, and there is no purge path.
 Restoring a revision is an ordinary edit, which records what it replaced, so the history is
