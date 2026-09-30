@@ -1,0 +1,44 @@
+-- Migration: add published_at for the author/viewer split
+--
+-- D4, resolved 2026-09-28 and recorded in DECISIONS.md. This migration is the first executable
+-- statement of it: until now the decision existed and the column did not.
+--
+-- Nullable TIMESTAMPTZ, following the deleted_at convention this table already established rather
+-- than introducing a status enum. The reason is that twelve query sites already read deleted_at IS
+-- NULL, and a second idiom for the same kind of fact is a second thing to get wrong. It also carries
+-- *when*, which a sitemap and a feed need anyway, and export.Poem already carries
+-- DeletedAt *time.Time, so the archive stays lossless.
+--
+-- NO DEFAULT clause, deliberately. ADD COLUMN ... NULL on an existing table backfills every existing
+-- row to NULL without a rewrite, so "backfill every row to NULL" is satisfied by the absence of a
+-- default rather than by an UPDATE. A DEFAULT now() would publish the whole existing library on the
+-- next deploy, which is the one irreversible mistake this project is most careful about.
+--
+-- Every existing row therefore lands NULL, and the publisher's filter is
+-- `published_at IS NOT NULL AND deleted_at IS NULL`, which matches no query in the codebase before
+-- this release. The first build emits an empty, valid site. Publication is a separate, explicit act
+-- by the author -- never a migration side effect -- and the dry-run that enumerates what publishing
+-- would expose is the gate before it happens.
+--
+-- IF NOT EXISTS matches migrations/002, which added deleted_at the same way. Idempotent statements
+-- are not a nicety here: the runner already refuses to re-apply a file whose checksum it has
+-- recorded, and a file that is also safe to apply twice costs nothing.
+--
+-- Nothing in the running application changes. Every query against poems names its columns
+-- explicitly -- there is no SELECT * anywhere in the repository -- so a new column is invisible to
+-- every existing read, and no status badge or filter is needed to avoid hiding anything. That is
+-- verified structurally by TestAddingPublishedAtChangesNoExistingRead and by the export
+-- byte-identity check in TestThePublicationMigrationIsNonDestructive.
+--
+-- Privilege: ADD COLUMN requires ownership of the table, not merely CREATE on the schema. The
+-- migration credential is the owner (see db/roles.sql and RUNNING.md); verse_runtime is the serving
+-- credential and is proved unable to do this by the Least privilege CI job. The serving role needs
+-- no new grant, because its existing grant is table-level.
+--
+-- An index is deliberately not created here. The publisher reads once at build time, not per
+-- request, so a partial index would be paid for on every write and used once. If publication ever
+-- becomes a per-request read, the index is a separate migration -- and the runner executes a
+-- multi-statement file through the simple protocol, so the escape hatch for a statement type it
+-- cannot support (CREATE INDEX CONCURRENTLY) is available when that day comes.
+ALTER TABLE poems
+ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ NULL;

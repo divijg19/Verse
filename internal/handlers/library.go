@@ -128,18 +128,13 @@ func timelineLabel(t time.Time) string {
 }
 
 func toPoemView(poem models.Poem) templ.PoemView {
-	title := presenters.FirstNonEmptyLine(poem.Content)
-	if title == "" {
-		title = "Untitled"
-	}
-
 	flat := presenters.FlattenContent(poem.Content)
 
 	return templ.PoemView{
 		ID:        poem.ID,
 		Content:   poem.Content,
 		CreatedAt: poem.CreatedAt,
-		Title:     presenters.TruncateRunes(title, 80),
+		Title:     presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Snippet:   presenters.TruncateRunes(flat, 120),
 	}
 }

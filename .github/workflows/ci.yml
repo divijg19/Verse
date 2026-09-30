@@ -233,9 +233,15 @@ jobs:
         # being satisfied -- a renamed variable, a typo in the consent value, a missing step --
         # this job would quietly shrink to a fraction of its coverage and still report green.
         #
-        # With both gates open the suite is 118 passing and 0 skipped, so expecting zero skips is
-        # exact rather than approximate. If a future test ever needs a genuine skip, this assertion
-        # is the thing that must be updated deliberately, which is the intent.
+          # The count is deliberately not asserted, which is a change from an earlier revision that
+          # claimed 118 passing. A hard-coded count goes stale the moment a test is added, and this
+          # one had been wrong since v0.3.8 -- eleven releases of reading as current precisely because
+          # nobody re-ran it. That is the whole failure mode of a stale claim.
+          #
+          # What is asserted is the property a count cannot express: nothing skipped. A skip is the
+          # dangerous outcome, because the database-backed tests sit behind two explicit opt-ins and a
+          # mistyped variable turns every one of them into a skip while the exit status stays zero.
+          # If a test ever needs a genuine skip, this assertion is what must change deliberately.
         run: |
           if grep -qE '^(---|[[:space:]]+---) SKIP' /tmp/verse-tests.log; then
             echo "::error::tests skipped, so the destructive-test gate is not satisfied in CI and coverage was silently reduced"
@@ -300,40 +306,27 @@ jobs:
         run: go run ./cmd/migrate
 
       - name: Create the roles and grants
-        # db/roles.sql is a one-time operator script, not a migration, so it is applied here rather
-        # than by the service. That is the same reason it does not live in migrations/: a service
-        # without CREATEROLE must be able to boot against a database where the roles already exist.
+        # db/roles.sql, the file the operator is told to run. Not a copy of it.
+        #
+        # This step used to inline its own GRANT statements while the operator ran db/roles.sql, on the
+        # reasoning that the script was a starting point rather than something to execute. The result is
+        # the failure this release exists to prevent: db/roles.sql required a psql variable the
+        # documented command did not pass, so it failed on its first statement, and CI stayed green
+        # throughout because CI was never running it.
+        #
+        # db/roles.sql is not a migration and does not belong in migrations/ -- migrations are applied
+        # at every boot by a service that must not hold CREATEROLE. It is a one-time operator step, and
+        # this job is the one place it gets executed on every pull request.
         #
         # The password is a fixed constant rather than a secret. It exists only inside this job's
-        # throwaway container, it authenticates a role that holds less than the job's own service
-        # account, and a random value would make the connection string in the next step unreadable in
-        # a failure message.
+        # throwaway container, it authenticates a role holding less than the job's own service account,
+        # and a random value would make the connection string in the next step unreadable in a failure
+        # message.
         run: |
-          psql "postgres://verse:verse@localhost:5432/verse" -v ON_ERROR_STOP=1 <<'SQL'
-          -- IF NOT EXISTS so a re-run against a persistent database is a no-op rather than a
-          -- half-applied grant set. The service container is fresh per job, so this is belt and
-          -- braces; it costs nothing and it makes the step safe to run by hand.
-          DO $$ BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verse_runtime') THEN
-              CREATE ROLE verse_runtime NOLOGIN;
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'verse_app') THEN
-              CREATE ROLE verse_app LOGIN PASSWORD 'ci-throwaway-password';
-            END IF;
-          END $$;
-          GRANT CONNECT ON DATABASE verse TO verse_runtime;
-          GRANT USAGE ON SCHEMA public TO verse_runtime;
-          GRANT SELECT, INSERT, UPDATE ON poems TO verse_runtime;
-          GRANT SELECT, INSERT ON poem_versions TO verse_runtime;
-          GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO verse_runtime;
-          GRANT SELECT, INSERT, UPDATE, DELETE ON login_attempts TO verse_runtime;
-          -- Deliberately absent: schema_migrations. The serving credential must not be able to
-          -- read the table that records which migrations it believes are applied.
-          GRANT verse_runtime TO verse_app;
-          SQL
+          psql "postgres://verse:verse@localhost:5432/verse" -v ON_ERROR_STOP=1 -v app_password=ci-throwaway-password -f db/roles.sql
 
       - name: Assert the serving credential's privileges
-        # Fourteen properties, seven of which are the important ones: what the credential must not be
+        # Fifteen properties, seven of which are the important ones: what the credential must not be
         # able to do. A check that only confirmed the happy path would pass against a role holding
         # every privilege in the database, so the denials are asserted too, and a denial that
         # succeeds fails the job.
@@ -379,6 +372,23 @@ jobs:
           allowed "INSERT INTO poems (id, content) VALUES (gen_random_uuid(), 'a work')" "insert a work"
           allowed "UPDATE poems SET content = 'edited' WHERE id = (SELECT id FROM poems LIMIT 1)" "edit a work"
           allowed "SELECT count(*) FROM poem_versions"                   "read retained revisions"
+          # published_at arrived with 007. The SELECT grant is table-level, so it covers a column
+          # added after the fact and no new grant was needed -- asserted rather than assumed, since
+          # a column the serving role cannot read would break the authoring app.
+          #
+          # The writable half is deliberately NOT asserted here, and the reason is worth stating
+          # because the natural thing to write is a `denied` line for it. The grant is table-level
+          # UPDATE, which the application needs in order to edit content and to soft-delete, and a
+          # table-level grant covers every column including one added later -- so the serving role
+          # CAN write published_at. That was checked against a real database rather than assumed:
+          # given one row, SET ROLE verse_app; UPDATE poems SET published_at = now() succeeded, and
+          # the publisher's filter then returned that row.
+          #
+          # Nothing writes the column, so this is latent rather than live, and it is recorded as R24
+          # in the project's risk register with two costed fixes. Asserting the denial would turn
+          # this job permanently red, and a permanently red job is a job whose other fourteen
+          # assertions stop being read.
+          allowed "SELECT count(published_at) FROM poems"                "read the publication instant"
           # The one table the service deletes from, and correctly so: ratelimit.go clears a caller's
           # row on a successful login. It holds an HMAC of an address and counters, never work.
           allowed "INSERT INTO login_attempts (subject, failures, first_failure) VALUES ('\\x00'::bytea, 1, now())" "record a login attempt"
@@ -401,6 +411,21 @@ jobs:
           # Deliberately not granted. The boot log reports which migrations ran; the serving process
           # cannot query the table that records it.
           denied "SELECT count(*) FROM schema_migrations"               "read the migration log"
+          # NOT asserted: that the serving credential cannot publish.
+          #
+          # It can. The grant is table-level UPDATE, which the application needs in order to
+          # edit content and to soft-delete, and a table-level grant covers every column
+          # including one added later. The denial below was written here, failed against a
+          # real database, and turned out to be asserting something false rather than
+          # something unimplemented: given one row, the serving role published it and the
+          # publisher's filter returned it.
+          #
+          # Whether publication should be structurally impossible for the serving role is
+          # an open question, recorded in the split's risk register. It is a grant-model
+          # change -- column-level grants, or a separate writer role behind a narrower API --
+          # and not a CI assertion. This job records the grants that exist rather than the
+          # grants someone would prefer, and an assertion that fails today would turn the
+          # job permanently red, which is how a red job gets ignored.
 
       # The assertions above are static: they check the grants, not that the application works with
       # them. This boots the real service on the restricted credential and confirms it comes up

@@ -88,14 +88,14 @@ func buildPoemHistory(r *http.Request, poemID, restored string) (templ.PoemHisto
 			ID:         v.ID,
 			PoemID:     v.PoemID,
 			Content:    v.Content,
-			Title:      presenters.TruncateRunes(presenters.FirstNonEmptyLine(v.Content), 80),
+			Title:      presenters.WorkTitle(v.Content, presenters.TitleWidthWide),
 			RecordedAt: v.RecordedAt,
 		})
 	}
 
 	return templ.PoemHistory{
 		PoemID:    poem.ID,
-		Title:     presenters.TruncateRunes(presenters.FirstNonEmptyLine(poem.Content), 80),
+		Title:     presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Current:   poem.Content,
 		Versions:  views,
 		Restored:  restored,

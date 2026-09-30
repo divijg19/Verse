@@ -25,9 +25,13 @@ func main() {
 	// "which commit is running" is a question an operator asks during every incident -- so it is
 	// answered by the first line of the boot log rather than requiring a round trip to the dashboard.
 	//
-	// The Dockerfile and render.yaml both pass -X main.version. That flag used to target a symbol
-	// that did not exist, so the build succeeded and the value was silently discarded: a check-shaped
-	// thing that did nothing. Declaring it is what makes either build path's stamp real.
+	// Both build paths stamp it: the Dockerfile takes it as a build argument, and render.yaml derives
+	// it with `git rev-parse` because a native build has no equivalent. That second half was missing
+	// when this was first written, and this comment claimed it existed -- so the production build
+	// logged "dev" on every boot while the comment said otherwise. Declaring the variable is only half
+	// the fix; passing it is the other half, and
+	// TestRenderYamlBuildCommandStampsTheVersion now reads render.yaml's buildCommand to check the
+	// two have not drifted apart again.
 	log.Printf("verse starting, version %s", version)
 	if err := run(); err != nil {
 		log.Fatalf("verse: %v", err)

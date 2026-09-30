@@ -40,7 +40,22 @@ services:
     buildCommand: |
       bun install --frozen-lockfile
       bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
-      go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
+      # Stamp the commit into the binary, so the first line of the boot log answers "which
+      # commit is running" without a round trip to the dashboard.
+      #
+      # The Dockerfile takes the same value as a build argument. A native build has no
+      # equivalent, so it is derived here -- and *attempted* rather than assumed. Render may
+      # clone shallow, and a deploy must not fail because an observability value could not be
+      # read. The fallback is explicit and logged rather than a silent empty string, so
+      # "version unknown" in a log is a statement rather than a gap.
+      #
+      # TestRenderYamlBuildCommandStampsTheVersion holds this line to cmd/server's real
+      # variable name. It exists because v0.4.11 added the variable, stamped only the
+      # Dockerfile, and asserted in a code comment that both build paths did it. The comment
+      # was false, and the production build logged "dev" on every boot since.
+      VERSION="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+      echo "building verse ${VERSION}"
+      go build -tags netgo -ldflags="-s -w -X main.version=${VERSION}" -o verse ./cmd/server
     startCommand: ./verse
     healthCheckPath: /health
       # There is deliberately no preDeployCommand here, and an earlier draft of this change had one.
