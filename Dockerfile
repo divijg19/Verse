@@ -5,6 +5,7 @@
 ##  * The Go base image pins MAJOR.MINOR and floats the patch release. It was previously
 ##    golang:1.25-alpine against `go 1.26.0` in go.mod, so the image could not build the module it
 ##    claimed to build. CI asserts the tag's minor matches go.mod, so this cannot drift silently.
+##    The current minor is Go 1.27, which both files name.
 ##
 ##  * The stylesheet is built with bun, from the repository's only lockfile (bun.lock). It was
 ##    previously `npm ci … || npm install` on a repository with no package-lock.json, so npm ci
@@ -31,12 +32,15 @@
 ## asset.
 
 # ── Stage 1: stylesheet ───────────────────────────────────────────────────────────────
-# The Bun version is pinned to the same value CI uses, and CI asserts the two agree. These were
-# previously `oven/bun:1-alpine` here (resolving to 1.4.2) against a pin of 1.3.5 in the workflow,
-# so the two build paths silently used different package managers. Both are now 1.4.2, and the tag
-# is fully qualified rather than floating on the 1.x line, so this build cannot drift underneath a
-# release when Bun publishes a new minor.
-FROM oven/bun:1.4.2-alpine AS css
+# The Bun tag is `latest`, matching CI's `bun-version` and Render's `BUN_VERSION`; the Container
+# job asserts all three agree. The policy is deliberate: this project wants the current Bun on every
+# build rather than a pin that only CI would notice had gone stale. The cost is that the stylesheet
+# is not byte-reproducible across time, which is an accepted trade recorded in RUNNING.md.
+#
+# These paths previously disagreed -- `oven/bun:1-alpine` here (resolving to 1.4.2) against a pin of
+# 1.3.5 in the workflow -- so the two build paths silently used different package managers. The
+# agreement gate is what makes that divergence impossible now.
+FROM oven/bun:latest AS css
 WORKDIR /src
 
 # Manifests first, so the dependency layer is cached independently of source changes.
@@ -62,7 +66,7 @@ COPY internal ./internal
 RUN bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
 
 # ── Stage 2: binary ───────────────────────────────────────────────────────────────────
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 ARG VERSION=dev
 WORKDIR /src
 

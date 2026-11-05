@@ -2,11 +2,24 @@
   "name": "verse",
   "type": "module",
   "private": true,
+  "scripts": {
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
+    "fmt:go": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 fmt --diff",
+    "templ": "go run \"github.com/a-h/templ/cmd/templ@$(go list -m -f '{{.Version}}' github.com/a-h/templ)\" generate",
+    "vet": "go vet ./...",
+    "build": "go build ./...",
+    "lint": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...",
+    "staticcheck": "go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./cmd/... ./internal/... ./templ/... ./tests/...",
+    "vuln": "go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+    "test": "go test ./... -count=1 -race",
+    "check": "bun run format:check && bun run fmt:go && bun run vet && bun run lint && bun run staticcheck && bun run vuln && bun run test"
+  },
   "dependencies": {
-    "@tailwindcss/cli": "^4.3.3"
+    "@tailwindcss/cli": "^4.3.4"
   },
   "devDependencies": {
-    "tailwindcss": "^4.3.3",
-    "@types/bun": "^1.4.3"
+    "tailwindcss": "^4.3.4",
+    "@types/bun": "^1.4.4"
   }
 }

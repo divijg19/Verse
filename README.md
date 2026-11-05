@@ -1,20 +1,17 @@
 # `Verse`
 
-
-
 > A daily poetic ritual engine.
 > Write. Reflect. Return.
 
 ---
 
-
 `Verse` is a private, daily web application built for disciplined poetic practice.
 
 It is not:
 
-* A social writing platform
-* A publishing tool
-* A productivity dashboard
+- A social writing platform
+- A publishing tool
+- A productivity dashboard
 
 It is:
 
@@ -40,14 +37,14 @@ No algorithmic interference.
 
 ## ✨ Features
 
-* Daily poem editor
-* Version history — every superseded draft is retained, and a restore is itself undoable
-* Recycle — soft-deleted work is listed and can be brought back
-* Export — a lossless JSON copy of the whole library, plus a Markdown rendering for reading
-* Streak tracking, counted in UTC days
-* Monthly activity heatmap
-* `Caelum` (random prompt engine)
-* Private-first architecture
+- Daily poem editor
+- Version history — every superseded draft is retained, and a restore is itself undoable
+- Recycle — soft-deleted work is listed and can be brought back
+- Export — a lossless JSON copy of the whole library, plus a Markdown rendering for reading
+- Streak tracking, counted in UTC days
+- Monthly activity heatmap
+- `Caelum` (random prompt engine)
+- Private-first architecture
 
 There is **no mood tagging**. It was listed here from the first commit and never built; there has
 never been a `mood` column.
@@ -76,11 +73,11 @@ than turned into roadmap, because the honest description of the feature is short
 
 Primary stack:
 
-* Go (core backend)
-* Templ (server-side rendering)
-* HTMX (dynamic interactions)
-* TailwindCSS (styling)
-* PostgreSQL (data layer)
+- Go (core backend)
+- Templ (server-side rendering)
+- HTMX (dynamic interactions)
+- TailwindCSS (styling)
+- PostgreSQL (data layer)
 
 ---
 
@@ -88,19 +85,19 @@ Primary stack:
 
 ## Backend
 
-* Go 1.26 (pinned in `go.mod`)
-* Chi router
-* pgx v5 (PostgreSQL driver)
-* Hand-written SQL. There is no query generator: every statement is in `internal/services`, and
+- Go 1.27 (declared in `go.mod`)
+- Chi router
+- pgx v5 (PostgreSQL driver)
+- Hand-written SQL. There is no query generator: every statement is in `internal/services`, and
   `tests/readme_schema_test.go` checks the schema block below against the live database
-* `internal/migrate`, which embeds the `.sql` files and applies them in filename order with a
+- `internal/migrate`, which embeds the `.sql` files and applies them in filename order with a
   recorded checksum per file. Not a migration framework — see `RUNNING.md`
 
 Why Go:
 
-* Performance
-* Explicitness
-* Long-term architectural alignment
+- Performance
+- Explicitness
+- Long-term architectural alignment
 
 ---
 
@@ -110,10 +107,10 @@ Templ generates type-safe HTML components.
 
 Used for:
 
-* Editor page
-* Library, dashboard, Caelum, share and recycle surfaces
-* Layout system, with the navigation rendered out of band on an HTMX swap
-* Reusable UI components
+- Editor page
+- Library, dashboard, Caelum, share and recycle surfaces
+- Layout system, with the navigation rendered out of band on an HTMX swap
+- Reusable UI components
 
 ---
 
@@ -121,10 +118,10 @@ Used for:
 
 HTMX handles:
 
-* Save a poem without a full page reload
-* Swap a surface without a full page reload
-* Replace the heatmap for a chosen month
-* Retain and restore a superseded revision
+- Save a poem without a full page reload
+- Swap a surface without a full page reload
+- Replace the heatmap for a chosen month
+- Retain and restore a superseded revision
 
 Minimal JS.
 Declarative interactivity.
@@ -135,14 +132,14 @@ Declarative interactivity.
 
 Used via:
 
-* Standalone CLI
-* Integrated into Go build pipeline
+- Standalone CLI
+- Integrated into Go build pipeline
 
 Provides:
 
-* Dark theme
-* Typography control
-* Minimal aesthetic
+- Dark theme
+- Typography control
+- Minimal aesthetic
 
 ---
 
@@ -191,7 +188,7 @@ verse/
 
 The tree above said `internal/services` held "the SQL. All of it." That was never true. Four other
 packages issue queries, each putting the SQL next to the thing that owns it: `internal/server/ratelimit.go`
-(the `login_attempts` limiter is middleware), `internal/export` (the dump *is* the product),
+(the `login_attempts` limiter is middleware), `internal/export` (the dump _is_ the product),
 `internal/migrate` (the runner queries its own bookkeeping), and `internal/database` (one `to_regclass`
 assertion at boot). The claim that holds is that **`internal/services` holds all the application-domain
 SQL** — poems, versions, and the dashboard aggregates — which is the boundary that matters.
@@ -210,6 +207,7 @@ cannot drift again silently. Types are documented by alias (`timestamptz` for
 type is one the schema actually uses.
 
 <!-- documented-schema:begin -->
+
 ```sql
 table poems {
     id           uuid        -- primary key
@@ -240,6 +238,7 @@ table schema_migrations {
     applied_at timestamp
 }
 ```
+
 <!-- documented-schema:end -->
 
 Two notes worth reading rather than skimming:
@@ -280,7 +279,7 @@ since a work can be published and then deleted — and it lives in exactly one p
 **The authoring app is unaffected by it.** Every read in the author's library filters `deleted_at IS
 NULL` only, so a draft is a row the author sees, opens, and can search for exactly as before, and no
 status badge or filter was needed anywhere in the interface. Nothing in the repository writes to
-`published_at` yet, and no public site exists; the dry-run that reports what publishing *would* expose
+`published_at` yet, and no public site exists; the dry-run that reports what publishing _would_ expose
 is the only consumer. See `internal/publish` and D4 in the project's decision record.
 
 **`poem_versions` has no pruning.** Nothing updates or deletes a row, and there is no purge path.
@@ -308,10 +307,10 @@ No cached streak field.
 
 Default:
 
-* Dark mode
-* Serif typography for poems
-* Minimal UI chrome
-* Subtle violet accent
+- Dark mode
+- Serif typography for poems
+- Minimal UI chrome
+- Subtle violet accent
 
 Focus:
 
@@ -363,15 +362,15 @@ troubleshooting — is in [`RUNNING.md`](RUNNING.md).
 
 v1.0.0+:
 
-* AI sentiment analysis
-* Theme detection
-* Writing evolution tracking
+- AI sentiment analysis
+- Theme detection
+- Writing evolution tracking
 
 v2.0.0+:
 
-* Local-first mode
-* Offline support
-* Desktop wrapper (Tauri)
+- Local-first mode
+- Offline support
+- Desktop wrapper (Tauri)
 
 Long-term:
 
@@ -383,10 +382,10 @@ Long-term:
 
 `Verse` exists to:
 
-* Encourage disciplined creation
-* Externalize emotion
-* Track personal growth
-* Preserve authenticity
+- Encourage disciplined creation
+- Externalize emotion
+- Track personal growth
+- Preserve authenticity
 
 It is not optimized for virality.
 

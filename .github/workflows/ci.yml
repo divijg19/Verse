@@ -64,10 +64,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           # Floating patch within the minor line, deliberately NOT go-version-file: go.mod.
           #
@@ -75,18 +75,19 @@ jobs:
           # toolchain pin. Reading it as a pin froze CI on go1.26.0 while local development ran
           # go1.26.8, and govulncheck then reported eighteen standard-library vulnerabilities in CI
           # that were already fixed in go1.26.6. The Dockerfile has always floated
-          # (golang:1.26-alpine); CI now matches it. A guard below keeps the declared minor in
+          # (golang:1.27-alpine); CI now matches it. A guard below keeps the declared minor in
           # step with go.mod.
-          go-version: '1.26.x'
+          go-version: "1.27.x"
           cache: true
           cache-dependency-path: go.sum
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          # Pinned rather than `latest`, and identical to the tag in the Dockerfile, so the two
-          # build paths cannot silently diverge. Bumping this is a deliberate commit.
-          bun-version: '1.4.2'
+          # Deliberately `latest`, and identical to the tag in the Dockerfile and to BUN_VERSION in
+          # render.yaml. The three build paths must agree on that policy, which the guard below
+          # asserts; they must never mix `latest` with a literal pin.
+          bun-version: "latest"
 
       - name: Install Bun dependencies
         run: bun install --frozen-lockfile
@@ -104,14 +105,24 @@ jobs:
           # templ artifacts are committed so `go build` works without a templ toolchain. That makes
           # stale generated code the failure mode: edit a .templ file, run a test that reads the
           # stale _templ.go, and ship the old markup with a passing build. This step converts that
-          # from silent drift into a build failure. The generator is pinned to the go.mod version.
-          go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
+          # from silent drift into a build failure.
+          #
+          # The generator is derived from go.mod rather than written as a literal or as `@latest`.
+          # `@latest` was the v0.4.13 defect: it regenerated with a version newer than the library
+          # the code compiles against, so the emitted calls named symbols the pinned runtime did not
+          # have. Reading the version back from the module graph makes the two impossible to
+          # disagree.
+          templ_version="$(go list -m -f '{{.Version}}' github.com/a-h/templ)"
+          if [ -z "$templ_version" ]; then
+            echo "::error::could not determine the templ version from go.mod"; exit 1
+          fi
+          go run "github.com/a-h/templ/cmd/templ@${templ_version}" generate
           if ! git diff --exit-code --stat -- templ/; then
             echo "::error::generated templ artifacts are stale. Run 'templ generate' and commit the result."
             git diff --stat -- templ/
             exit 1
           fi
-          echo "templ artifacts match their sources"
+          echo "templ artifacts match their sources (generator ${templ_version})"
 
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
@@ -121,17 +132,26 @@ jobs:
           # CI deliberately floats the Go patch release, so it is the minor that must agree with
           # go.mod. Without this, bumping the module to a new minor would leave CI building it with
           # the previous line.
-          ci_go=$(grep -oE "go-version: '[0-9]+\.[0-9]+\.x'" .github/workflows/ci.yml \
-            | head -1 | grep -oE '[0-9]+\.[0-9]+')
+          #
+          # Every `go-version` line is compared, not just the first. The three jobs are independent
+          # and an earlier revision checked only the Verify job, so the other two could have pinned a
+          # different minor while this gate reported success. bun fmt normalizes these values to
+          # double quotes, which the pattern follows.
+          mapfile -t ci_gos < <(
+            grep -oE 'go-version: "[0-9]+\.[0-9]+\.x"' .github/workflows/ci.yml \
+              | grep -oE '[0-9]+\.[0-9]+'
+          )
           mod_go=$(awk '/^go /{print $2}' go.mod | cut -d. -f1,2)
-          if [ -z "$ci_go" ] || [ -z "$mod_go" ]; then
+          if [ "${#ci_gos[@]}" -eq 0 ] || [ -z "$mod_go" ]; then
             echo "::error::could not determine the Go version from both files"; exit 1
           fi
-          if [ "$ci_go" != "$mod_go" ]; then
-            echo "::error::CI builds with Go $ci_go but go.mod requires $mod_go"
-            exit 1
-          fi
-          echo "CI Go $ci_go.x matches go.mod $mod_go"
+          for ci_go in "${ci_gos[@]}"; do
+            if [ "$ci_go" != "$mod_go" ]; then
+              echo "::error::CI builds with Go $ci_go but go.mod requires $mod_go"
+              exit 1
+            fi
+          done
+          echo "all ${#ci_gos[@]} CI Go pins (${ci_gos[*]}) match go.mod $mod_go.x"
 
       # Linters are installed before anything uses them. An earlier revision ran `golangci-lint
       # config verify` as its own step ahead of the action that installed the binary, which failed
@@ -139,8 +159,8 @@ jobs:
       # rather than of which step happens to come first, and drops a third-party action.
       - name: Install linters
         run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
-          go install honnef.co/go/tools/cmd/staticcheck@2026.2.1
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+          go install honnef.co/go/tools/cmd/staticcheck@2026.2.2
 
       - name: Verify lint configuration
         # A lint config that does not validate is worse than none: the run aborts, or silently
@@ -148,15 +168,20 @@ jobs:
         run: golangci-lint config verify
 
       - name: Check formatting
+        # Two formatters, because the repository is two languages. `bun fmt` owns JavaScript, CSS,
+        # JSON, YAML, and Markdown; `golangci-lint fmt` owns Go. Neither is enforced by the other's
+        # lint run, so both checks are load-bearing.
+        #
         # `golangci-lint fmt --diff` prints a diff and rewrites nothing, but it also exits non-zero
         # when it finds one, so the exit status is deliberately not the signal here: the output is.
         # The `|| true` is required because GitHub runs steps under `bash -e`, where a failing
         # command substitution in an assignment would abort the step before the diff could be
         # printed.
-        #
-        # Note that `golangci-lint run` does not enforce the formatters section, so this gate is
-        # load-bearing and must not be dropped in favour of relying on the linter.
         run: |
+          # Fails with a list of files; `bun fmt` rewrites them. Run first so a contributor sees
+          # non-Go drift even when the Go tree is clean.
+          bun fmt --check
+
           out="$(golangci-lint fmt --diff 2>&1 || true)"
           if [ -n "$out" ]; then
             echo "$out"
@@ -226,22 +251,22 @@ jobs:
           go test ./... -count=1 -race -v 2>&1 | tee /tmp/verse-tests.log
         env:
           VERSE_E2E_DATABASE_URL: postgres://verse:verse@localhost:5432/verse_test?sslmode=disable
-          VERSE_E2E_ALLOW_DESTRUCTIVE: '1'
+          VERSE_E2E_ALLOW_DESTRUCTIVE: "1"
 
       - name: Assert the database-backed tests actually ran
         # A skipped test and a passed test both leave the exit status at zero. If the gate stopped
         # being satisfied -- a renamed variable, a typo in the consent value, a missing step --
         # this job would quietly shrink to a fraction of its coverage and still report green.
         #
-          # The count is deliberately not asserted, which is a change from an earlier revision that
-          # claimed 118 passing. A hard-coded count goes stale the moment a test is added, and this
-          # one had been wrong since v0.3.8 -- eleven releases of reading as current precisely because
-          # nobody re-ran it. That is the whole failure mode of a stale claim.
-          #
-          # What is asserted is the property a count cannot express: nothing skipped. A skip is the
-          # dangerous outcome, because the database-backed tests sit behind two explicit opt-ins and a
-          # mistyped variable turns every one of them into a skip while the exit status stays zero.
-          # If a test ever needs a genuine skip, this assertion is what must change deliberately.
+        # The count is deliberately not asserted, which is a change from an earlier revision that
+        # claimed 118 passing. A hard-coded count goes stale the moment a test is added, and this
+        # one had been wrong since v0.3.8 -- eleven releases of reading as current precisely because
+        # nobody re-ran it. That is the whole failure mode of a stale claim.
+        #
+        # What is asserted is the property a count cannot express: nothing skipped. A skip is the
+        # dangerous outcome, because the database-backed tests sit behind two explicit opt-ins and a
+        # mistyped variable turns every one of them into a skip while the exit status stays zero.
+        # If a test ever needs a genuine skip, this assertion is what must change deliberately.
         run: |
           if grep -qE '^(---|[[:space:]]+---) SKIP' /tmp/verse-tests.log; then
             echo "::error::tests skipped, so the destructive-test gate is not satisfied in CI and coverage was silently reduced"
@@ -253,7 +278,7 @@ jobs:
       - name: Vulnerability scan
         # Pinned rather than @latest, so a new advisory database cannot change the result of a run
         # without a deliberate commit.
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   # The serving credential holds no capability the application does not use.
   #
@@ -289,12 +314,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: "1.27.x"
 
       # Migrations run as the owner, which is what MIGRATION_DATABASE_URL will name. Applied here
       # rather than by the service below, so the privilege assertions test a schema that already
@@ -442,7 +467,7 @@ jobs:
           MIGRATION_DATABASE_URL: postgres://verse:verse@localhost:5432/verse?sslmode=disable
           VERSE_AUTHORIZATION: a-ci-passphrase-long-enough
           VERSE_AUTH_SECRET: 0123456789abcdef0123456789abcdef
-          PORT: '8080'
+          PORT: "8080"
         run: |
           set -euo pipefail
           go run ./cmd/server > /tmp/verse-lp.log 2>&1 &
@@ -485,18 +510,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           # Floating patch, for the same reason as the verify job. See the note there.
-          go-version: '1.26.x'
+          go-version: "1.27.x"
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.4.2'
+          bun-version: "latest"
 
       - name: Install Bun dependencies
         run: bun install --frozen-lockfile
@@ -521,46 +546,46 @@ jobs:
           # Three build paths exist: the Dockerfile, this workflow, and Render. They all install Bun
           # and all produce the stylesheet, so they have to agree.
           #
-          # render.yaml is the newest of the three and the one that had drifted furthest. Render's
-          # default Bun depends on the service's creation date, so production was building the
-          # stylesheet with 1.3.4 while CI and the Dockerfile used 1.3.5 and then 1.4.2. The two
-          # repository paths were cross-checked against each other; Render was not checked against
-          # anything, which is why nothing noticed.
+          # Since v0.4.13 the policy on all three paths is `latest`: production deliberately follows
+          # current Bun rather than pinning a release that only CI would notice had gone stale. The
+          # trade-off is that a build is not reproducible across time, which is accepted here and
+          # recorded in RUNNING.md. What remains checkable, and what this gate checks, is that the
+          # paths agree on the policy -- a literal pin is still allowed, but `latest` and a literal
+          # must never mix, because that mixture is exactly how production came to build with 1.3.4
+          # while CI used 1.3.5 and then 1.4.2.
           #
           # Every occurrence is compared, not just the first. An earlier version of this check piped
           # through `head -1`, so it compared the Dockerfile against only the first `bun-version`
           # line and would have reported success while a second one still disagreed.
           #
+          # bun fmt normalizes these values to double quotes, and the patterns below follow that.
+          #
           # Go is deliberately absent. Render's native Go runtime always tracks the latest stable 1.x
           # and cannot be pinned without deploying a Docker image, so asserting it here would be a
           # check that cannot pass. RUNNING.md records the difference instead.
-          docker_bun=$(grep -oE '^FROM oven/bun:[0-9.]+' Dockerfile | head -1 | cut -d: -f2)
+          docker_bun=$(grep -oE '^FROM oven/bun:[A-Za-z0-9._]+' Dockerfile | head -1 | cut -d: -f2)
           if [ -z "$docker_bun" ]; then
             echo "::error::could not determine the Bun version from the Dockerfile"; exit 1
           fi
 
-          mapfile -t ci_buns < <(grep -oE "bun-version: '[0-9.]+'" .github/workflows/ci.yml | grep -oE '[0-9.]+')
+          mapfile -t ci_buns < <(
+            grep -E '^[[:space:]]+bun-version:' .github/workflows/ci.yml \
+              | sed -E 's/.*bun-version:[[:space:]]*"([^"]+)".*/\1/'
+          )
           if [ "${#ci_buns[@]}" -eq 0 ]; then
             echo "::error::could not determine the Bun version from the workflow"; exit 1
           fi
 
-          render_bun=$(grep -A1 'key: BUN_VERSION' render.yaml | grep -oE "value: '[0-9.]+'" | grep -oE '[0-9.]+')
+          render_bun=$(grep -A1 'key: BUN_VERSION' render.yaml | grep -oE 'value: "[^"]+"' | cut -d'"' -f2)
           if [ -z "$render_bun" ]; then
-            echo "::error::render.yaml does not pin BUN_VERSION, so Render builds the stylesheet with whatever its default is"
+            echo "::error::render.yaml does not set BUN_VERSION, so Render builds the stylesheet with whatever its default is"
             exit 1
           fi
-
-          for ci_bun in "${ci_buns[@]}"; do
-            if [ "$docker_bun" != "$ci_bun" ]; then
-              echo "::error::Dockerfile uses oven/bun:$docker_bun but CI pins $ci_bun"
-              exit 1
-            fi
-          done
 
           # Agreement with the Dockerfile is necessary but not sufficient: a pin the loops above did
           # not see could still disagree with the others. Compare the set, so "all pins are one
           # value" is asserted rather than assumed.
-          all_pins=("${ci_buns[@]}" "$render_bun")
+          all_pins=("$docker_bun" "${ci_buns[@]}" "$render_bun")
           distinct=$(printf '%s\n' "${all_pins[@]}" | sort -u | wc -l)
           if [ "$distinct" -ne 1 ]; then
             echo "::error::the build paths disagree about the Bun version:"

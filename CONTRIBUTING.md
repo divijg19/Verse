@@ -35,38 +35,46 @@ generated code the failure mode: edit a `.templ` file, run a test that reads the
 and ship the old markup with a passing build.
 
 ```bash
-templ generate        # then commit the result
+bun run templ        # regenerates with the go.mod version; then commit the result
 ```
 
-CI regenerates and fails if the result differs, so this cannot be forgotten. The version is pinned to
-`v0.3.1020`; match it, or the diff will be unreadable.
+CI regenerates and fails if the result differs, so this cannot be forgotten. The version is derived
+from `go.mod` (currently `v0.3.1100`); match it, or the diff will be unreadable.
 
 ## Style
 
-- **Comments explain why, not what.** The codebase is dense with reasoning about *why* a thing is
+- **Comments explain why, not what.** The codebase is dense with reasoning about _why_ a thing is
   the way it is — that is the part worth maintaining. Do not add comments that restate the code.
 - **Correctness before features.** A test that proves a property is worth more than a feature that
   could break one. When a change is subtle, write the test that would fail if it were wrong, and
   confirm it fails first.
-  - **The three gates below must all be clean.** CI runs all three, and this guide used to name only
-    the first — which is the exact substitution CI warns about in a comment of its own: `golangci-lint
-    run` does not enforce the formatters section, so the formatting gate is load-bearing and must not
+  - **The gates below must all be clean.** CI runs all of them, and this guide used to name only the
+    first — which is the exact substitution CI warns about in a comment of its own: `golangci-lint
+run` does not enforce the formatters section, so the formatting gate is load-bearing and must not
     be dropped in favor of relying on the linter.
 
     ```
-    golangci-lint fmt          # formatting; the linter's run does not check this
-    golangci-lint run ./...    # lint, including misspell and gosec
-    staticcheck ./...          # whole-program analysis
+    bun run format:check   # bun fmt, repo-wide: JS, CSS, JSON, YAML, Markdown
+    bun run fmt:go         # golangci-lint fmt --diff, for Go
+    bun run vet            # go vet
+    bun run lint           # golangci-lint, including misspell and gosec
+    bun run staticcheck    # whole-program analysis
+    bun run vuln           # govulncheck
+    bun run test           # go test, race-enabled
     ```
+
+    `bun run check` runs all of them in that order. The scripts pin the tool versions CI installs,
+    so a local pass means the same thing CI means; there is no Makefile to keep in step. The
+    database-backed tests still need the two environment variables above, or they skip and the exit
+    status stays zero.
 
     `staticcheck` is a separate gate deliberately. `golangci-lint`'s staticcheck is per-package; the
     standalone binary also catches unused identifiers across package boundaries, which is how two
     genuinely dead symbols were found here.
 
-    CI additionally runs `govulncheck`, which needs no local counterpart to keep the tree mergeable.
-
     Where a `gosec` finding is a false positive, suppress it narrowly with `#nosec` and a comment
     explaining what the actual mitigation is — the pattern is already used throughout.
+
   - **Spellings are US.** `behavior`, `defense`, `recognize`. The linter enforces it.
   - **Three test suites govern files you would not expect them to.** `render.yaml` is read by
     `TestRenderYamlDashboardQueryCountMatchesTheMeasurement`; `README.md` is read by the `TestReadme*`
