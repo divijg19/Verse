@@ -17,12 +17,12 @@ requires a passphrase to enter. It is not a blog, a social network, or a reader-
 
 ## Requirements
 
-| Tool | Version | Notes |
-|---|---|---|
-| Go | 1.26.0 or newer | Declared in `go.mod` |
-| templ CLI | v0.3.1020 | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file |
-| Bun | 1.4.2 or newer | Stylesheet build. Matches the version pinned in CI and in the `Dockerfile`; CI asserts the two agree |
-| PostgreSQL | 16 or newer | Any instance; Neon is what production uses |
+| Tool       | Version         | Notes                                                                                                                   |
+| ---------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Go         | 1.27.0 or newer | Declared in `go.mod`                                                                                                    |
+| templ CLI  | v0.3.1100       | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file |
+| Bun        | `latest`        | Stylesheet build. CI, the `Dockerfile`, and Render all name the same policy; CI asserts they agree                      |
+| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses                                                                              |
 
 ---
 
@@ -63,11 +63,11 @@ Then open <http://localhost:8080> and enter your passphrase.
 
 ### Required
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string for the serving credential. The application will not start without a reachable database |
-| `VERSE_AUTHORIZATION` | The authoring passphrase, compared against the submitted value in constant time. **Minimum 16 characters** |
-| `VERSE_AUTH_SECRET` | Key used to sign session and CSRF tokens. **Minimum 32 characters.** Treat it as a secret: changing it invalidates every active session |
+| Variable              | Purpose                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`        | PostgreSQL connection string for the serving credential. The application will not start without a reachable database                    |
+| `VERSE_AUTHORIZATION` | The authoring passphrase, compared against the submitted value in constant time. **Minimum 16 characters**                              |
+| `VERSE_AUTH_SECRET`   | Key used to sign session and CSRF tokens. **Minimum 32 characters.** Treat it as a secret: changing it invalidates every active session |
 
 **Both have a length floor, and the application refuses to start below either.** The passphrase floor
 did not exist before v0.4.2, which made it the weaker of the pair: the key needed 32 characters and
@@ -84,23 +84,23 @@ have forgotten `VERSE_AUTH_SECRET`, set a new one; all sessions end, and you sig
 
 ### Optional
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `MIGRATION_DATABASE_URL` | Connection string for the startup migration, which is then discarded. Unset, the migration falls back to `DATABASE_URL` and the boot log says so. Set it to drop DDL rights from the serving credential — see [Dropping DDL rights](#dropping-ddl-rights-from-the-serving-credential) |
-| `PORT` | `8080` | Listen port. Platforms such as Render inject this |
-| `DB_MAX_CONNS` | `5` | Maximum pooled connections |
-| `DB_MIN_CONNS` | `1` | Minimum pooled connections |
-| `DB_MAX_CONN_LIFETIME` | `1h` | Maximum connection lifetime |
-| `DB_MAX_CONN_IDLE` | `5m` | Idle time before a connection is closed |
-| `VERSE_STATIC_DIR` | `static` | Asset directory, resolved relative to the working directory |
-| `TRUSTED_CLIENT_IP_HEADER` | *(unset)* | Request header to take the caller's address from, for the login rate limiter. See below |
-| `SERVER_READ_HEADER_TIMEOUT_SEC` | `10` | |
-| `SERVER_READ_TIMEOUT_SEC` | `30` | |
-| `SERVER_WRITE_TIMEOUT_SEC` | `60` | |
-| `SERVER_IDLE_TIMEOUT_SEC` | `120` | |
-| `SERVER_SHUTDOWN_TIMEOUT_SEC` | `15` | Grace period for in-flight requests on `SIGTERM` |
-| `SERVER_MAX_HEADER_BYTES` | `1048576` | |
-| `SERVER_MAX_BODY_BYTES` | `1048576` | Largest accepted request body |
+| Variable                         | Default                                                                                                                                                                                                                                                                               | Purpose                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `MIGRATION_DATABASE_URL`         | Connection string for the startup migration, which is then discarded. Unset, the migration falls back to `DATABASE_URL` and the boot log says so. Set it to drop DDL rights from the serving credential — see [Dropping DDL rights](#dropping-ddl-rights-from-the-serving-credential) |
+| `PORT`                           | `8080`                                                                                                                                                                                                                                                                                | Listen port. Platforms such as Render inject this                                       |
+| `DB_MAX_CONNS`                   | `5`                                                                                                                                                                                                                                                                                   | Maximum pooled connections                                                              |
+| `DB_MIN_CONNS`                   | `1`                                                                                                                                                                                                                                                                                   | Minimum pooled connections                                                              |
+| `DB_MAX_CONN_LIFETIME`           | `1h`                                                                                                                                                                                                                                                                                  | Maximum connection lifetime                                                             |
+| `DB_MAX_CONN_IDLE`               | `5m`                                                                                                                                                                                                                                                                                  | Idle time before a connection is closed                                                 |
+| `VERSE_STATIC_DIR`               | `static`                                                                                                                                                                                                                                                                              | Asset directory, resolved relative to the working directory                             |
+| `TRUSTED_CLIENT_IP_HEADER`       | _(unset)_                                                                                                                                                                                                                                                                             | Request header to take the caller's address from, for the login rate limiter. See below |
+| `SERVER_READ_HEADER_TIMEOUT_SEC` | `10`                                                                                                                                                                                                                                                                                  |                                                                                         |
+| `SERVER_READ_TIMEOUT_SEC`        | `30`                                                                                                                                                                                                                                                                                  |                                                                                         |
+| `SERVER_WRITE_TIMEOUT_SEC`       | `60`                                                                                                                                                                                                                                                                                  |                                                                                         |
+| `SERVER_IDLE_TIMEOUT_SEC`        | `120`                                                                                                                                                                                                                                                                                 |                                                                                         |
+| `SERVER_SHUTDOWN_TIMEOUT_SEC`    | `15`                                                                                                                                                                                                                                                                                  | Grace period for in-flight requests on `SIGTERM`                                        |
+| `SERVER_MAX_HEADER_BYTES`        | `1048576`                                                                                                                                                                                                                                                                             |                                                                                         |
+| `SERVER_MAX_BODY_BYTES`          | `1048576`                                                                                                                                                                                                                                                                             | Largest accepted request body                                                           |
 
 The pool defaults are tuned for a managed connection-limited database such as Neon. They are
 deliberately conservative and rarely need changing.
@@ -114,11 +114,11 @@ that header with any value it likes and thereby evade its own limit, or aim it a
 Naming the header makes that an explicit statement about the deployment rather than an inference
 from an unrelated variable. Set it to the header your front proxy overwrites:
 
-| Front | Value |
-|---|---|
-| Cloudflare | `CF-Connecting-IP` - the edge sets it and strips any client-supplied value |
-| Render only | `X-Forwarded-For` - the rightmost entry is the one the nearest hop recorded |
-| Direct, no proxy | *(unset)* - only `RemoteAddr` is trustworthy, and that is the default |
+| Front            | Value                                                                       |
+| ---------------- | --------------------------------------------------------------------------- |
+| Cloudflare       | `CF-Connecting-IP` - the edge sets it and strips any client-supplied value  |
+| Render only      | `X-Forwarded-For` - the rightmost entry is the one the nearest hop recorded |
+| Direct, no proxy | _(unset)_ - only `RemoteAddr` is trustworthy, and that is the default       |
 
 A value that is a comma-separated chain is reduced to its rightmost entry, so one variable serves
 both a single-address header and a chain. A value that is not a valid address is ignored and the
@@ -159,12 +159,12 @@ library — every draft, every unfinished piece, anything you deleted and kept �
 deploy ran, with no way to tell from the outside. **Every work is a draft until you publish it, and
 nothing in this repository publishes anything yet.**
 
-| | |
-|---|---|
-| What a draft is | A work with `published_at` set to `NULL`. Nothing else. |
-| What you can see | Everything, as before. The library, the search box, the dashboard and `/poem/<id>` are unchanged — they filter on `deleted_at`, not on publication. |
-| What a publisher can see | Nothing yet. There is no public site in this release. |
-| What to run | Nothing. There is no publish command. |
+|                          |                                                                                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What a draft is          | A work with `published_at` set to `NULL`. Nothing else.                                                                                             |
+| What you can see         | Everything, as before. The library, the search box, the dashboard and `/poem/<id>` are unchanged — they filter on `deleted_at`, not on publication. |
+| What a publisher can see | Nothing yet. There is no public site in this release.                                                                                               |
+| What to run              | Nothing. There is no publish command.                                                                                                               |
 
 **If you want a backup anyway**, it is the command you already have:
 
@@ -197,8 +197,8 @@ excludes. This is the copy that matters if the column ever needed removing.
 
 - **A migration that adds a column with a `DEFAULT` is rewritten, not merely slow.** `ADD COLUMN ...
 DEFAULT <value>` that is not a constant takes `ACCESS EXCLUSIVE` for the whole rewrite, on a live
-table the service is querying. v0.4.7's `006_timestamptz.sql` shows the shape this project uses
-instead: add the column, backfill in bounded batches, then add the constraint.
+  table the service is querying. v0.4.7's `006_timestamptz.sql` shows the shape this project uses
+  instead: add the column, backfill in bounded batches, then add the constraint.
 - **A file that is blank after trimming is skipped and never recorded.** A file containing only
   comments is a valid no-op and is recorded like any other migration.
 - **A run is bounded, so a blocked migration fails instead of hanging.** An `ALTER TABLE` needs
@@ -228,7 +228,7 @@ untouched. This is covered by a test rather than assumed.
 `006_timestamptz.sql` rewrites `poems.created_at`, `poems.deleted_at` and `poem_versions.recorded_at`
 as `timestamptz`. It carries an explicit `AT TIME ZONE 'UTC'` on each column, so the result is the
 same whatever time zone the database server is configured for. That is safe for a database that has
-always run in UTC, which this one has. If a database's history is *not* in UTC — a restored dump, a
+always run in UTC, which this one has. If a database's history is _not_ in UTC — a restored dump, a
 branch, an instance moved somewhere else — the zone was discarded on the way in, so the stored values
 look exactly like UTC wall clocks and no migration can detect the difference.
 
@@ -270,12 +270,12 @@ that answers a request needs either.
 ### Dropping DDL rights from the serving credential
 
 This is available on a **free plan**. It does not need `preDeployCommand`, because it is not a deploy
-step — the migration still runs at boot, it just runs over a *different connection*:
+step — the migration still runs at boot, it just runs over a _different connection_:
 
-| Variable | Used for | Rights needed |
-|---|---|---|
-| `MIGRATION_DATABASE_URL` | the startup migration, then discarded | `CREATE`, `ALTER`, ownership of the tables |
-| `DATABASE_URL` | every request, for the life of the process | `SELECT`, `INSERT`, `UPDATE` — and `DELETE` on `login_attempts` only |
+| Variable                 | Used for                                   | Rights needed                                                        |
+| ------------------------ | ------------------------------------------ | -------------------------------------------------------------------- |
+| `MIGRATION_DATABASE_URL` | the startup migration, then discarded      | `CREATE`, `ALTER`, ownership of the tables                           |
+| `DATABASE_URL`           | every request, for the life of the process | `SELECT`, `INSERT`, `UPDATE` — and `DELETE` on `login_attempts` only |
 
 The migration pool is opened, used, and closed before the first request is served, so the privileged
 credential is not held once the service is up.
@@ -319,6 +319,7 @@ self-announcing rather than a new requirement.
 
    This exact command is what the `Least privilege` CI job runs on every pull request, so the file is
    exercised rather than merely described.
+
 2. Add `ALTER DEFAULT PRIVILEGES FOR ROLE <your migration role> ... GRANT ... TO verse_runtime` as
    described in that file, or the first future migration will create a table the service cannot read.
 3. On Render, set `MIGRATION_DATABASE_URL` to the current credential — the same value `DATABASE_URL`
@@ -343,7 +344,7 @@ Two of those are worth a moment:
 - **No `UPDATE` on `poem_versions`.** A retained revision is immutable by design; restoring one is an
   ordinary edit, which records the displaced text as a new version in turn.
 
-The full suite still runs as the owner, and deliberately is *not* run against the restricted role: it
+The full suite still runs as the owner, and deliberately is _not_ run against the restricted role: it
 truncates, and `TRUNCATE` is not in the grant set. Granting it would make the job claim a
 least-privilege role it does not have.
 
@@ -352,7 +353,6 @@ least-privilege role it does not have.
 Nothing here reduces the blast radius of a compromised **migration** credential, which still owns the
 tables. The improvement is that the credential which is reachable by every request in the world no
 longer does.
-
 
 ### If this service moves to a paid compute plan
 
@@ -381,7 +381,7 @@ docker run --rm -e DATABASE_URL="$DATABASE_URL" --entrypoint /app/migrate verse:
 ### Concurrency
 
 Migrations are serialized across processes by a Postgres advisory lock, so two instances starting at
-once cannot both apply the same file. The applied set is read *after* the lock is taken — reading it
+once cannot both apply the same file. The applied set is read _after_ the lock is taken — reading it
 first would let both processes conclude the same migration was pending. The wait is bounded at 30
 seconds and reports a clear error rather than appearing to hang.
 
@@ -394,13 +394,13 @@ step, and it would matter immediately on any scale-up.
 Wrong passphrases are counted per caller and refused once they add up. Without it, the passphrase is
 a shared secret on an endpoint reachable from the internet with no other barrier.
 
-| | |
-|---|---|
-| Threshold | 5 failures |
-| Window | 15 minutes, after which failures are forgotten |
-| Backoff | 1 minute at the threshold, doubling per further failure, capped at 15 |
-| Response | `429` with `Retry-After`, and a body with no numbers in it |
-| Key | HMAC-SHA256 of the client address, under `VERSE_AUTH_SECRET` |
+|           |                                                                       |
+| --------- | --------------------------------------------------------------------- |
+| Threshold | 5 failures                                                            |
+| Window    | 15 minutes, after which failures are forgotten                        |
+| Backoff   | 1 minute at the threshold, doubling per further failure, capped at 15 |
+| Response  | `429` with `Retry-After`, and a body with no numbers in it            |
+| Key       | HMAC-SHA256 of the client address, under `VERSE_AUTH_SECRET`          |
 
 Four properties worth knowing before changing any of it:
 
@@ -435,13 +435,13 @@ A refused login answers `403` with the body `forbidden`, whatever the reason, be
 cannot produce a valid token has no business learning which of its mistakes it made. The reason goes
 to the log instead, and each one reads differently:
 
-| Log line | Means |
-|---|---|
+| Log line                                                            | Means                                                                                                                                                                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `no synchroniser cookie was sent; request arrived over plain HTTP…` | **A deployment fault, not an attack.** A browser refuses to store a `Secure` cookie on a plain-HTTP page, so the form renders and the submission then cannot be correlated with it. The message says so explicitly |
-| `the form carried no synchroniser field` | The template did not render a token. Ours, not the caller's |
-| `the synchroniser cookie did not match the form` | A token was sent and was wrong |
-| `cross-origin submission` | The attack this defence exists for |
-| `rate limited, retry in Ns` | Too many failures; see above |
+| `the form carried no synchroniser field`                            | The template did not render a token. Ours, not the caller's                                                                                                                                                        |
+| `the synchroniser cookie did not match the form`                    | A token was sent and was wrong                                                                                                                                                                                     |
+| `cross-origin submission`                                           | The attack this defence exists for                                                                                                                                                                                 |
+| `rate limited, retry in Ns`                                         | Too many failures; see above                                                                                                                                                                                       |
 
 That first line exists because its absence cost a debugging session. Before v0.4.2 every one of these
 produced an identical bare `403` and the log said nothing, so a plain-HTTP deploy fault and a
@@ -507,11 +507,11 @@ any migration you are unsure about, rather than relying on the provider's own ba
 
 Three things can destroy a saved work, and all three are now recoverable:
 
-| What happened | How to undo it |
-|---|---|
+| What happened           | How to undo it                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | A bad edit overwrote it | Open the work, then **History**. Every superseded draft is retained, newest first, and restoring one is itself undoable. |
-| It was deleted | **Recycle**, reachable from the library. Soft-deleted work is listed there and can be restored; it keeps its history. |
-| The database was lost | `verse-export` from before the incident, restored with `psql`. |
+| It was deleted          | **Recycle**, reachable from the library. Soft-deleted work is listed there and can be restored; it keeps its history.    |
+| The database was lost   | `verse-export` from before the incident, restored with `psql`.                                                           |
 
 Version history is written by the application, not by a database trigger, so work edited by hand in
 SQL has no history. That is a deliberate trade: a trigger would capture every change including
@@ -584,7 +584,7 @@ go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
 
 A container build is also provided in the `Dockerfile` and is exercised by CI.
 
-Since v0.4.9 that exercise asserts the image *renders*, not merely that it starts. The job requests
+Since v0.4.9 that exercise asserts the image _renders_, not merely that it starts. The job requests
 `/static/js/htmx.min.js`, `/static/js/navigation.js` and `/static/css/output.css` from the running
 container and requires a 200 for each, then greps the served stylesheet for a generated utility class.
 Earlier revisions checked only `/health` and that `/library` refuses an anonymous caller, and an image
@@ -606,17 +606,20 @@ When changing how the service is built, change `render.yaml` **and** the dashboa
 same commit. CI checks the repository's three build paths against each other; it cannot see the
 dashboard.
 
-### Toolchain: Bun is pinned, Go cannot be
+### Toolchain: Bun floats `latest`, Go cannot be pinned
 
-| | CI and `Dockerfile` | Render |
-|---|---|---|
-| Bun | `1.4.2`, asserted equal across all three paths | `1.4.2`, via `BUN_VERSION` in `render.yaml` |
-| Go | `1.26.x` from `go.mod`, asserted equal to the `Dockerfile` | **latest stable 1.x** — not pinnable |
+|     | CI and `Dockerfile`                                        | Render                                       |
+| --- | ---------------------------------------------------------- | -------------------------------------------- |
+| Bun | `latest`, asserted equal across all three paths            | `latest`, via `BUN_VERSION` in `render.yaml` |
+| Go  | `1.27.x` from `go.mod`, asserted equal to the `Dockerfile` | **latest stable 1.x** — not pinnable         |
 
 Render's default Bun depends on when the service was created, and this one defaulted to `1.3.4` while
 the repository was on `1.3.5` and then `1.4.2`. Production was therefore building the stylesheet with
-a package manager version no other build path used. `BUN_VERSION` fixes that, and CI now fails if the
-three disagree — including when the pin is *absent*, which was the state that produced `1.3.4`.
+a package manager version no other build path used. `BUN_VERSION: latest` fixes that, and CI now fails
+if the three paths disagree — including when the policy is _absent_, which was the state that
+produced `1.3.4`. The trade-off is deliberate: a build is not reproducible across time, because all
+three paths resolve `latest` when they run. A literal pin remains accepted by the gate, but every
+path must name the same literal; mixing `latest` with a pin is what the gate rejects.
 
 Go is a genuine, accepted difference. Render's native Go runtime always tracks the latest stable 1.x
 and, in their words, "you can't pin to a specific Go version unless you deploy a Docker image." CI
@@ -661,7 +664,7 @@ Note what a `503` does and does not mean. The service refuses to start without a
 `RequireSchema` runs at boot — so an unreachable database at startup is a failed deploy, visible in
 the logs, not a `503`.
 
-A `503` means the check did not succeed within `HealthPingTimeout` (1.5s). That is *not* the same as
+A `503` means the check did not succeed within `HealthPingTimeout` (1.5s). That is _not_ the same as
 "the database is gone", and the distinction matters when deciding whether to restart. It is reported
 when the database is unreachable, and also when it is merely slow — including when the connection
 pool is saturated, which the probe cannot tell apart from a slow database from inside the handler. The
@@ -729,7 +732,6 @@ a review, whereas the application refuses to serve content without a valid sessi
 
 ---
 
-
 ### Release tags do not trigger a run
 
 Pushing a `v*` tag deliberately starts no workflow. A tag points at a commit its pull request has
@@ -752,23 +754,24 @@ proves the service both starts and refuses to start unauthenticated.
 
 To see the running application, use the live service. To try an unreleased change, deploy the branch
 to the live service deliberately and knowingly.
+
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or either is under its minimum (16 and 32) | Set both in the environment and restart. The message states both minimums |
-| `too many failed attempts` (HTTP 429) | The caller is rate limited; the body is deliberately numberless | Wait for `Retry-After`. If it is you and you have not been guessing, see the rate-limit section above || `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
-| `database connection failed` | `DATABASE_URL` unset, unreachable, or the database is asleep | Check the variable; managed databases need a moment to resume |
-| `DATABASE_URL environment variable not set` | The variable is not in the process environment | Export it. A `.env` file in the working directory is **not** read |
-| `database migration failed: ... another process has held the migration lock` | Two instances are migrating at once, or one died holding the lock | Usually transient; the wait is bounded at 30s. If it persists, check for an instance stuck in `pg_locks` |
-| `database schema is not ready: the poems table does not exist` | The migration runner reported success but the `poems` table is absent | A real inconsistency between the runner and the application; check `schema_migrations` and the migration files |
-| `migration <file> was modified after it was applied` | An already-applied `.sql` file was edited | Restore the original file, or write a new migration. Do not edit history |
-| `these migrations are recorded as applied but no longer exist` | An applied `.sql` file was deleted or renamed | Restore it. Renaming an applied migration is indistinguishable from deleting it |
-| `apply migration <file>: ...` | The SQL in a migration failed | Nothing was recorded and nothing was left behind; fix the file and re-run |
-| Production stylesheet differs from CI | Render's Bun drifted from the repository's | Check `BUN_VERSION` on the service; CI asserts all three build paths agree |
-| Deploy used a stale or different build command | The dashboard diverged from `render.yaml` | Re-sync the dashboard from `render.yaml`; CI cannot detect this |
-| Unstyled page | The stylesheet was not built | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify` |
-| Blank page or missing navigation in the console | The vendored htmx bundle is missing or its checksum changed | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256` |
-| `templ generate` reports `expected operand` | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper | See `templ/helpers.go` and existing templates for the convention |
-| Tests pass but almost nothing ran | No DSN was set, so the database-backed tests skipped silently | Set `VERSE_E2E_DATABASE_URL` and check the skip count in the output |
-| Tests fail intermittently with a truncated or missing row | Two packages shared one `poems` table | Should be impossible as of v0.4.3, since each package has its own schema. If it recurs the isolation has been broken: check that `verse_t_tests` and `verse_t_cmdserver` each exist and hold their own `poems` |
+| Symptom                                                                      | Cause                                                                                             | Fix                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `refusing to start: authentication is not configured`                        | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or either is under its minimum (16 and 32) | Set both in the environment and restart. The message states both minimums                                                                                                                                      |
+| `too many failed attempts` (HTTP 429)                                        | The caller is rate limited; the body is deliberately numberless                                   | Wait for `Retry-After`. If it is you and you have not been guessing, see the rate-limit section above                                                                                                          |     | `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
+| `database connection failed`                                                 | `DATABASE_URL` unset, unreachable, or the database is asleep                                      | Check the variable; managed databases need a moment to resume                                                                                                                                                  |
+| `DATABASE_URL environment variable not set`                                  | The variable is not in the process environment                                                    | Export it. A `.env` file in the working directory is **not** read                                                                                                                                              |
+| `database migration failed: ... another process has held the migration lock` | Two instances are migrating at once, or one died holding the lock                                 | Usually transient; the wait is bounded at 30s. If it persists, check for an instance stuck in `pg_locks`                                                                                                       |
+| `database schema is not ready: the poems table does not exist`               | The migration runner reported success but the `poems` table is absent                             | A real inconsistency between the runner and the application; check `schema_migrations` and the migration files                                                                                                 |
+| `migration <file> was modified after it was applied`                         | An already-applied `.sql` file was edited                                                         | Restore the original file, or write a new migration. Do not edit history                                                                                                                                       |
+| `these migrations are recorded as applied but no longer exist`               | An applied `.sql` file was deleted or renamed                                                     | Restore it. Renaming an applied migration is indistinguishable from deleting it                                                                                                                                |
+| `apply migration <file>: ...`                                                | The SQL in a migration failed                                                                     | Nothing was recorded and nothing was left behind; fix the file and re-run                                                                                                                                      |
+| Production stylesheet differs from CI                                        | Render's Bun drifted from the repository's                                                        | Check `BUN_VERSION` on the service; CI asserts all three build paths agree                                                                                                                                     |
+| Deploy used a stale or different build command                               | The dashboard diverged from `render.yaml`                                                         | Re-sync the dashboard from `render.yaml`; CI cannot detect this                                                                                                                                                |
+| Unstyled page                                                                | The stylesheet was not built                                                                      | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify`                                                                                                                          |
+| Blank page or missing navigation in the console                              | The vendored htmx bundle is missing or its checksum changed                                       | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256`                                                                                                                      |
+| `templ generate` reports `expected operand`                                  | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper      | See `templ/helpers.go` and existing templates for the convention                                                                                                                                               |
+| Tests pass but almost nothing ran                                            | No DSN was set, so the database-backed tests skipped silently                                     | Set `VERSE_E2E_DATABASE_URL` and check the skip count in the output                                                                                                                                            |
+| Tests fail intermittently with a truncated or missing row                    | Two packages shared one `poems` table                                                             | Should be impossible as of v0.4.3, since each package has its own schema. If it recurs the isolation has been broken: check that `verse_t_tests` and `verse_t_cmdserver` each exist and hold their own `poems` |

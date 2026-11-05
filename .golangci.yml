@@ -25,14 +25,14 @@ linters:
     # config look like it controlled them while changing nothing.
 
     # Correctness.
-    - bodyclose     # HTTP response bodies never closed
-    - noctx         # http requests issued without a context
-    - errorlint     # == on errors instead of errors.Is, and %w misuse
-    - copyloopvar   # loop variables captured by reference
-    - unconvert     # redundant type conversions
-    - misspell      # spelling in identifiers, comments, and strings
+    - bodyclose # HTTP response bodies never closed
+    - noctx # http requests issued without a context
+    - errorlint # == on errors instead of errors.Is, and %w misuse
+    - copyloopvar # loop variables captured by reference
+    - unconvert # redundant type conversions
+    - misspell # spelling in identifiers, comments, and strings
     - durationcheck # suspicious time.Duration multiplication
-    - makezero      # slice created with non-zero length and then appended to
+    - makezero # slice created with non-zero length and then appended to
 
     # Security. Justified specifically because the service is internet-reachable and holds private
     # work. Findings are triaged individually rather than blanket-suppressed.

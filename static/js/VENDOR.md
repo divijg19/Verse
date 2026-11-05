@@ -5,14 +5,14 @@ application. Keep this file up to date whenever a vendored asset is added, remov
 
 ## `htmx.min.js`
 
-| | |
-|---|---|
-| **Version** | 2.0.4 |
-| **Upstream** | https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js |
-| **License** | BSD-2-Clause (https://github.com/bigskysoftware/htmx) |
-| **SHA-256** | `e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447` |
-| **Size** | 50917 bytes |
-| **Fetched** | 2026-09-26 |
+|              |                                                                    |
+| ------------ | ------------------------------------------------------------------ |
+| **Version**  | 2.0.4                                                              |
+| **Upstream** | https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js                  |
+| **License**  | BSD-2-Clause (https://github.com/bigskysoftware/htmx)              |
+| **SHA-256**  | `e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447` |
+| **Size**     | 50917 bytes                                                        |
+| **Fetched**  | 2026-09-26                                                         |
 
 ### Why vendored rather than loaded from a CDN
 

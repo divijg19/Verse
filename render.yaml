@@ -4,21 +4,21 @@
 # (see RUNNING.md), and this service must never hold a Cloudflare credential.
 #
 # Note the health check. Without an explicit path, Render probes "/", which is the dashboard: a full
-  # private page render issuing two database queries on every probe, which is two of the pool's five
-  # connections. /health is a real readiness check instead, and so the probe means something.
-  #
-  # The figure is not a guess -- TestRenderYamlDashboardQueryCountMatchesTheMeasurement fails if this
-  # number stops agreeing with the acquisition count that
-  # TestDashboardLoadLeavesTheHealthProbeAConnection measures.
-  #
-  # /health does issue one query, and that is deliberate. An earlier revision of this comment said it
-  # issued none, twice over, which was false: v0.4.4 made it ping the database so a Neon outage fails
-  # the probe rather than producing a stream of reassuring 200s. It runs under HealthPingTimeout,
-  # far shorter than Render's five-second window, so a slow database fails the check quickly instead
-  # of holding a pool connection for the life of the request.
+# private page render issuing two database queries on every probe, which is two of the pool's five
+# connections. /health is a real readiness check instead, and so the probe means something.
+#
+# The figure is not a guess -- TestRenderYamlDashboardQueryCountMatchesTheMeasurement fails if this
+# number stops agreeing with the acquisition count that
+# TestDashboardLoadLeavesTheHealthProbeAConnection measures.
+#
+# /health does issue one query, and that is deliberate. An earlier revision of this comment said it
+# issued none, twice over, which was false: v0.4.4 made it ping the database so a Neon outage fails
+# the probe rather than producing a stream of reassuring 200s. It runs under HealthPingTimeout,
+# far shorter than Render's five-second window, so a slow database fails the check quickly instead
+# of holding a pool connection for the life of the request.
 #
 # It was documented here as touching no database, and that was true when written. It stopped being true
-  # in v0.4.4, which made /health ping the database so that a Neon outage would fail the probe rather
+# in v0.4.4, which made /health ping the database so that a Neon outage would fail the probe rather
 # than produce a stream of reassuring 200s. The consequence for uptime is the opposite of what this
 # comment used to claim: a database outage now takes the service out of rotation until it recovers.
 # That is the intended trade and it is documented in RUNNING.md, but the two are not
@@ -58,35 +58,35 @@ services:
       go build -tags netgo -ldflags="-s -w -X main.version=${VERSION}" -o verse ./cmd/server
     startCommand: ./verse
     healthCheckPath: /health
-      # There is deliberately no preDeployCommand here, and an earlier draft of this change had one.
-      #
-      # Migrations run as a step between the build and the deploy on a paid plan, so the service needs
-      # no DDL rights and the schema is never ahead of the code. Render provides that hook only for
-      # "paid web services, private services, and background workers": a pre-deploy command needs a
-      # paid compute plan, not merely a paid workspace. This service runs on a free instance, so the
-      # setting would have been accepted by this blueprint and then silently never run -- which is the
-      # worst possible failure mode for the step that everything else depends on.
-      #
-      # So the service applies its own pending migrations at startup. The .sql files are embedded in the
-      # binary, which means the schema and the code that expects it can never come from different
-      # versions, and there is no step that can be forgotten.
-      #
-      # This comment used to end here: "The cost is that the runtime credential holds DDL rights for
-      # the life of the process." That was a true observation about the arrangement and a wrong
-      # conclusion about it. Running the migration at boot is not the same as the serving credential
-      # needing DDL -- the migration can run over a different connection, which is what MIGRATION_DATABASE_URL
-      # below is for. Conflating the two kept the DDL rights in place for eleven releases.
-      #
-      # On a free plan the split is available now. Set MIGRATION_DATABASE_URL to the owner credential
-      # and point DATABASE_URL at a role holding only SELECT, INSERT, UPDATE (and DELETE on
-      # login_attempts); db/roles.sql creates it. Unset, the service falls back to DATABASE_URL for the
-      # migration and says so in the boot log, so the weaker arrangement is never silent.
-      #
-      # On a paid plan the startup migration also stops running, so the owner credential is not used
-      # during a normal start: add -o migrate ./cmd/migrate to buildCommand plus preDeployCommand:
-      # ./migrate. That is a narrower improvement and it is not a prerequisite for the credential
-      # split. The runner, the bookkeeping and the tests are identical either way. See RUNNING.md.
 
+    # There is deliberately no preDeployCommand here, and an earlier draft of this change had one.
+    #
+    # Migrations run as a step between the build and the deploy on a paid plan, so the service needs
+    # no DDL rights and the schema is never ahead of the code. Render provides that hook only for
+    # "paid web services, private services, and background workers": a pre-deploy command needs a
+    # paid compute plan, not merely a paid workspace. This service runs on a free instance, so the
+    # setting would have been accepted by this blueprint and then silently never run -- which is the
+    # worst possible failure mode for the step that everything else depends on.
+    #
+    # So the service applies its own pending migrations at startup. The .sql files are embedded in the
+    # binary, which means the schema and the code that expects it can never come from different
+    # versions, and there is no step that can be forgotten.
+    #
+    # This comment used to end here: "The cost is that the runtime credential holds DDL rights for
+    # the life of the process." That was a true observation about the arrangement and a wrong
+    # conclusion about it. Running the migration at boot is not the same as the serving credential
+    # needing DDL -- the migration can run over a different connection, which is what MIGRATION_DATABASE_URL
+    # below is for. Conflating the two kept the DDL rights in place for eleven releases.
+    #
+    # On a free plan the split is available now. Set MIGRATION_DATABASE_URL to the owner credential
+    # and point DATABASE_URL at a role holding only SELECT, INSERT, UPDATE (and DELETE on
+    # login_attempts); db/roles.sql creates it. Unset, the service falls back to DATABASE_URL for the
+    # migration and says so in the boot log, so the weaker arrangement is never silent.
+    #
+    # On a paid plan the startup migration also stops running, so the owner credential is not used
+    # during a normal start: add -o migrate ./cmd/migrate to buildCommand plus preDeployCommand:
+    # ./migrate. That is a narrower improvement and it is not a prerequisite for the credential
+    # split. The runner, the bookkeeping and the tests are identical either way. See RUNNING.md.
 
     # Fail closed. The application refuses to start without these, by design: serving the authoring
     # surface unauthenticated is never correct. There is no bypass flag. Recovery from a forgotten
@@ -94,22 +94,24 @@ services:
     #
     # Set these in the Render dashboard BEFORE the first deploy of v0.3.7, or the service will not
     # start. See RUNNING.md.
-    # Toolchain pins, and what cannot be pinned.
+    # Toolchain policy, and what cannot be pinned.
     #
-    # Bun is pinned to the same version CI uses and the Dockerfile uses. Render's default depends on
-    # when the service was created, and this one defaulted to 1.3.4 while the repository was on 1.3.5
-    # and then 1.4.2 -- so the production build used a package manager version that no other build path
-    # used, and nothing noticed. CI now asserts all three agree.
+    # Bun is `latest`, the same policy CI and the Dockerfile follow. Render's default depends on when
+    # the service was created, and this one defaulted to 1.3.4 while the repository was on 1.3.5 and
+    # then 1.4.2 -- so the production build used a package manager version that no other build path
+    # used, and nothing noticed. CI now asserts all three paths name the same policy, so they cannot
+    # diverge again; what it cannot do is make `latest` reproducible across time, which is the
+    # accepted cost of always building with current Bun.
     #
     # Go deliberately has no pin. Render's native Go runtime always tracks the latest stable 1.x, and
     # "you can't pin to a specific Go version unless you deploy a Docker image." go.mod asks for
-    # 1.26.0 as a minimum and a newer toolchain is compatible, so production runs a newer Go than CI
+    # 1.27.0 as a minimum and a newer toolchain is compatible, so production runs a newer Go than CI
     # and the Dockerfile. That is a real difference, recorded here rather than papered over with a
     # pin that would be ignored. CI asserts the Dockerfile matches go.mod; it cannot make Render
     # match, and a check that cannot pass is worse than no check.
     envVars:
       - key: BUN_VERSION
-        value: '1.4.2'
+        value: "latest"
 
       - key: DATABASE_URL
         # The serving credential. After the split below, a role holding only SELECT, INSERT, UPDATE

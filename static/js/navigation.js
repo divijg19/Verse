@@ -1,142 +1,147 @@
 function verseBodyScrollLockCount() {
-    return Number(document.body.dataset.verseScrollLocks || "0");
+  return Number(document.body.dataset.verseScrollLocks || "0");
 }
 
 function verseLockBodyScroll() {
-    const next = verseBodyScrollLockCount() + 1;
-    document.body.dataset.verseScrollLocks = String(next);
-    document.body.style.overflow = "hidden";
+  const next = verseBodyScrollLockCount() + 1;
+  document.body.dataset.verseScrollLocks = String(next);
+  document.body.style.overflow = "hidden";
 }
 
 function verseUnlockBodyScroll() {
-    const next = Math.max(0, verseBodyScrollLockCount() - 1);
-    if (next === 0) {
-        delete document.body.dataset.verseScrollLocks;
-        document.body.style.overflow = "";
-        return;
-    }
+  const next = Math.max(0, verseBodyScrollLockCount() - 1);
+  if (next === 0) {
+    delete document.body.dataset.verseScrollLocks;
+    document.body.style.overflow = "";
+    return;
+  }
 
-    document.body.dataset.verseScrollLocks = String(next);
+  document.body.dataset.verseScrollLocks = String(next);
 }
 
 window.verseLockBodyScroll = verseLockBodyScroll;
 window.verseUnlockBodyScroll = verseUnlockBodyScroll;
 
 function activeScreenSwapTarget(event) {
-    const screen = document.getElementById("screen");
-    const detail = event && event.detail ? event.detail : null;
-    const target = detail ? detail.target : null;
-    if (!screen || target !== screen) {
-        return null;
-    }
-    return screen;
+  const screen = document.getElementById("screen");
+  const detail = event && event.detail ? event.detail : null;
+  const target = detail ? detail.target : null;
+  if (!screen || target !== screen) {
+    return null;
+  }
+  return screen;
 }
 
 function restoreScreenTransition(event) {
-    const screen = activeScreenSwapTarget(event);
-    if (!screen) {
-        return;
-    }
+  const screen = activeScreenSwapTarget(event);
+  if (!screen) {
+    return;
+  }
 
-    requestAnimationFrame(() => {
-        screen.classList.remove("opacity-0", "translate-y-2");
-    });
+  requestAnimationFrame(() => {
+    screen.classList.remove("opacity-0", "translate-y-2");
+  });
 }
 
 const verseMobileNavState = {
-    open: false,
-    lastTrigger: null,
+  open: false,
+  lastTrigger: null,
 };
 
 function verseMobileNavRoot() {
-    return document.getElementById("mobile-nav");
+  return document.getElementById("mobile-nav");
 }
 
 function verseMobileNavSheet() {
-    const root = verseMobileNavRoot();
-    return root ? root.querySelector("[data-mobile-nav-sheet]") : null;
+  const root = verseMobileNavRoot();
+  return root ? root.querySelector("[data-mobile-nav-sheet]") : null;
 }
 
 function verseMobileNavToggle() {
-    const root = verseMobileNavRoot();
-    return root ? root.querySelector("[data-mobile-nav-toggle]") : null;
+  const root = verseMobileNavRoot();
+  return root ? root.querySelector("[data-mobile-nav-toggle]") : null;
 }
 
 function verseMobileNavFocusTarget() {
-    const sheet = verseMobileNavSheet();
-    if (!sheet) {
-        return null;
-    }
+  const sheet = verseMobileNavSheet();
+  if (!sheet) {
+    return null;
+  }
 
-    return sheet.querySelector("[data-mobile-nav-link][data-active='true']") ||
-        sheet.querySelector("[data-mobile-nav-link]");
+  return (
+    sheet.querySelector("[data-mobile-nav-link][data-active='true']") ||
+    sheet.querySelector("[data-mobile-nav-link]")
+  );
 }
 
 function verseSyncMobileNavButton(expanded) {
-    const toggle = verseMobileNavToggle();
-    if (!toggle) {
-        return;
-    }
+  const toggle = verseMobileNavToggle();
+  if (!toggle) {
+    return;
+  }
 
-    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
 }
 
 function verseOpenMobileNav(node) {
-    const sheet = verseMobileNavSheet();
-    if (!sheet || verseMobileNavState.open) {
-        return;
-    }
+  const sheet = verseMobileNavSheet();
+  if (!sheet || verseMobileNavState.open) {
+    return;
+  }
 
-    verseMobileNavState.open = true;
-    verseMobileNavState.lastTrigger = node || verseMobileNavToggle();
-    sheet.hidden = false;
-    verseSyncMobileNavButton(true);
-    verseLockBodyScroll();
+  verseMobileNavState.open = true;
+  verseMobileNavState.lastTrigger = node || verseMobileNavToggle();
+  sheet.hidden = false;
+  verseSyncMobileNavButton(true);
+  verseLockBodyScroll();
 
-    const focusTarget = verseMobileNavFocusTarget();
-    if (focusTarget) {
-        requestAnimationFrame(() => focusTarget.focus());
-    }
+  const focusTarget = verseMobileNavFocusTarget();
+  if (focusTarget) {
+    requestAnimationFrame(() => focusTarget.focus());
+  }
 }
 
 function verseCloseMobileNav() {
-    const sheet = verseMobileNavSheet();
-    if (sheet) {
-        sheet.hidden = true;
-    }
+  const sheet = verseMobileNavSheet();
+  if (sheet) {
+    sheet.hidden = true;
+  }
 
-    if (verseMobileNavState.open) {
-        verseUnlockBodyScroll();
-    }
+  if (verseMobileNavState.open) {
+    verseUnlockBodyScroll();
+  }
 
-    verseMobileNavState.open = false;
-    verseSyncMobileNavButton(false);
+  verseMobileNavState.open = false;
+  verseSyncMobileNavButton(false);
 
-    if (verseMobileNavState.lastTrigger && verseMobileNavState.lastTrigger.isConnected) {
-        const focusTarget = verseMobileNavState.lastTrigger;
-        requestAnimationFrame(() => focusTarget.focus());
-    }
-    verseMobileNavState.lastTrigger = null;
+  if (
+    verseMobileNavState.lastTrigger &&
+    verseMobileNavState.lastTrigger.isConnected
+  ) {
+    const focusTarget = verseMobileNavState.lastTrigger;
+    requestAnimationFrame(() => focusTarget.focus());
+  }
+  verseMobileNavState.lastTrigger = null;
 }
 
 window.verseOpenMobileNav = verseOpenMobileNav;
 window.verseCloseMobileNav = verseCloseMobileNav;
 
 document.body.addEventListener("htmx:beforeRequest", (event) => {
-    const screen = activeScreenSwapTarget(event);
-    if (!screen) {
-        return;
-    }
+  const screen = activeScreenSwapTarget(event);
+  if (!screen) {
+    return;
+  }
 
-    screen.classList.add("opacity-0", "translate-y-2");
+  screen.classList.add("opacity-0", "translate-y-2");
 });
 
 document.body.addEventListener("htmx:afterSwap", (event) => {
-    restoreScreenTransition(event);
+  restoreScreenTransition(event);
 
-    if (activeScreenSwapTarget(event)) {
-        verseCloseMobileNav();
-    }
+  if (activeScreenSwapTarget(event)) {
+    verseCloseMobileNav();
+  }
 });
 
 // Ensure the screen is restored even if the request fails or no swap occurs.
@@ -146,19 +151,19 @@ document.body.addEventListener("htmx:afterRequest", restoreScreenTransition);
 document.body.addEventListener("htmx:responseError", restoreScreenTransition);
 
 document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") {
-        return;
-    }
+  if (event.key !== "Escape") {
+    return;
+  }
 
-    if (verseMobileNavState.open) {
-        verseCloseMobileNav();
-    }
+  if (verseMobileNavState.open) {
+    verseCloseMobileNav();
+  }
 });
 
 window.addEventListener("resize", () => {
-    if (window.innerWidth >= 1024 && verseMobileNavState.open) {
-        verseCloseMobileNav();
-    }
+  if (window.innerWidth >= 1024 && verseMobileNavState.open) {
+    verseCloseMobileNav();
+  }
 });
 
 // Delegated listeners for the mobile navigation.
@@ -178,17 +183,17 @@ window.addEventListener("resize", () => {
 // itself, and calling closest on those is a TypeError rather than a false result. An inline
 // attribute never had to consider it, because the browser passed the element directly.
 document.addEventListener("click", (event) => {
-    if (!(event.target instanceof Element)) {
-        return;
-    }
+  if (!(event.target instanceof Element)) {
+    return;
+  }
 
-    const toggle = event.target.closest("[data-mobile-nav-toggle]");
-    if (toggle) {
-        verseOpenMobileNav(toggle);
-        return;
-    }
+  const toggle = event.target.closest("[data-mobile-nav-toggle]");
+  if (toggle) {
+    verseOpenMobileNav(toggle);
+    return;
+  }
 
-    if (event.target.closest("[data-mobile-nav-close]")) {
-        verseCloseMobileNav();
-    }
+  if (event.target.closest("[data-mobile-nav-close]")) {
+    verseCloseMobileNav();
+  }
 });
