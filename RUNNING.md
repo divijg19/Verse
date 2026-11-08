@@ -596,6 +596,63 @@ existence shipping a 4,165-byte stylesheet with no utility classes in it — see
 If you add a static asset, add it to the same assertions. The allowlist in
 `internal/server/router.go` is the other place that needs to hear about it.
 
+### Building and deploying the public site
+
+The public archive is a static build, not a second web service. It reads the published set through
+the same query the dry-run uses, renders every page in memory, validates the result, and writes the
+output directory. Readers never hold a database credential, and the deployed files do not depend on
+Render or Neon at request time.
+
+```bash
+# What would be published, without writing anything.
+go run ./cmd/publish -dry-run
+
+# Build into dist/. Use the read-only serving credential, not the migration credential.
+DATABASE_URL="postgres://verse_app:...@host/db?sslmode=require" \
+  go run ./cmd/publish -out dist -base-url https://your-public-origin.example
+```
+
+`-base-url` (or `PUBLIC_BASE_URL`) is required for a real deployment: `sitemap.xml` and `feed.xml`
+use absolute URLs. The default is the reserved placeholder `https://verse.example`, which is
+deliberately not a real host. The output is a pure function of the published set and the configured
+origin; there is no build timestamp, so two builds from the same input are byte-identical.
+
+The build refuses to write if validation fails. Validation checks that the required files exist, that
+no authoring route, asset, htmx attribute, script element, or secret name reached the output, and
+that every internal link resolves. It runs before the previous `dist/` is replaced, so a failed build
+leaves the last good site in place.
+
+Work pages use `/w/<uuid>/` for now. The identifier is stable and is not derived from the text, so
+editing a work cannot change its address. A future `works`/slug migration is additive: existing
+URLs must keep resolving, either directly or through a redirect. `search.json` carries only an id, a
+path, a title, a date, and a bounded excerpt; full body text is not published twice.
+
+Until the domain decision (D7) lands, `robots.txt` disallows every crawler and every page carries
+`<meta name="robots" content="noindex">`. Deploy on a platform subdomain, not a custom domain.
+
+A manual Cloudflare Workers Static Assets deploy needs only a minimal Wrangler configuration:
+
+```jsonc
+{
+  "name": "verse-public",
+  "compatibility_date": "2026-11-08",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+  },
+}
+```
+
+Then:
+
+```bash
+bunx wrangler@latest deploy
+```
+
+Keep the previous `dist/` (or the previous deployment) until the new one has been checked. Rolling
+back is redeploying the last known-good build, not a database operation. There is no
+`repository_dispatch`, no publish button, and no PAT in this release.
+
 ### `render.yaml` is the source of truth; the dashboard must mirror it
 
 The two have already diverged once. The dashboard's build command was a copy of an older revision of

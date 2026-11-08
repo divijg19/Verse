@@ -1,0 +1,115 @@
+package templ
+
+// The public surface. These components are rendered at build time into static files; nothing here is
+// served by the authoring application, and nothing here imports htmx, authoring JavaScript, CSRF
+// helpers, or a database connection.
+
+templ PublicLayout(site PublicSite, title string, description string, content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="robots" content="noindex"/>
+			<title>{ title }</title>
+			<meta name="description" content={ description }/>
+			<link rel="stylesheet" href={ site.AssetPath }/>
+			<link rel="alternate" type="application/rss+xml" title={ site.Title } href="/feed.xml"/>
+		</head>
+		<body>
+			<header class="site-header">
+				<a class="wordmark" href="/">{ site.Title }</a>
+				<nav aria-label="Site">
+					<a href="/archive/">Archive</a>
+				</nav>
+			</header>
+			<main class="site-main">
+				@content
+			</main>
+			<footer class="site-footer">
+				<p>{ site.Description }</p>
+			</footer>
+		</body>
+	</html>
+}
+
+templ PublicIndex(site PublicSite) {
+	@PublicLayout(site, site.Title, site.Description, PublicIndexBody(site))
+}
+
+templ PublicIndexBody(site PublicSite) {
+	<section class="hero">
+		<p class="eyebrow">Selected work</p>
+		<h1>{ site.Title }</h1>
+		<p class="lede">{ site.Description }</p>
+	</section>
+	<section class="listing" aria-labelledby="latest-heading">
+		<h2 id="latest-heading">Latest</h2>
+		if len(site.Works) == 0 {
+			<p class="empty">Nothing published yet.</p>
+		} else {
+			<ol class="work-list">
+				for _, work := range site.Works {
+					<li>
+						<a href={ work.Path }>
+							<span class="work-title">{ work.Title }</span>
+							<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+						</a>
+					</li>
+				}
+			</ol>
+		}
+	</section>
+	<p class="more"><a href="/archive/">All works</a></p>
+}
+
+templ PublicArchive(site PublicSite) {
+	@PublicLayout(site, "Archive — "+site.Title, site.Description, PublicArchiveBody(site))
+}
+
+templ PublicArchiveBody(site PublicSite) {
+	<section class="listing">
+		<h1>Archive</h1>
+		if len(site.Works) == 0 {
+			<p class="empty">Nothing published yet.</p>
+		} else {
+			<ol class="work-list">
+				for _, work := range site.Works {
+					<li>
+						<a href={ work.Path }>
+							<span class="work-title">{ work.Title }</span>
+							<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+						</a>
+					</li>
+				}
+			</ol>
+		}
+	</section>
+	<p class="more"><a href="/">Return home</a></p>
+}
+
+templ PublicWorkPage(site PublicSite, work PublicWork) {
+	@PublicLayout(site, work.Title+" — "+site.Title, work.Excerpt, PublicWorkBody(site, work))
+}
+
+templ PublicWorkBody(site PublicSite, work PublicWork) {
+	<article class="work">
+		<h1 class="visually-hidden">{ work.Title }</h1>
+		<p class="meta"><time datetime={ work.ISODate() }>{ work.DisplayDate() }</time></p>
+		<div class="poem">{ work.Content }</div>
+	</article>
+	<p class="more"><a href="/archive/">Back to the archive</a></p>
+}
+
+templ PublicNotFound(site PublicSite) {
+	@PublicLayout(site, "Not found — "+site.Title, site.Description, PublicNotFoundBody(site))
+}
+
+templ PublicNotFoundBody(site PublicSite) {
+	<section class="hero">
+		<p class="eyebrow">404</p>
+		<h1>Page not found</h1>
+		<p class="lede">This page does not exist, or it was never published.</p>
+	</section>
+	<p class="more"><a href="/">Return home</a></p>
+}

@@ -60,6 +60,10 @@ tmp/
   # export command in v0.4.4, and a local `go build ./cmd/verse-export` committed a 14MB binary
   # before this line existed.
 /verse-export
+
+# `verse-publish` is the public build command's build-output name, used the same way (`-o
+# verse-publish`). The release command is `cmd/publish`; `dist/` is already ignored above.
+/verse-publish
 *.test
 coverage.out
 vendor/
