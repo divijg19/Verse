@@ -205,20 +205,24 @@ func TestV019LibraryFlowE2E(t *testing.T) {
 	srv := newE2EServer(t)
 
 	poem := "Lantern across dark water\nDust in late sunlight"
-	status, body, _ := postForm(t, srv.URL+"/poem", url.Values{"content": {poem}}, nil)
+	status, _, createHeaders := postForm(t, srv.URL+"/poem", url.Values{"content": {poem}}, map[string]string{"HX-Request": "true"})
 	if status != http.StatusOK {
 		t.Fatalf("POST /poem status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Saved") {
-		t.Fatalf("POST /poem body missing success text: %q", body)
+	redirect := createHeaders.Get("HX-Redirect")
+	if !strings.HasPrefix(redirect, "/editor/") {
+		t.Fatalf("POST /poem HX-Redirect = %q, want /editor/{id}", redirect)
 	}
 
 	var poemID string
 	if err := database.Pool.QueryRow(ctx, `SELECT id FROM poems WHERE content = $1 ORDER BY created_at DESC LIMIT 1`, poem).Scan(&poemID); err != nil {
 		t.Fatalf("lookup poem id: %v", err)
 	}
+	if redirect != "/editor/"+poemID {
+		t.Fatalf("POST /poem redirected to %q, want /editor/%s", redirect, poemID)
+	}
 
-	status, body, _ = get(t, srv.URL+"/library", nil)
+	status, body, _ := get(t, srv.URL+"/library", nil)
 	if status != http.StatusOK {
 		t.Fatalf("GET /library status = %d, want 200", status)
 	}

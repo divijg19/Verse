@@ -17,20 +17,25 @@ func TestIntegrationPoemFlow(t *testing.T) {
 	defer srv.Close()
 
 	original := "Lantern across dark water\nDust in late sunlight"
-	status, body, _ := postForm(t, srv.URL+"/poem", url.Values{"content": {original}}, nil)
+	status, _, createHeaders := postForm(t, srv.URL+"/poem", url.Values{"content": {original}}, map[string]string{"HX-Request": "true"})
 	if status != 200 {
 		t.Fatalf("POST /poem status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Saved") {
-		t.Fatalf("POST /poem missing success text: %q", body)
+	redirect := createHeaders.Get("HX-Redirect")
+	if !strings.HasPrefix(redirect, "/editor/") {
+		t.Fatalf("POST /poem HX-Redirect = %q, want /editor/{id}", redirect)
 	}
+	id := strings.TrimPrefix(redirect, "/editor/")
 
-	var id string
-	if err := database.Pool.QueryRow(context.Background(), `SELECT id FROM poems WHERE content = $1 ORDER BY created_at DESC LIMIT 1`, original).Scan(&id); err != nil {
+	var storedID string
+	if err := database.Pool.QueryRow(context.Background(), `SELECT id FROM poems WHERE content = $1 ORDER BY created_at DESC LIMIT 1`, original).Scan(&storedID); err != nil {
 		t.Fatalf("lookup created poem id failed: %v", err)
 	}
+	if storedID != id {
+		t.Fatalf("create redirected to %q but stored id is %q", id, storedID)
+	}
 
-	status, body, _ = get(t, srv.URL+"/poem/"+id, nil)
+	status, body, _ := get(t, srv.URL+"/poem/"+id, nil)
 	if status != 200 {
 		t.Fatalf("GET /poem/{id} status = %d, want 200", status)
 	}
@@ -58,11 +63,11 @@ func TestIntegrationPoemFlow(t *testing.T) {
 		t.Fatalf("GET /poem/{id} after update missing updated content: %q", body)
 	}
 
-	status, _, headers := postForm(t, srv.URL+"/poem/delete", url.Values{"id": {id}}, map[string]string{"HX-Request": "true"})
+	status, _, deleteHeaders := postForm(t, srv.URL+"/poem/delete", url.Values{"id": {id}}, map[string]string{"HX-Request": "true"})
 	if status != 200 {
 		t.Fatalf("POST /poem/delete status = %d, want 200", status)
 	}
-	if headers.Get("HX-Redirect") != "/library" {
+	if deleteHeaders.Get("HX-Redirect") != "/library" {
 		t.Fatalf("POST /poem/delete missing HX-Redirect /library")
 	}
 
