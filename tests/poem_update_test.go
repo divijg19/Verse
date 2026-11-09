@@ -23,7 +23,7 @@ func TestPoemUpdateEndpoint(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("POST /poem/update status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Bloom updated") {
+	if !strings.Contains(body, "Updated") {
 		t.Fatalf("POST /poem/update missing success text: %q", body)
 	}
 

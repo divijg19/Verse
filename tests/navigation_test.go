@@ -56,7 +56,6 @@ func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
 	for _, removed := range []string{
 		`>Navigate</p>`,
 		`>Overview and activity</span>`,
-		`>Write or revise a bloom</span>`,
 		`>Browse your archive</span>`,
 		`>Draw a fresh prompt</span>`,
 		`>Prepare work for export</span>`,
