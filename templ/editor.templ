@@ -138,20 +138,22 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 				display: inline-flex;
 			}
 
-			.verse-editor-overlay[hidden] {
-				display: none;
-			}
-
 			.verse-editor-overlay {
 				position: fixed;
 				inset: 0;
 				z-index: 130;
+				width: 100%;
+				height: 100%;
+				max-width: none;
+				max-height: none;
+				margin: 0;
+				padding: 0;
+				border: none;
+				background: transparent;
 				overflow: hidden;
 			}
 
-			.verse-editor-overlay-backdrop {
-				position: absolute;
-				inset: 0;
+			.verse-editor-overlay::backdrop {
 				background:
 					radial-gradient(circle at top, rgba(168, 85, 247, 0.12) 0%, rgba(10, 10, 10, 0) 34%),
 					rgba(10, 10, 10, 0.9);
@@ -166,13 +168,9 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 				justify-content: center;
 				padding: 1rem;
 				overflow: hidden;
-				/* The panel covers the backdrop. Let clicks outside the card fall through to it,
-				   while the card and everything inside it keep receiving pointer events. */
-				pointer-events: none;
 			}
 
 			.verse-editor-overlay-card {
-				pointer-events: auto;
 				display: flex;
 				height: 100%;
 				max-height: 100%;
@@ -445,8 +443,7 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 				</button>
 			</div>
 		</form>
-		<div data-editor-overlay class="verse-editor-overlay" hidden>
-			<div class="verse-editor-overlay-backdrop" data-editor-overlay-close></div>
+		<dialog data-editor-overlay class="verse-editor-overlay">
 			<div class="verse-editor-overlay-panel">
 				<div class="verse-editor-overlay-card">
 					<div class="verse-editor-overlay-header">
@@ -498,7 +495,7 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 					</form>
 				</div>
 			</div>
-		</div>
+		</dialog>
 		<script src="/static/js/editor.js"></script>
 	</div>
 }

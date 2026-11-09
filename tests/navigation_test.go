@@ -10,30 +10,31 @@ import (
 )
 
 func TestNavigationMatrix(t *testing.T) {
-	type navCase struct {
+	cases := []struct {
 		surface string
-		top     string
-		left    string
-		right   string
-		bottom  string
-	}
-
-	cases := []navCase{
-		{surface: "dashboard", top: "/caelum", left: "", right: "/editor", bottom: "/share"},
-		{surface: "editor", top: "/caelum", left: "/dashboard", right: "/library", bottom: "/share"},
-		{surface: "library", top: "/caelum", left: "/editor", right: "", bottom: "/share"},
-		{surface: "caelum", top: "", left: "/dashboard", right: "/library", bottom: "/editor"},
-		{surface: "share", top: "/editor", left: "/dashboard", right: "/library", bottom: ""},
+		active  string
+	}{
+		{surface: "dashboard", active: "/dashboard"},
+		{surface: "editor", active: "/editor"},
+		{surface: "library", active: "/library"},
+		{surface: "caelum", active: "/caelum"},
+		{surface: "share", active: "/share"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.surface, func(t *testing.T) {
 			body := renderNavOOB(t, tc.surface)
 
-			assertRenderedSlotPath(t, body, "nav-top", tc.top)
-			assertRenderedSlotPath(t, body, "nav-left", tc.left)
-			assertRenderedSlotPath(t, body, "nav-right", tc.right)
-			assertRenderedSlotPath(t, body, "nav-bottom", tc.bottom)
+			for _, path := range []string{"/dashboard", "/editor", "/library", "/caelum", "/share"} {
+				want := "false"
+				if path == tc.active {
+					want = "true"
+				}
+				needle := `href="` + path + `" hx-get="` + path + `" hx-target="#screen" hx-swap="innerHTML" class="verse-masthead-link" data-masthead-link data-active="` + want + `"`
+				if !strings.Contains(body, needle) {
+					t.Fatalf("masthead link %q should have data-active=%q; body: %q", path, want, body)
+				}
+			}
 		})
 	}
 }
@@ -47,8 +48,8 @@ func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
 	if !strings.Contains(body, `data-mobile-nav-sheet`) {
 		t.Fatalf("mobile nav sheet markup missing from nav render: %q", body)
 	}
-	if !strings.Contains(body, `class="verse-mobile-current-surface">Editor</span>`) {
-		t.Fatalf("mobile nav current surface label missing from nav render: %q", body)
+	if !strings.Contains(body, `class="verse-mobile-brand">Verse</a>`) {
+		t.Fatalf("mobile nav brand missing from nav render: %q", body)
 	}
 	if !strings.Contains(body, `data-mobile-nav-link`) {
 		t.Fatalf("mobile nav link hooks missing from nav render: %q", body)
@@ -64,8 +65,11 @@ func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
 			t.Fatalf("mobile nav should no longer render redundant copy %q in %q", removed, body)
 		}
 	}
-	if !strings.Contains(body, `class="verse-desktop-nav-button inline-flex`) {
-		t.Fatalf("desktop nav button class missing from nav render: %q", body)
+	if !strings.Contains(body, `class="verse-masthead-link"`) {
+		t.Fatalf("masthead link class missing from nav render: %q", body)
+	}
+	if !strings.Contains(body, `id="masthead" class="verse-masthead" hx-swap-oob="outerHTML"`) {
+		t.Fatalf("masthead oob shell missing from nav render: %q", body)
 	}
 }
 
@@ -78,33 +82,4 @@ func renderNavOOB(t *testing.T, surface string) string {
 	}
 
 	return buf.String()
-}
-
-func assertRenderedSlotPath(t *testing.T, body, slotID, expectedPath string) {
-	t.Helper()
-
-	marker := `id="` + slotID + `" hx-swap-oob="outerHTML"`
-	start := strings.Index(body, marker)
-	if start == -1 {
-		t.Fatalf("missing slot marker %s", marker)
-	}
-
-	fragment := body[start:]
-	end := strings.Index(fragment, "</div>")
-	if end == -1 {
-		t.Fatalf("missing closing div for slot %s", slotID)
-	}
-	slot := fragment[:end]
-
-	if expectedPath == "" {
-		if strings.Contains(slot, `hx-get="`) {
-			t.Fatalf("slot %s unexpectedly contains link: %q", slotID, slot)
-		}
-		return
-	}
-
-	needle := `hx-get="` + expectedPath + `"`
-	if !strings.Contains(slot, needle) {
-		t.Fatalf("slot %s missing %q in %q", slotID, needle, slot)
-	}
 }

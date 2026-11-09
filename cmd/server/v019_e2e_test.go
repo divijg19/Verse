@@ -357,18 +357,15 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 
 	type navExpectation struct {
 		path   string
-		top    string
-		left   string
-		right  string
-		bottom string
+		active string
 	}
 
 	checks := []navExpectation{
-		{path: "/dashboard", top: "/caelum", left: "", right: "/editor", bottom: "/share"},
-		{path: "/editor", top: "/caelum", left: "/dashboard", right: "/library", bottom: "/share"},
-		{path: "/library", top: "/caelum", left: "/editor", right: "", bottom: "/share"},
-		{path: "/caelum", top: "", left: "/dashboard", right: "/library", bottom: "/editor"},
-		{path: "/share", top: "/editor", left: "/dashboard", right: "/library", bottom: ""},
+		{path: "/dashboard", active: "/dashboard"},
+		{path: "/editor", active: "/editor"},
+		{path: "/library", active: "/library"},
+		{path: "/caelum", active: "/caelum"},
+		{path: "/share", active: "/share"},
 	}
 
 	headers := map[string]string{"HX-Request": "true"}
@@ -378,10 +375,7 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 			t.Fatalf("GET %s status = %d, want 200", tc.path, status)
 		}
 
-		assertNavSlotPath(t, body, "nav-top", tc.top)
-		assertNavSlotPath(t, body, "nav-left", tc.left)
-		assertNavSlotPath(t, body, "nav-right", tc.right)
-		assertNavSlotPath(t, body, "nav-bottom", tc.bottom)
+		assertMastheadNav(t, body, tc.active)
 	}
 
 	status, body, _ := get(t, srv.URL+"/poem/"+poemID, headers)
@@ -396,32 +390,22 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 	}
 }
 
-func assertNavSlotPath(t *testing.T, body, slotID, expectedPath string) {
+func assertMastheadNav(t *testing.T, body, activePath string) {
 	t.Helper()
 
-	marker := `id="` + slotID + `" hx-swap-oob="outerHTML"`
-	idx := strings.Index(body, marker)
-	if idx == -1 {
-		t.Fatalf("missing nav slot marker %q in response body", marker)
+	if !strings.Contains(body, `id="masthead" class="verse-masthead" hx-swap-oob="outerHTML"`) {
+		t.Fatalf("missing masthead oob marker in response body")
 	}
 
-	fragment := body[idx:]
-	end := strings.Index(fragment, "</div>")
-	if end == -1 {
-		t.Fatalf("missing closing div for nav slot %s", slotID)
-	}
-	slot := fragment[:end]
-
-	if expectedPath == "" {
-		if strings.Contains(slot, `hx-get="`) {
-			t.Fatalf("nav slot %s unexpectedly had a link: %q", slotID, slot)
+	for _, path := range []string{"/dashboard", "/editor", "/library", "/caelum", "/share"} {
+		want := "false"
+		if path == activePath {
+			want = "true"
 		}
-		return
-	}
-
-	needle := `hx-get="` + expectedPath + `"`
-	if !strings.Contains(slot, needle) {
-		t.Fatalf("nav slot %s missing expected link %s in %q", slotID, needle, slot)
+		needle := `href="` + path + `" hx-get="` + path + `" hx-target="#screen" hx-swap="innerHTML" class="verse-masthead-link" data-masthead-link data-active="` + want + `"`
+		if !strings.Contains(body, needle) {
+			t.Fatalf("masthead link %q should have data-active=%q; body: %q", path, want, body)
+		}
 	}
 }
 

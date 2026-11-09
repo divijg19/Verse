@@ -18,27 +18,27 @@ func TestSharedScreenLayoutLocksViewport(t *testing.T) {
 
 	assertContainsAll(t, body,
 		`<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">`,
-		`id="viewport" class="verse-app-shell h-screen overflow-hidden flex items-start justify-center"`,
+		`id="viewport" class="verse-app-shell h-screen overflow-hidden"`,
 		`[data-editor-overlay-active="true"] #screen {`,
 		`z-index: 120;`,
 		`.verse-mobile-screen-title,`,
 		`.verse-mobile-copy-trim {`,
-		`class="verse-mobile-current-surface">Share</span>`,
+		`class="verse-mobile-brand">Verse</a>`,
 		`.verse-button,`,
 		`.verse-button-danger {`,
 		`min-width: 8.5rem;`,
 		`min-height: 2.625rem;`,
 		`border-radius: 0.375rem;`,
 		`font-size: 1rem;`,
-		`--verse-desktop-nav-rail-inline: clamp(7.75rem, 11vw, 8.75rem);`,
-		`grid-template-areas:`,
-		`"nav-left screen nav-right"`,
-		`grid-area: screen;`,
+		`.verse-masthead {`,
+		`.verse-masthead-link {`,
+		`.verse-masthead-link[data-active="true"] {`,
+		`.verse-mobile-brand {`,
 		`id="mobile-nav"`,
 		`class="verse-mobile-nav-toggle"`,
 		`data-mobile-nav-link`,
 		`id="screen" class="verse-screen-frame verse-screen-frame--standard`,
-		`class="verse-desktop-nav-button inline-flex`,
+		`class="verse-masthead-link"`,
 		`<div class="verse-surface-shell">`,
 		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`>Share</h1>`,
@@ -104,7 +104,7 @@ func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
 	body := renderComponent(t, views.Editor(renderContext()))
 
 	assertContainsAll(t, body,
-		`data-editor-overlay class="verse-editor-overlay" hidden`,
+		`data-editor-overlay class="verse-editor-overlay">`,
 		`.verse-editor-overlay {`,
 		`z-index: 130;`,
 		`overflow: hidden;`,
@@ -160,14 +160,19 @@ func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
 		`verseClosest(event.target, "[data-editor-overlay-close]")`,
 	)
 
-	// The panel is painted over the backdrop and covers it, so without this the backdrop carries the
-	// close marker but can never receive a click.
+	// The overlay is a native dialog. The backdrop is the dialog's ::backdrop, and the close
+	// path is the dialog's close event, so the panel no longer needs pointer-events tricks to
+	// let clicks reach a backdrop element.
 	body := renderComponent(t, views.Editor(renderContext()))
 	assertContainsAll(t, body,
-		`.verse-editor-overlay-panel {`,
-		`pointer-events: none;`,
-		`.verse-editor-overlay-card {`,
-		`pointer-events: auto;`,
+		`<dialog data-editor-overlay class="verse-editor-overlay">`,
+		`.verse-editor-overlay::backdrop {`,
+	)
+
+	assertContainsAll(t, js,
+		`overlay.showModal()`,
+		`overlay.close()`,
+		`editorOverlay.addEventListener("close"`,
 	)
 }
 
@@ -340,7 +345,7 @@ func TestSurfaceRoutesStillReturnLockedScreenShell(t *testing.T) {
 
 		assertContainsAll(t, body,
 			`<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">`,
-			`id="viewport" class="verse-app-shell h-screen overflow-hidden flex items-start justify-center"`,
+			`id="viewport" class="verse-app-shell h-screen overflow-hidden"`,
 			`id="screen" class="verse-screen-frame`,
 		)
 	}

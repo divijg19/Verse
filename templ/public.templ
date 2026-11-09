@@ -18,9 +18,25 @@ templ PublicLayout(site PublicSite, title string, description string, content te
 		</head>
 		<body>
 			<header class="site-header">
-				<a class="wordmark" href="/">{ site.Title }</a>
+				<div class="brand-dropdown">
+					<a
+						class="wordmark brand-trigger"
+						href="/"
+						tabindex="0"
+						aria-label={ site.Title }
+					>
+						{ site.Title }
+					</a>
+					<div class="brand-menu">
+						<a href="/">Home</a>
+						<a href="/archive/">Archive</a>
+						<a href="/share/">Share</a>
+						<a href="/feed.xml">RSS feed</a>
+					</div>
+				</div>
 				<nav aria-label="Site">
 					<a href="/archive/">Archive</a>
+					<a href="/share/">Share</a>
 				</nav>
 			</header>
 			<main class="site-main">
@@ -112,4 +128,50 @@ templ PublicNotFoundBody(site PublicSite) {
 		<p class="lede">This page does not exist, or it was never published.</p>
 	</section>
 	<p class="more"><a href="/">Return home</a></p>
+}
+
+templ PublicShare(site PublicSite) {
+	@PublicLayout(site, "Share — "+site.Title, site.Description, PublicShareBody(site))
+}
+
+templ PublicShareBody(site PublicSite) {
+	<section class="hero">
+		<p class="eyebrow">Share</p>
+		<h1>Share your work</h1>
+		<p class="lede">Copy a link to any published work to share it. Feed and archive are open to everyone.</p>
+	</section>
+
+	<section class="listing">
+		<h2 id="works-heading">Published works</h2>
+		<ol class="work-list">
+			if len(site.Works) == 0 {
+				<p class="empty">Nothing published yet.</p>
+			} else {
+				for _, work := range site.Works {
+					<li>
+						<a href={ work.Path }>
+							<span class="work-title">{ work.Title }</span>
+							<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+						</a>
+					</li>
+				}
+			}
+		</ol>
+	</section>
+
+	<section class="more-links">
+		<p class="eyebrow">Subscribe</p>
+		<a
+			href="/feed.xml"
+			class="verse-button-ghost"
+		>
+			RSS feed
+		</a>
+		<a
+			href="/archive/"
+			class="verse-button-ghost"
+		>
+			Browse archive
+		</a>
+	</section>
 }

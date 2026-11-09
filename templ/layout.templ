@@ -28,7 +28,10 @@ templ Layout(surface string, content templ.Component) {
 		.verse-app-shell {
 			position: relative;
 			isolation: isolate;
+			display: flex;
+			flex-direction: column;
 			width: 100%;
+			height: 100%;
 			min-width: 0;
 			min-height: 0;
 		}
@@ -47,8 +50,7 @@ templ Layout(surface string, content templ.Component) {
 		#screen {
 			position: relative;
 			z-index: 1;
-			width: 100%;
-			height: 100%;
+			flex: 1;
 			min-width: 0;
 			min-height: 0;
 		}
@@ -68,9 +70,9 @@ templ Layout(surface string, content templ.Component) {
 		max-width: 60rem;
 	}
 
-	.verse-screen-frame--wide {
-		max-width: 82rem;
-	}
+		.verse-screen-frame--wide {
+			max-width: 82rem;
+		}
 
 		.verse-surface-shell {
 			display: flex;
@@ -103,34 +105,34 @@ templ Layout(surface string, content templ.Component) {
 			box-shadow:
 			0 24px 80px rgba(0, 0, 0, 0.24),
 			inset 0 1px 0 rgba(115, 115, 115, 0.1);
-	}
+		}
 
 		.verse-panel-soft {
-			border: 1px solid rgb(23 23 23);
+			border: 1px solid rgb(23, 23, 23);
 			border-radius: 1.25rem;
 			min-width: 0;
 			background: linear-gradient(180deg, rgba(23, 23, 23, 0.54) 0%, rgba(10, 10, 10, 0.24) 100%);
 			box-shadow: inset 0 1px 0 rgba(82, 82, 82, 0.12);
-	}
+		}
 
-	.verse-eyebrow {
-		font-size: 0.62rem;
-		letter-spacing: 0.22em;
-		text-transform: uppercase;
-		color: rgb(115 115 115);
-	}
+		.verse-eyebrow {
+			font-size: 0.62rem;
+			letter-spacing: 0.22em;
+			text-transform: uppercase;
+			color: rgb(115 115 115);
+		}
 
-	.verse-body-copy {
-		font-size: 0.98rem;
-		line-height: 1.75;
-		color: rgb(163 163 163);
-	}
+		.verse-body-copy {
+			font-size: 0.98rem;
+			line-height: 1.75;
+			color: rgb(163 163 163);
+		}
 
-	.verse-mobile-screen-title,
-	.verse-mobile-screen-title-wrap,
-	.verse-mobile-copy-trim {
-		min-width: 0;
-	}
+		.verse-mobile-screen-title,
+		.verse-mobile-screen-title-wrap,
+		.verse-mobile-copy-trim {
+			min-width: 0;
+		}
 
 		.verse-button,
 		.verse-button-secondary,
@@ -153,180 +155,252 @@ templ Layout(surface string, content templ.Component) {
 			border: 1px solid transparent;
 			cursor: pointer;
 			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
-	}
+		}
 
-	.verse-button {
-		background: rgb(147 51 234);
-		color: rgb(250 245 255);
-	}
+		.verse-button {
+			background: rgb(147 51 234);
+			color: rgb(250 245 255);
+		}
 
-	.verse-button:hover {
-		background: rgb(168 85 247);
-	}
+		.verse-button:hover {
+			background: rgb(168 85 247);
+		}
 
-	.verse-button-secondary {
-		border: 1px solid rgb(64 64 64);
-		background: rgba(23, 23, 23, 0.72);
-		color: rgb(229 229 229);
-	}
+		.verse-button-secondary {
+			border: 1px solid rgb(64 64 64);
+			background: rgba(23, 23, 23, 0.72);
+			color: rgb(229 229 229);
+		}
 
-	.verse-button-secondary:hover {
-		border-color: rgb(115 115 115);
-		background: rgba(38, 38, 38, 0.9);
-	}
+		.verse-button-secondary:hover {
+			border-color: rgb(115 115 115);
+			background: rgba(38, 38, 38, 0.9);
+		}
 
-	.verse-button-ghost {
-		border: 1px solid rgba(38, 38, 38, 0.72);
-		background: transparent;
-		color: rgb(163 163 163);
-	}
+		.verse-button-ghost {
+			border: 1px solid rgba(38, 38, 38, 0.72);
+			background: transparent;
+			color: rgb(163 163 163);
+		}
 
-	.verse-button-ghost:hover {
-		border-color: rgb(82 82 82);
-		color: rgb(229 229 229);
-	}
+		.verse-button-ghost:hover {
+			border-color: rgb(82 82 82);
+			color: rgb(229 229 229);
+		}
 
-	.verse-button-danger {
-		border-color: rgba(127, 29, 29, 0.72);
-		background: rgba(69, 10, 10, 0.32);
-		color: rgb(252 165 165);
-	}
+		.verse-button-danger {
+			border-color: rgba(127, 29, 29, 0.72);
+			background: rgba(69, 10, 10, 0.32);
+			color: rgb(252 165 165);
+		}
 
-	.verse-button-danger:hover {
-		border-color: rgba(185, 28, 28, 0.82);
-		background: rgba(127, 29, 29, 0.4);
-		color: rgb(254 202 202);
-	}
+		.verse-button-danger:hover {
+			border-color: rgba(185, 28, 28, 0.82);
+			background: rgba(127, 29, 29, 0.4);
+			color: rgb(254 202 202);
+		}
 
-	#mobile-nav {
-		position: fixed;
-		inset: 0;
-		z-index: 80;
-		display: none;
-		pointer-events: none;
-	}
+		/* Masthead */
+		.verse-masthead {
+			position: relative;
+			z-index: 30;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			padding: 0.7rem 1.5rem;
+			border-bottom: 1px solid rgb(38 38 38);
+			background: rgba(10, 10, 10, 0.82);
+			backdrop-filter: blur(10px);
+		}
 
-	.verse-mobile-nav-bar {
-		position: fixed;
-		top: 0;
-		right: 0;
-		left: 0;
-		padding: calc(env(safe-area-inset-top) + 0.65rem) 0.9rem 0;
-		pointer-events: none;
-	}
+		.verse-masthead-brand {
+			font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+			font-size: 1rem;
+			line-height: 1;
+			color: rgb(245 245 245);
+			text-decoration: none;
+			letter-spacing: 0.02em;
+		}
 
-	.verse-mobile-nav-bar-inner {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		max-width: 82rem;
-		margin: 0 auto;
-		pointer-events: auto;
-	}
+		.verse-masthead-nav {
+			display: flex;
+			align-items: center;
+			gap: 0.25rem;
+		}
 
-	.verse-mobile-current-surface {
-		font-family: Georgia, Cambria, "Times New Roman", Times, serif;
-		font-size: 1.05rem;
-		line-height: 1;
-		color: rgb(245 245 245);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
+		.verse-masthead-link {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-height: 2.25rem;
+			padding: 0.45rem 0.85rem;
+			border-radius: 0.5rem;
+			color: rgb(163 163 163);
+			font-size: 0.82rem;
+			letter-spacing: 0.04em;
+			text-decoration: none;
+			transition: background-color 150ms ease, color 150ms ease;
+		}
 
-	.verse-mobile-nav-toggle {
-		display: inline-flex;
-		flex-direction: column;
-		justify-content: center;
-		gap: 0.28rem;
-		width: 2.75rem;
-		height: 2.75rem;
-		padding: 0 0.75rem;
-		border: 1px solid rgba(64, 64, 64, 0.92);
-		border-radius: 0.875rem;
-		background: rgba(15, 15, 15, 0.82);
-		color: rgb(229 229 229);
-		box-shadow: inset 0 1px 0 rgba(115, 115, 115, 0.06);
-	}
+		.verse-masthead-link:hover {
+			background: rgba(38, 38, 38, 0.72);
+			color: rgb(245 245 245);
+		}
 
-	.verse-mobile-nav-toggle span {
-		display: block;
-		width: 100%;
-		height: 2px;
-		border-radius: 999px;
-		background: currentColor;
-	}
+		.verse-masthead-link[data-active="true"] {
+			background: rgba(76, 29, 149, 0.28);
+			color: rgb(229 229 229);
+		}
 
-	.verse-mobile-nav-sheet[hidden] {
-		display: none;
-	}
+		.verse-masthead-actions {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
 
-	.verse-mobile-nav-sheet {
-		position: fixed;
-		inset: 0;
-		pointer-events: auto;
-	}
+		.verse-masthead-actions .verse-signout-button {
+			min-height: 2.25rem;
+			padding: 0.45rem 0.85rem;
+			border-radius: 0.5rem;
+			font-size: 0.72rem;
+			letter-spacing: 0.16em;
+			text-transform: uppercase;
+		}
 
-	.verse-mobile-nav-backdrop {
-		position: absolute;
-		inset: 0;
-		background:
-			radial-gradient(circle at top, rgba(168, 85, 247, 0.08) 0%, rgba(10, 10, 10, 0) 30%),
-			rgba(10, 10, 10, 0.38);
-		backdrop-filter: blur(4px);
-	}
+		#mobile-nav {
+			position: fixed;
+			inset: 0;
+			z-index: 80;
+			display: none;
+			pointer-events: none;
+		}
 
-	.verse-mobile-nav-panel {
-		position: absolute;
-		top: calc(env(safe-area-inset-top) + 3.35rem);
-		right: 0.75rem;
-		width: min(19rem, calc(100vw - 1.5rem));
-		max-height: min(22rem, calc(100svh - env(safe-area-inset-top) - 4.5rem));
-		padding: 0.45rem;
-		border: 1px solid rgba(38, 38, 38, 0.92);
-		border-radius: 1rem;
-		background: linear-gradient(180deg, rgba(18, 18, 18, 0.96) 0%, rgba(10, 10, 10, 0.98) 100%);
-		box-shadow:
+		.verse-mobile-nav-bar {
+			position: fixed;
+			top: 0;
+			right: 0;
+			left: 0;
+			padding: calc(env(safe-area-inset-top) + 0.65rem) 0.9rem 0;
+			pointer-events: none;
+		}
+
+		.verse-mobile-nav-bar-inner {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			max-width: 82rem;
+			margin: 0 auto;
+			padding: 0.55rem 0.8rem;
+			border: 1px solid rgba(38, 38, 38, 0.92);
+			border-radius: 0.875rem;
+			background: rgba(15, 15, 15, 0.82);
+			box-shadow: inset 0 1px 0 rgba(115, 115, 115, 0.06);
+			backdrop-filter: blur(10px);
+			pointer-events: auto;
+		}
+
+		.verse-mobile-brand {
+			font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+			font-size: 1.05rem;
+			line-height: 1;
+			color: rgb(245 245 245);
+			text-decoration: none;
+		}
+
+		.verse-mobile-nav-toggle {
+			display: inline-flex;
+			flex-direction: column;
+			justify-content: center;
+			gap: 0.28rem;
+			width: 2.75rem;
+			height: 2.75rem;
+			padding: 0 0.75rem;
+			border: 1px solid rgba(64, 64, 64, 0.92);
+			border-radius: 0.875rem;
+			background: rgba(15, 15, 15, 0.82);
+			color: rgb(229 229 229);
+			box-shadow: inset 0 1px 0 rgba(115, 115, 115, 0.06);
+		}
+
+		.verse-mobile-nav-toggle span {
+			display: block;
+			width: 100%;
+			height: 2px;
+			border-radius: 999px;
+			background: currentColor;
+		}
+
+		.verse-mobile-nav-sheet[hidden] {
+			display: none;
+		}
+
+		.verse-mobile-nav-sheet {
+			position: fixed;
+			inset: 0;
+			pointer-events: auto;
+		}
+
+		.verse-mobile-nav-backdrop {
+			position: absolute;
+			inset: 0;
+			background:
+				radial-gradient(circle at top, rgba(168, 85, 247, 0.08) 0%, rgba(10, 10, 10, 0) 30%),
+				rgba(10, 10, 10, 0.38);
+			backdrop-filter: blur(4px);
+		}
+
+		.verse-mobile-nav-panel {
+			position: absolute;
+			top: calc(env(safe-area-inset-top) + 3.35rem);
+			right: 0.75rem;
+			width: min(19rem, calc(100vw - 1.5rem));
+			max-height: min(22rem, calc(100svh - env(safe-area-inset-top) - 4.5rem));
+			padding: 0.45rem;
+			border: 1px solid rgba(38, 38, 38, 0.92);
+			border-radius: 1rem;
+			background: linear-gradient(180deg, rgba(18, 18, 18, 0.96) 0%, rgba(10, 10, 10, 0.98) 100%);
+			box-shadow:
 			0 24px 70px rgba(0, 0, 0, 0.34),
 			inset 0 1px 0 rgba(115, 115, 115, 0.06);
-		overflow-y: auto;
-	}
+			overflow-y: auto;
+		}
 
-	.verse-mobile-nav-list {
-		display: grid;
-		gap: 0.35rem;
-	}
+		.verse-mobile-nav-list {
+			display: grid;
+			gap: 0.35rem;
+		}
 
-	.verse-mobile-nav-link {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		min-height: 2.85rem;
-		padding: 0.75rem 0.9rem;
-		border: 1px solid rgb(38 38 38);
-		border-radius: 0.9rem;
-		background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.28) 100%);
-		text-decoration: none;
-		transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease, color 150ms ease;
-	}
+		.verse-mobile-nav-link {
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+			min-height: 2.85rem;
+			padding: 0.75rem 0.9rem;
+			border: 1px solid rgb(38 38 38);
+			border-radius: 0.9rem;
+			background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.28) 100%);
+			text-decoration: none;
+			transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease, color 150ms ease;
+		}
 
-	.verse-mobile-nav-link:hover {
-		border-color: rgb(82 82 82);
-		background: linear-gradient(180deg, rgba(31, 31, 31, 0.88) 0%, rgba(10, 10, 10, 0.4) 100%);
-	}
+		.verse-mobile-nav-link:hover {
+			border-color: rgb(82 82 82);
+			background: linear-gradient(180deg, rgba(31, 31, 31, 0.88) 0%, rgba(10, 10, 10, 0.4) 100%);
+		}
 
-	.verse-mobile-nav-link[data-active="true"] {
-		border-color: rgba(168, 85, 247, 0.52);
-		background: linear-gradient(180deg, rgba(76, 29, 149, 0.3) 0%, rgba(10, 10, 10, 0.42) 100%);
-		box-shadow: inset 0 1px 0 rgba(216, 180, 254, 0.08);
-	}
+		.verse-mobile-nav-link[data-active="true"] {
+			border-color: rgba(168, 85, 247, 0.52);
+			background: linear-gradient(180deg, rgba(76, 29, 149, 0.3) 0%, rgba(10, 10, 10, 0.42) 100%);
+			box-shadow: inset 0 1px 0 rgba(216, 180, 254, 0.08);
+		}
 
-	.verse-mobile-nav-link-copy {
-		display: flex;
-		align-items: center;
-		min-width: 0;
-	}
+		.verse-mobile-nav-link-copy {
+			display: flex;
+			align-items: center;
+			min-width: 0;
+		}
 
 		.verse-mobile-nav-link-copy strong {
 			font-size: 0.98rem;
@@ -376,48 +450,11 @@ templ Layout(surface string, content templ.Component) {
 			box-shadow: 0 0 0 2px rgb(212 212 212);
 		}
 
-		/* The only control in this application that is not navigation, kept out of the directional
-		   rail on purpose. Every rail button means "go to another surface", and an irreversible action
-		   sitting among them would be a claim the layout cannot make. Hidden by default because below
-		   1024px the mobile sheet's copy is the reachable one, and two controls for one irreversible
-		   action on one screen invites a misclick. */
-		#nav-signout {
-			display: none;
-		}
-
-		@media (min-width: 1024px) {
-			#nav-signout {
-				display: flex;
-				justify-content: center;
-				padding: 0 0.5rem;
-			}
-
-			#nav-signout .verse-signout-button {
-				width: auto;
-				min-height: 2.4rem;
-				padding: 0.5rem 1rem;
-				font-size: 0.7rem;
-				letter-spacing: 0.24em;
-				text-transform: uppercase;
-				border-radius: 9999px;
-			}
-		}
-
-		.verse-desktop-nav-button {
-			width: min(100%, 7rem);
-			min-height: 4.25rem;
-			justify-content: center;
-			padding: 0.8rem 0.9rem;
-			line-height: 1.2;
-			white-space: normal;
-		}
-
-		#nav-top, #nav-left, #nav-right, #nav-bottom {
-			z-index: 40;
-			display: none;
-	}
-
 		@media (max-width: 1023px) {
+			.verse-masthead {
+				display: none;
+			}
+
 			#mobile-nav {
 				display: block;
 			}
@@ -487,87 +524,29 @@ templ Layout(surface string, content templ.Component) {
 
 		@media (min-width: 1024px) {
 			.verse-app-shell {
-				--verse-desktop-nav-rail-inline: clamp(7.75rem, 11vw, 8.75rem);
-				--verse-desktop-nav-rail-block: clamp(5rem, 9vh, 6.25rem);
 				--verse-surface-top-space: clamp(2.5rem, 5vh, 4rem);
-				display: grid;
-				grid-template-columns:
-					var(--verse-desktop-nav-rail-inline)
-					minmax(0, 1fr)
-					var(--verse-desktop-nav-rail-inline);
-				grid-template-rows:
-					var(--verse-desktop-nav-rail-block)
-					minmax(0, 1fr)
-					var(--verse-desktop-nav-rail-block);
-				grid-template-areas:
-					". nav-top ."
-					"nav-left screen nav-right"
-					". nav-bottom .";
-				align-items: stretch;
-				justify-items: stretch;
 			}
 
 			#screen {
-				grid-area: screen;
 				overflow: hidden;
 				padding: 0 1.5rem;
-			}
-
-			#nav-top,
-			#nav-left,
-			#nav-right,
-			#nav-bottom {
-				display: flex;
-				position: relative;
-				min-width: 0;
-				min-height: 0;
-				z-index: 2;
-			}
-
-			#nav-top {
-				grid-area: nav-top;
-				align-items: flex-start;
-				justify-content: center;
-				padding-top: 0.75rem;
-			}
-
-			#nav-left {
-				grid-area: nav-left;
-				align-items: center;
-				justify-content: center;
-				padding-right: 0.65rem;
-			}
-
-			#nav-right {
-				grid-area: nav-right;
-				align-items: center;
-				justify-content: center;
-				padding-left: 0.65rem;
-			}
-
-			#nav-bottom {
-				grid-area: nav-bottom;
-				align-items: flex-end;
-				justify-content: center;
-				padding-bottom: 0.75rem;
 			}
 		}
 
 		@media (min-width: 1280px) {
 			.verse-app-shell {
-				--verse-desktop-nav-rail-inline: clamp(8rem, 10vw, 9.25rem);
 				--verse-surface-top-space: clamp(2.75rem, 5vh, 4.25rem);
 			}
 
 			#screen {
 				padding-right: 2.25rem;
 				padding-left: 2.25rem;
+			}
 		}
-	}
-</style>
+	</style>
 		</head>
 		<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">
-			<div id="viewport" class="verse-app-shell h-screen overflow-hidden flex items-start justify-center">
+			<div id="viewport" class="verse-app-shell h-screen overflow-hidden">
 				@Nav(surface)
 				@If(surface == "library") {
 					<div id="screen" class="verse-screen-frame verse-screen-frame--wide transition-all duration-300 ease-out">
