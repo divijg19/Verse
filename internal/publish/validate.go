@@ -19,6 +19,7 @@ import (
 var requiredOutputs = []string{
 	"index.html",
 	"archive/index.html",
+	"share/index.html",
 	"404.html",
 	"search.json",
 	"sitemap.xml",

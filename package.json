@@ -5,15 +5,15 @@
   "scripts": {
     "format": "bun fmt",
     "format:check": "bun fmt --check",
-    "fmt:go": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 fmt --diff",
-    "templ": "go run \"github.com/a-h/templ/cmd/templ@$(go list -m -f '{{.Version}}' github.com/a-h/templ)\" generate",
+    "fmt:go": "golangci-lint fmt --diff",
+    "templ": "templ generate",
     "vet": "go vet ./...",
     "build": "go build ./...",
-    "lint": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...",
-    "staticcheck": "go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./cmd/... ./internal/... ./templ/... ./tests/...",
-    "vuln": "go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
+    "lint": "golangci-lint run ./...",
+    "staticcheck": "staticcheck ./cmd/... ./internal/... ./templ/... ./tests/...",
+    "vuln": "govulncheck ./...",
     "test": "go test ./... -count=1 -race",
-    "check": "bun run format:check && bun run fmt:go && bun run vet && bun run lint && bun run staticcheck && bun run vuln && bun run test"
+    "check": "bun format:check && bun fmt:go && bun vet && bun lint && bun staticcheck && bun vuln && bun run test"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.3.4"

@@ -1,21 +1,63 @@
 package templ
 
 templ Nav(surface string) {
+	@masthead(surface, false)
 	@mobileNav(surface, false)
-	@navSlot("nav-top", surface, "up", false)
-	@navSlot("nav-left", surface, "left", false)
-	@navSlot("nav-right", surface, "right", false)
-	@navSlot("nav-bottom", surface, "down", false)
-	@desktopSignOut()
 }
 
 templ NavOOB(surface string) {
+	@masthead(surface, true)
 	@mobileNav(surface, true)
-	@navSlot("nav-top", surface, "up", true)
-	@navSlot("nav-left", surface, "left", true)
-	@navSlot("nav-right", surface, "right", true)
-	@navSlot("nav-bottom", surface, "down", true)
-	@desktopSignOut()
+}
+
+templ masthead(surface string, oob bool) {
+	@If(oob) {
+		<header id="masthead" class="verse-masthead" hx-swap-oob="outerHTML">
+			@mastheadContent(surface)
+		</header>
+	}
+	@If(!oob) {
+		<header id="masthead" class="verse-masthead">
+			@mastheadContent(surface)
+		</header>
+	}
+}
+
+templ mastheadContent(surface string) {
+	<a
+		href="/dashboard"
+		hx-get="/dashboard"
+		hx-target="#screen"
+		hx-swap="innerHTML"
+		class="verse-masthead-brand"
+	>
+		Verse
+	</a>
+	<nav class="verse-masthead-nav" aria-label="Primary">
+		@mastheadLink(surface, "/dashboard", "Dashboard")
+		@mastheadLink(surface, "/editor", "Editor")
+		@mastheadLink(surface, "/library", "Library")
+		@mastheadLink(surface, "/caelum", "Caelum")
+		@mastheadLink(surface, "/share", "Share")
+	</nav>
+	<div class="verse-masthead-actions">
+		@signOut()
+	</div>
+}
+
+templ mastheadLink(surface string, path string, label string) {
+	<a
+		href={ path }
+		hx-get={ path }
+		hx-target="#screen"
+		hx-swap="innerHTML"
+		class="verse-masthead-link"
+		data-masthead-link
+		data-active={ navActiveValue(surface, path) }
+		aria-label={ "Navigate to " + label }
+	>
+		{ label }
+	</a>
 }
 
 templ mobileNav(surface string, oob bool) {
@@ -34,7 +76,15 @@ templ mobileNav(surface string, oob bool) {
 templ mobileNavContent(surface string) {
 	<div class="verse-mobile-nav-bar">
 		<div class="verse-mobile-nav-bar-inner">
-			<span class="verse-mobile-current-surface">{ navSurfaceLabel(surface) }</span>
+			<a
+				href="/dashboard"
+				hx-get="/dashboard"
+				hx-target="#screen"
+				hx-swap="innerHTML"
+				class="verse-mobile-brand"
+			>
+				Verse
+			</a>
 			<button
 				type="button"
 				data-mobile-nav-toggle
@@ -84,13 +134,6 @@ templ signOut() {
 	</form>
 }
 
-// desktopSignOut is the copy in the navigation rail, shown from 1024px up.
-templ desktopSignOut() {
-	<div id="nav-signout">
-		@signOut()
-	</div>
-}
-
 templ mobileNavLink(surface string, path string, label string) {
 	<a
 		href={ path }
@@ -105,65 +148,6 @@ templ mobileNavLink(surface string, path string, label string) {
 		<div class="verse-mobile-nav-link-copy">
 			<strong>{ label }</strong>
 		</div>
-	</a>
-}
-
-templ navSlot(id string, surface string, direction string, oob bool) {
-	@If(oob) {
-		<div id={ id } hx-swap-oob="outerHTML">
-			@navButtonFor(surface, direction)
-		</div>
-	}
-	@If(!oob) {
-		<div id={ id }>
-			@navButtonFor(surface, direction)
-		</div>
-	}
-}
-
-templ navButtonFor(surface string, direction string) {
-	@If(direction == "left" && surface == "editor") {
-		@navButton("/dashboard", "Dashboard", "◀")
-	}
-	@If(direction == "left" && surface == "library") {
-		@navButton("/editor", "Editor", "◀")
-	}
-	@If(direction == "left" && (surface == "caelum" || surface == "share")) {
-		@navButton("/dashboard", "Dashboard", "◀")
-	}
-	@If(direction == "right" && surface == "dashboard") {
-		@navButton("/editor", "Editor", "▶")
-	}
-	@If(direction == "right" && (surface == "editor" || surface == "caelum" || surface == "share")) {
-		@navButton("/library", "Library", "▶")
-	}
-	@If(direction == "up" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
-		@navButton("/caelum", "Caelum", "▲")
-	}
-	@If(direction == "up" && surface == "share") {
-		@navButton("/editor", "Editor", "▲")
-	}
-	@If(direction == "down" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
-		@navButton("/share", "Share", "▼")
-	}
-	@If(direction == "down" && surface == "caelum") {
-		@navButton("/editor", "Editor", "▼")
-	}
-}
-
-templ navButton(path string, label string, icon string) {
-	<a
-		href={ path }
-		hx-get={ path }
-		hx-target="#screen"
-		hx-swap="innerHTML"
-		role="button"
-		aria-label={ "Navigate to " + label }
-		title={ label }
-		class="verse-desktop-nav-button inline-flex flex-col items-center gap-1 rounded-full border border-neutral-800 bg-neutral-950/90 px-4 py-3 text-center text-[0.7rem] uppercase tracking-[0.28em] text-neutral-100 shadow-lg shadow-black/20 transition hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-400"
-	>
-		<span aria-hidden="true" class="text-base leading-none">{ icon }</span>
-		<span>{ label }</span>
 	</a>
 }
 

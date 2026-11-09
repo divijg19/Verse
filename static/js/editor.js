@@ -43,7 +43,7 @@ function verseOpenEditorOverlay(node) {
   const overlayTextarea = root.querySelector("[data-editor-overlay-textarea]");
   if (!overlay || !base || !overlayTextarea) return;
   overlayTextarea.value = base.value;
-  overlay.hidden = false;
+  overlay.showModal();
   verseSetEditorOverlayState(true);
   if (window.verseLockBodyScroll) {
     window.verseLockBodyScroll();
@@ -57,18 +57,8 @@ function verseCloseEditorOverlay(node) {
   const root = verseEditorRoot(node);
   if (!root) return;
   const overlay = root.querySelector("[data-editor-overlay]");
-  const base = root.querySelector("[data-editor-base]");
-  const overlayTextarea = root.querySelector("[data-editor-overlay-textarea]");
-  if (!overlay || !base || !overlayTextarea) return;
-  base.value = overlayTextarea.value;
-  overlay.hidden = true;
-  verseSetEditorOverlayState(false);
-  if (window.verseUnlockBodyScroll) {
-    window.verseUnlockBodyScroll();
-  } else {
-    document.body.style.overflow = "";
-  }
-  requestAnimationFrame(() => base.focus());
+  if (!overlay) return;
+  overlay.close();
 }
 
 function verseSyncEditorOverlay(node) {
@@ -117,19 +107,35 @@ document.addEventListener("input", (event) => {
   }
 });
 
-if (!window.verseEditorEscapeBound) {
-  window.verseEditorEscapeBound = true;
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== "Escape") return;
-    const overlay = document.querySelector(
-      "[data-editor-overlay]:not([hidden])",
+// The overlay is a native dialog, so Escape and the backdrop both close it. The close
+// event is the single place that copies the overlay text back to the base textarea,
+// clears the viewport state, and restores focus.
+const editorOverlay = document.querySelector("[data-editor-overlay]");
+if (editorOverlay) {
+  editorOverlay.addEventListener("close", () => {
+    const root = editorOverlay.closest("[data-editor-root]");
+    const base = root ? root.querySelector("[data-editor-base]") : null;
+    const overlayTextarea = editorOverlay.querySelector(
+      "[data-editor-overlay-textarea]",
     );
-    if (!overlay) return;
-    const closeButton = overlay.querySelector(
-      "[aria-label='Close full screen editor']",
-    );
-    if (closeButton) {
-      verseCloseEditorOverlay(closeButton);
+    if (base && overlayTextarea) {
+      base.value = overlayTextarea.value;
+    }
+    verseSetEditorOverlayState(false);
+    if (window.verseUnlockBodyScroll) {
+      window.verseUnlockBodyScroll();
+    } else {
+      document.body.style.overflow = "";
+    }
+    if (base) {
+      requestAnimationFrame(() => base.focus());
+    }
+  });
+
+  editorOverlay.addEventListener("click", (event) => {
+    const card = editorOverlay.querySelector(".verse-editor-overlay-card");
+    if (card && !card.contains(event.target)) {
+      verseCloseEditorOverlay(editorOverlay);
     }
   });
 }

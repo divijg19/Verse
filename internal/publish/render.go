@@ -54,6 +54,9 @@ func Render(works []publictempl.PublicWork, opts Options) (map[string][]byte, er
 	if err := add("archive/index.html", publictempl.PublicArchive(site)); err != nil {
 		return nil, err
 	}
+	if err := add("share/index.html", publictempl.PublicShare(site)); err != nil {
+		return nil, err
+	}
 	if err := add("404.html", publictempl.PublicNotFound(site)); err != nil {
 		return nil, err
 	}
