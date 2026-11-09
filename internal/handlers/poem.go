@@ -133,7 +133,7 @@ func SavePoemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeHTML(w, []byte(`<span class="text-purple-400 italic">Bloom recorded.</span>`))
+	writeHTML(w, []byte(`<span class="text-purple-400 italic">Saved.</span>`))
 }
 
 // UpdatePoemHandler updates an existing work's content.
@@ -154,7 +154,7 @@ func UpdatePoemHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeHTML(w, []byte(`<span class="text-purple-400 italic">Bloom updated.</span>`))
+	writeHTML(w, []byte(`<span class="text-purple-400 italic">Updated.</span>`))
 }
 
 // DeletePoemHandler performs a soft-delete of a work.

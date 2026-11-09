@@ -21,7 +21,7 @@ func TestIntegrationPoemFlow(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("POST /poem status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Bloom recorded") {
+	if !strings.Contains(body, "Saved") {
 		t.Fatalf("POST /poem missing success text: %q", body)
 	}
 
@@ -46,7 +46,7 @@ func TestIntegrationPoemFlow(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("POST /poem/update status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Bloom updated") {
+	if !strings.Contains(body, "Updated") {
 		t.Fatalf("POST /poem/update missing success text: %q", body)
 	}
 

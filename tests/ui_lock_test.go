@@ -67,19 +67,19 @@ func TestEditorDefaultViewUsesFixedPanelAndPinnedActions(t *testing.T) {
 		`font-size: 1rem;`,
 		`.verse-editor-fullscreen-button {`,
 		`class="verse-surface-heading verse-mobile-screen-title"`,
-		`<span class="verse-editor-submit-text">Save Bloom</span>`,
+		`<span class="verse-editor-submit-text">Save</span>`,
 		`<span class="verse-editor-saving">Saving</span>`,
 		`@media (max-width: 1023px) {`,
 		`<span>Full screen</span>`,
 	)
 
-	saveIndex := strings.Index(body, `<span class="verse-editor-submit-text">Save Bloom</span>`)
+	saveIndex := strings.Index(body, `<span class="verse-editor-submit-text">Save</span>`)
 	fullscreenIndex := strings.Index(body, `<span>Full screen</span>`)
 	if saveIndex == -1 || fullscreenIndex == -1 {
 		t.Fatalf("editor actions missing expected buttons: %q", body)
 	}
 	if saveIndex > fullscreenIndex {
-		t.Fatalf("editor action order changed, want Save Bloom before Full screen: %q", body)
+		t.Fatalf("editor action order changed, want Save before Full screen: %q", body)
 	}
 }
 

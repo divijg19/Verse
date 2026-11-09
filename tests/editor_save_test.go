@@ -21,7 +21,7 @@ func TestEditorSaveCreatesPoem(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("POST /poem status = %d, want 200", status)
 	}
-	if !strings.Contains(body, "Bloom recorded") {
+	if !strings.Contains(body, "Saved") {
 		t.Fatalf("POST /poem body missing success text: %q", body)
 	}
 

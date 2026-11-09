@@ -271,7 +271,7 @@ func TestANewWorkCanBeSavedFromTheRenderedForm(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("saving a new work returned %d, want 200. body: %s", resp.StatusCode, truncate([]byte(body)))
 	}
-	if !strings.Contains(body, "Bloom recorded") {
+	if !strings.Contains(body, "Saved") {
 		t.Fatalf("the save was not acknowledged; body: %s", truncate([]byte(body)))
 	}
 
