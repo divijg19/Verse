@@ -1,27 +1,16 @@
 # `Verse`
 
-> A daily poetic ritual engine.
+> A private daily writing practice.
 > Write. Reflect. Return.
 
 ---
 
-`Verse` is a private, daily web application built for disciplined poetic practice.
-
-It is not:
-
-- A social writing platform
-- A publishing tool
-- A productivity dashboard
-
-It is:
-
-> A personal cognitive ritual system for daily poetry.
-
-Minimal. Focused. Intentional.
+`Verse` is a private, daily web application built for disciplined poetic practice: a personal
+writing ritual, not a social platform, publishing tool, or productivity dashboard.
 
 ---
 
-## 🧭 Core Philosophy
+## Core Philosophy
 
 `Verse` is designed around three principles:
 
@@ -29,13 +18,11 @@ Minimal. Focused. Intentional.
 2. Reflection follows.
 3. Analysis is optional.
 
-No clutter.
-No noise.
-No algorithmic interference.
+The interface stays out of the way: no feeds, no recommendations, no algorithmic interference.
 
 ---
 
-## ✨ Features
+## Features
 
 - Daily poem editor
 - Version history — every superseded draft is retained, and a restore is itself undoable
@@ -44,14 +31,11 @@ No algorithmic interference.
 - Streak tracking, counted in UTC days
 - Monthly activity heatmap
 - `Caelum` (random prompt engine)
-- Private-first architecture
-
-There is **no mood tagging**. It was listed here from the first commit and never built; there has
-never been a `mood` column.
+- Single-author, passphrase-protected access
 
 ---
 
-## 🌌 `Caelum`
+## `Caelum`
 
 `Caelum` is the inspiration surface within `Verse`.
 
@@ -60,16 +44,11 @@ prompts, held as a static list in `internal/services/prompts.go` and served as a
 by `handlers.PromptHandler`. There is no generation, no model, and no network call — the whole
 feature is ten strings and `math/rand/v2`.
 
-This section previously claimed "constraint-based writing seeds" and "emotional triggers". Neither
-has ever existed. It also promised AI-assisted generation, which would have needed a credential in
-an application whose design is that it holds no third-party secret. Both claims are removed rather
-than turned into roadmap, because the honest description of the feature is short.
-
 ---
 
-# 🏗 Architecture Overview
+# Architecture Overview
 
-`Verse` intentionally minimizes JavaScript-heavy frameworks.
+`Verse` uses server-rendered HTML with minimal JavaScript.
 
 Primary stack:
 
@@ -81,7 +60,7 @@ Primary stack:
 
 ---
 
-# 🧱 Tech Stack (Detailed)
+# Tech Stack (Detailed)
 
 ## Backend
 
@@ -95,9 +74,9 @@ Primary stack:
 
 Why Go:
 
-- Performance
-- Explicitness
-- Long-term architectural alignment
+- Single-binary deployment
+- Explicit error handling
+- A strong standard library
 
 ---
 
@@ -118,7 +97,7 @@ Used for:
 
 HTMX handles:
 
-- Save a poem without a full page reload
+- Update a work without a full page reload
 - Swap a surface without a full page reload
 - Replace the heatmap for a chosen month
 - Retain and restore a superseded revision
@@ -133,7 +112,7 @@ Declarative interactivity.
 Used via:
 
 - Standalone CLI
-- Integrated into Go build pipeline
+- Bun scripts and the container build
 
 Provides:
 
@@ -143,14 +122,16 @@ Provides:
 
 ---
 
-# 📁 Project Structure
+# Project Structure
 
 ```
 verse/
 |
 ├── cmd/
 |   ├── server/        the application, and the migration run at its boot
-|   └── migrate/       the standalone migration runner, same migrations
+|   ├── migrate/       the standalone migration runner, same migrations
+|   ├── publish/       the static public-site builder
+|   └── verse-export/  the standalone export command
 |
 ├── internal/
 |   ├── server/        routes, security headers, sessions, CSRF
@@ -161,6 +142,8 @@ verse/
 |   ├── models/        domain types
 |   ├── presenters/    content flattening and truncation for rendering
 |   ├── export/        the export writers, JSON and Markdown
+|   ├── publish/       the public site renderer, validator, and atomic writer
+|   ├── htmx/          the one HTMX-request predicate
 |   ├── clock/         the injectable clock
 |   └── testsupport/   disposable-DSN gate and scratch schemas
 |
@@ -168,13 +151,15 @@ verse/
 |   ├── layout.templ   shell, navigation, and the CSP-relevant script tags
 |   ├── editor.templ   the editor and its Focus Mode
 |   ├── heatmap.templ  the month grid
+|   ├── public.templ   the static public site: index, archive, work pages, and 404
 |   └── security.go    the CSRF field the mutating routes require
 |
 ├── static/
 |   ├── css/input.css  Tailwind entry point, with its @source directives
 |   └── js/            navigation.js, editor.js, and vendored htmx
 |
-├── migrations/        001 through 006, embedded into both the server and cmd/migrate
+├── migrations/        001 through 007, embedded by the migrations package and used by the
+|                     server, cmd/migrate, and cmd/publish
 |
 ├── db/                role bootstrap: the least-privilege grants, applied once by an operator
 |                     and deliberately not a migration, because it needs a credential the
@@ -186,20 +171,16 @@ verse/
 └── README.md
 ```
 
-The tree above said `internal/services` held "the SQL. All of it." That was never true. Four other
-packages issue queries, each putting the SQL next to the thing that owns it: `internal/server/ratelimit.go`
-(the `login_attempts` limiter is middleware), `internal/export` (the dump _is_ the product),
-`internal/migrate` (the runner queries its own bookkeeping), and `internal/database` (one `to_regclass`
-assertion at boot). The claim that holds is that **`internal/services` holds all the application-domain
-SQL** — poems, versions, and the dashboard aggregates — which is the boundary that matters.
+`internal/services` holds all the application-domain SQL — poems, versions, and the dashboard
+aggregates. The rate limiter, export writers, migration bookkeeping, and the boot-time
+`to_regclass` assertion keep their queries next to the code that owns them.
 
 ---
 
-# 🗄 Database Schema
+# Database Schema
 
 There is no `users` table, no registration, and no multi-tenancy. Authentication is a single
-passphrase compared against a configured value; the poems belong to whoever holds it. This section
-used to describe a `users` table and a `poems.mood` enum, none of which have ever existed.
+passphrase compared against a configured value; the poems belong to whoever holds it.
 
 The block below is checked against the live schema by `TestReadmeSchemaMatchesTheDatabase`, so it
 cannot drift again silently. Types are documented by alias (`timestamptz` for
@@ -241,7 +222,7 @@ table schema_migrations {
 
 <!-- documented-schema:end -->
 
-Two notes worth reading rather than skimming:
+Notes:
 
 **Every timestamp in the schema is `timestamptz` except one.** `schema_migrations.applied_at` is the
 exception, and it is left as `timestamp` on purpose: nothing reads it — the runner selects only
@@ -263,24 +244,19 @@ redundant — the clause states the intent for whoever reads the query, the pin 
 written without it.
 
 **`poems.published_at` is how a work becomes public, and it is `NULL` on every existing row.**
-`007_published_at.sql` added it for the author/viewer split, and it has no `DEFAULT` — deliberately, and
-this is the one place in the schema where the absence of a default is load-bearing rather than
-incidental. `ADD COLUMN ... NULL` with no default backfills every existing row to `NULL` without a
-rewrite; a `DEFAULT now()` would publish the whole library on the next deploy, and would publish every
-future insert that omitted the column. Publication is an explicit act by the author, so the column stays
-`NULL` until they perform it, and the migration publishes nothing.
+`007_published_at.sql` added it for the author/viewer split. It has no `DEFAULT`, so the migration
+backfills existing rows to `NULL` without a rewrite and publishes nothing. Publication is an explicit
+act by the author, and no application path writes the column yet.
 
-It follows `deleted_at` rather than introducing a `status` enum, because twelve query sites already read
-`deleted_at IS NULL` and a second idiom for the same kind of fact is a second thing to get wrong. The
-publisher's filter is `published_at IS NOT NULL AND deleted_at IS NULL` — both halves load-bearing,
-since a work can be published and then deleted — and it lives in exactly one place,
+It follows `deleted_at` rather than introducing a `status` enum, because twelve query sites already
+read `deleted_at IS NULL` and a second idiom for the same kind of fact is a second thing to get wrong.
+The publisher's filter is `published_at IS NOT NULL AND deleted_at IS NULL` — both halves
+load-bearing, since a work can be published and then deleted — and it lives in exactly one place,
 `models.PublishedFilter`.
 
 **The authoring app is unaffected by it.** Every read in the author's library filters `deleted_at IS
-NULL` only, so a draft is a row the author sees, opens, and can search for exactly as before, and no
-status badge or filter was needed anywhere in the interface. Nothing in the repository writes to
-`published_at` yet, and no public site exists; the dry-run that reports what publishing _would_ expose
-is the only consumer. See `internal/publish` and D4 in the project's decision record.
+NULL` only, so a draft is a row the author sees, opens, and can search for exactly as before. The
+public site is built by `cmd/publish` from the published set; see `internal/publish`.
 
 **`poem_versions` has no pruning.** Nothing updates or deletes a row, and there is no purge path.
 Restoring a revision is an ordinary edit, which records what it replaced, so the history is
@@ -288,7 +264,7 @@ append-only and a restore can itself be undone.
 
 ---
 
-# 🔁 Streak Logic
+# Streak Logic
 
 Computed dynamically.
 
@@ -303,7 +279,7 @@ No cached streak field.
 
 ---
 
-# 🎨 Design Direction
+# Design Direction
 
 Default:
 
@@ -318,7 +294,7 @@ Focus:
 
 ---
 
-# 🚀 Running Locally
+# Running Locally
 
 ```bash
 # 1. Start a database
@@ -333,9 +309,9 @@ export DATABASE_URL="postgres://verse:verse@localhost:5432/verse?sslmode=disable
 export VERSE_AUTHORIZATION="choose-a-passphrase"
 export VERSE_AUTH_SECRET="at-least-32-characters-of-entropy"
 
-  # 4. Apply the migrations — optional; cmd/server runs the same runner at boot.
-  #    Use this step to migrate without starting the service (deploy scripts, CI).
-  go run ./cmd/migrate
+# 4. Apply the migrations — optional; cmd/server runs the same runner at boot.
+#    Use this step to migrate without starting the service (deploy scripts, CI).
+go run ./cmd/migrate
 
 # 5. Run
 go run ./cmd/server
@@ -349,7 +325,7 @@ them, by design. There is no way to disable authentication.
 **Verse does not read a `.env` file.** Every variable must be exported into the process
 environment. Tailwind watch mode:
 
-```bash id="t3w67k"
+```bash
 bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch
 ```
 
@@ -358,41 +334,21 @@ troubleshooting — is in [`RUNNING.md`](RUNNING.md).
 
 ---
 
-# 🔮 Future Roadmap
-
-v1.0.0+:
-
-- AI sentiment analysis
-- Theme detection
-- Writing evolution tracking
-
-v2.0.0+:
+# Future Roadmap
 
 - Local-first mode
 - Offline support
 - Desktop wrapper (Tauri)
 
-Long-term:
+---
 
-`Verse` integrates into a broader cognition ecosystem.
+# Why `Verse` Exists
+
+`Verse` exists to make daily writing a habit: to create, reflect, and keep a record over time.
+It is optimized for depth, not virality.
 
 ---
 
-# 🧠 Why `Verse` Exists
-
-`Verse` exists to:
-
-- Encourage disciplined creation
-- Externalize emotion
-- Track personal growth
-- Preserve authenticity
-
-It is not optimized for virality.
-
-It is optimized for depth.
-
----
-
-# 📜 License
+# License
 
 Private project.

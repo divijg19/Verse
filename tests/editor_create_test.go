@@ -259,6 +259,14 @@ func TestANewWorkCanBeSavedFromTheRenderedForm(t *testing.T) {
 	}
 	submitted.Set("content", "a work written through the rendered form")
 
+	// The rendered form is submitted without an HX-Request header here, so the handler answers with
+	// the browser redirect. Do not follow it: the assertion is that create hands off to the edit
+	// surface, not that some later page happens to answer 200.
+	authClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	defer func() { authClient.CheckRedirect = nil }()
+
 	resp := doPostForm(t, authClient, srv.URL+forms[0].hxPost, submitted)
 	body := readBody(t, resp)
 	defer resp.Body.Close()
@@ -268,15 +276,14 @@ func TestANewWorkCanBeSavedFromTheRenderedForm(t *testing.T) {
 			"something the route requires, and htmx does not swap a non-2xx response, so this would "+
 			"look to the author like nothing happening at all", body)
 	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("saving a new work returned %d, want 200. body: %s", resp.StatusCode, truncate([]byte(body)))
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("saving a new work returned %d, want 303. body: %s", resp.StatusCode, truncate([]byte(body)))
 	}
-	if !strings.Contains(body, "Saved") {
-		t.Fatalf("the save was not acknowledged; body: %s", truncate([]byte(body)))
+	if location := resp.Header.Get("Location"); !strings.HasPrefix(location, "/editor/") {
+		t.Fatalf("saving a new work redirected to %q, want /editor/{id}", location)
 	}
 
-	// The handler returns a 200 and a cheerful message whether or not a row exists, so the assertion
-	// that matters is the row.
+	// A redirect is not proof the row exists, so the assertion that matters is still the row.
 	var count int
 	if err := database.Pool.QueryRow(t.Context(),
 		`SELECT count(*) FROM poems WHERE content = $1`, "a work written through the rendered form").Scan(&count); err != nil {
