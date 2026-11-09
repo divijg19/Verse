@@ -21,14 +21,18 @@ function verseEditorViewport() {
   return document.getElementById("viewport");
 }
 
+// The viewport flag is deliberately not data-editor-overlay-open. That name belongs to the Full
+// screen button, and the delegated click handler looks for it with closest(). The viewport is an
+// ancestor of the overlay, so reusing the name made every click inside an open overlay match the
+// viewport first, call the open path, and return before the Close button or backdrop could run.
 function verseSetEditorOverlayState(open) {
   const viewport = verseEditorViewport();
   if (!viewport) return;
   if (open) {
-    viewport.dataset.editorOverlayOpen = "true";
+    viewport.dataset.editorOverlayActive = "true";
     return;
   }
-  delete viewport.dataset.editorOverlayOpen;
+  delete viewport.dataset.editorOverlayActive;
 }
 
 function verseOpenEditorOverlay(node) {

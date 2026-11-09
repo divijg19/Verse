@@ -17,12 +17,13 @@ requires a passphrase to enter. It is not a blog, a social network, or a reader-
 
 ## Requirements
 
-| Tool       | Version         | Notes                                                                                                                   |
-| ---------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Go         | 1.27.0 or newer | Declared in `go.mod`                                                                                                    |
-| templ CLI  | v0.3.1100       | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file |
-| Bun        | `latest`        | Stylesheet build. CI, the `Dockerfile`, and Render all name the same policy; CI asserts they agree                      |
-| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses                                                                              |
+| Tool       | Version         | Notes                                                                                                                              |
+| ---------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Go         | 1.27.0 or newer | Declared in `go.mod`                                                                                                               |
+| templ CLI  | v0.3.1100       | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file            |
+| Bun        | `latest`        | Stylesheet build. CI, the `Dockerfile`, Render, and Workers Builds all name the same policy; CI asserts the repository paths agree |
+| Node       | 24              | Workers Builds only, pinned by `.node-version`. Not needed for local development                                                   |
+| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses                                                                                         |
 
 ---
 
@@ -630,23 +631,35 @@ path, a title, a date, and a bounded excerpt; full body text is not published tw
 Until the domain decision (D7) lands, `robots.txt` disallows every crawler and every page carries
 `<meta name="robots" content="noindex">`. Deploy on a platform subdomain, not a custom domain.
 
-A manual Cloudflare Workers Static Assets deploy needs only a minimal Wrangler configuration:
+The public site deploys to Cloudflare Workers Static Assets as the Worker `verse`. `wrangler.jsonc`
+is committed, so Workers Builds never runs Wrangler's interactive setup. The committed `name` must
+stay identical to the Worker name in the Cloudflare dashboard.
 
-```jsonc
-{
-  "name": "verse-public",
-  "compatibility_date": "2026-11-08",
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "404-page",
-  },
-}
-```
+Workers Builds settings:
 
-Then:
+| Setting         | Value                                                                                |
+| --------------- | ------------------------------------------------------------------------------------ |
+| Build command   | `go run ./cmd/publish -out dist -base-url https://verse.divijganjoo2003.workers.dev` |
+| Deploy command  | `bunx wrangler deploy`                                                               |
+| Preview command | `bunx wrangler preview`                                                              |
+| Build variable  | `DATABASE_URL` — encrypted variable; never written into either command               |
+| Build variable  | `BUN_VERSION=latest`                                                                 |
+| Node version    | `24`, from the committed `.node-version`                                             |
+
+The build reads the published set over the read-only serving credential. `DATABASE_URL` must come
+from an encrypted variable only: the command is echoed into the build log, and a serving password
+was exposed that way once before. If a credential has appeared in a build log, rotate it; removing
+it from the command does not un-expose it.
+
+Preview builds must use the Preview command (`bunx wrangler preview`), not the deploy command.
+Previews run against a branch-specific internal script, so `wrangler deploy` reports a misleading
+name mismatch against production.
+
+A manual deploy uses the same committed configuration:
 
 ```bash
-bunx wrangler@latest deploy
+DATABASE_URL="..." go run ./cmd/publish -out dist -base-url https://verse.divijganjoo2003.workers.dev
+bunx wrangler deploy
 ```
 
 Keep the previous `dist/` (or the previous deployment) until the new one has been checked. Rolling
@@ -660,23 +673,25 @@ The two have already diverged once. The dashboard's build command was a copy of 
 specified `--frozen-lockfile` — and nothing noticed, because nothing compared them.
 
 When changing how the service is built, change `render.yaml` **and** the dashboard setting, in the
-same commit. CI checks the repository's three build paths against each other; it cannot see the
-dashboard.
+same commit. CI checks the repository's Bun pins against each other; it cannot see the Render or
+Workers Builds dashboards.
 
-### Toolchain: Bun floats `latest`, Go cannot be pinned
+### Toolchain: Bun floats `latest`, Node is pinned on Workers Builds, Go cannot be pinned
 
-|     | CI and `Dockerfile`                                        | Render                                       |
-| --- | ---------------------------------------------------------- | -------------------------------------------- |
-| Bun | `latest`, asserted equal across all three paths            | `latest`, via `BUN_VERSION` in `render.yaml` |
-| Go  | `1.27.x` from `go.mod`, asserted equal to the `Dockerfile` | **latest stable 1.x** — not pinnable         |
+|      | CI and `Dockerfile`                                                 | Render                                       | Workers Builds                                        |
+| ---- | ------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
+| Bun  | `latest`, asserted equal across CI, `Dockerfile`, and `render.yaml` | `latest`, via `BUN_VERSION` in `render.yaml` | `latest`, via `BUN_VERSION`                           |
+| Node | —                                                                   | —                                            | `24`, via the committed `.node-version`               |
+| Go   | `1.27.x` from `go.mod`, asserted equal to the `Dockerfile`          | **latest stable 1.x** — not pinnable         | build image default (`1.27.x`); `go.mod` sets a floor |
 
 Render's default Bun depends on when the service was created, and this one defaulted to `1.3.4` while
 the repository was on `1.3.5` and then `1.4.2`. Production was therefore building the stylesheet with
 a package manager version no other build path used. `BUN_VERSION: latest` fixes that, and CI now fails
-if the three paths disagree — including when the policy is _absent_, which was the state that
-produced `1.3.4`. The trade-off is deliberate: a build is not reproducible across time, because all
-three paths resolve `latest` when they run. A literal pin remains accepted by the gate, but every
-path must name the same literal; mixing `latest` with a pin is what the gate rejects.
+if the three repository paths disagree — including when the policy is _absent_, which was the state
+that produced `1.3.4`. The trade-off is deliberate: a build is not reproducible across time, because
+all paths resolve `latest` when they run. A literal pin remains accepted by the gate, but every path
+must name the same literal; mixing `latest` with a pin is what the gate rejects. Workers Builds uses
+the same `latest` policy; its dashboard variable is not visible to CI.
 
 Go is a genuine, accepted difference. Render's native Go runtime always tracks the latest stable 1.x
 and, in their words, "you can't pin to a specific Go version unless you deploy a Docker image." CI

@@ -19,7 +19,7 @@ func TestSharedScreenLayoutLocksViewport(t *testing.T) {
 	assertContainsAll(t, body,
 		`<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">`,
 		`id="viewport" class="verse-app-shell h-screen overflow-hidden flex items-start justify-center"`,
-		`[data-editor-overlay-open="true"] #screen {`,
+		`[data-editor-overlay-active="true"] #screen {`,
 		`z-index: 120;`,
 		`.verse-mobile-screen-title,`,
 		`.verse-mobile-copy-trim {`,
@@ -127,8 +127,47 @@ func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
 	// statements were in the markup and therefore never ran in any browser, and this test passed
 	// anyway. The assertion is kept, against the file the policy now permits.
 	assertContainsAll(t, readStaticFile(t, filepath.Join("static", "js", "editor.js")),
-		`viewport.dataset.editorOverlayOpen = "true";`,
-		`delete viewport.dataset.editorOverlayOpen;`,
+		`viewport.dataset.editorOverlayActive = "true";`,
+		`delete viewport.dataset.editorOverlayActive;`,
+	)
+}
+
+// TestEditorOverlayStateDoesNotCollideWithItsOpenControl is the regression for the close path.
+//
+// The viewport used data-editor-overlay-open as its open/closed state flag, and the delegated click
+// handler uses the same selector to find the Full screen button. The viewport is an ancestor of the
+// overlay, so while the overlay was open every click inside it matched the viewport first, called
+// the open path, and returned before the Close button or the backdrop could close anything. Escape
+// still worked because its handler calls the close function directly. The state flag and the
+// control selector must stay separate names.
+func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
+	layout := renderComponent(t, views.Layout("share", views.Share()))
+	if !strings.Contains(layout, `[data-editor-overlay-active="true"] #screen {`) {
+		t.Fatalf("layout does not style the viewport from data-editor-overlay-active: %q", layout)
+	}
+
+	js := readStaticFile(t, filepath.Join("static", "js", "editor.js"))
+	if strings.Contains(js, `viewport.dataset.editorOverlayOpen`) {
+		t.Fatalf("the viewport state flag reuses data-editor-overlay-open, which is also the open " +
+			"control selector; every click inside an open overlay then matches the viewport ancestor " +
+			"and the close control never runs")
+	}
+
+	assertContainsAll(t, js,
+		`viewport.dataset.editorOverlayActive = "true";`,
+		`delete viewport.dataset.editorOverlayActive;`,
+		`verseClosest(event.target, "[data-editor-overlay-open]")`,
+		`verseClosest(event.target, "[data-editor-overlay-close]")`,
+	)
+
+	// The panel is painted over the backdrop and covers it, so without this the backdrop carries the
+	// close marker but can never receive a click.
+	body := renderComponent(t, views.Editor(renderContext()))
+	assertContainsAll(t, body,
+		`.verse-editor-overlay-panel {`,
+		`pointer-events: none;`,
+		`.verse-editor-overlay-card {`,
+		`pointer-events: auto;`,
 	)
 }
 

@@ -1,0 +1,13 @@
+{
+  "name": "verse",
+  "compatibility_date": "2026-11-08",
+  "preview_urls": true,
+  "observability": {
+    "enabled": true,
+  },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+  },
+  "previews": {},
+}
