@@ -29,6 +29,95 @@ requires a passphrase to enter. It is not a blog, a social network, or a reader-
 
 ## Local setup
 
+Four commands, all invoked through Bun:
+
+```bash
+# 1. Once per checkout: start a database and write the .env file.
+bun dev:setup
+
+# 2. Both sites, at once.
+bun dev
+
+# 3. One site on its own.
+bun dev:author
+bun dev:public
+```
+
+`bun dev` starts both servers together and prints where each one is:
+
+```
+  authoring site   http://localhost:8080
+  public site      http://localhost:4000
+```
+
+`bun dev:author` serves only the authoring site, and `bun dev:public` only the public site. Each
+prints its own address when it is ready.
+
+The public preview rebuilds when a template changes: it regenerates the templates, republishes the
+site, and serves the new files. The authoring site is a compiled Go binary, so a template change
+needs a restart to take effect there.
+
+`bun dev:setup` starts the PostgreSQL service from `compose.yaml`, writes a `.env` file, applies the
+migrations, and fills the library with generated work. It is the reset: run it again to start over.
+
+The `.env` file holds `DATABASE_URL`, `VERSE_AUTHORIZATION` and `VERSE_AUTH_SECRET`. The passphrase
+and the signing secret are generated, so nothing is written down anywhere and nothing has to be
+chosen by hand. **`DATABASE_URL` is always pointed at the local database**, and the previous host is
+named when that changes: the file may hold a hosted one, and carrying it forward would mean local
+development reads and writes the author's real work.
+
+The `DATABASE_URL` line is **replaced where it is**, not appended. A file that accumulates one copy
+per setup run ends up with a hosted database at the top and a local one at the bottom, and which of
+them a tool reads depends on a rule the file does not say. One line in the file is one value, and
+one value cannot disagree with itself. A second definition of the variable is dropped when the file
+is rewritten, so a leftover copy of a hosted connection string does not survive there either.
+
+The passphrase and the signing secret are **kept** if the file already has them. A passphrase the
+developer has typed into a running session is not theirs to have changed under them, and rotating
+the signing secret would invalidate the session it signs.
+
+The library the seed writes is generated, not copied, so no real work is reproduced by accident. It
+is deterministic for a given seed, so a reseed reproduces the same library rather than a different one
+each time. It holds about sixty works spread over the last ninety days, with a run of recent days
+so the dashboard's streak reads as more than one, ten of them published so the public site has an
+index and an archive, six soft-deleted so the recycle surface has something in it, and a few with
+earlier revisions so the history and restore paths have something to act on.
+
+```bash
+go run ./cmd/seed -reset          # empty the library and fill it again
+go run ./cmd/seed -count 200       # a larger library
+go run ./cmd/seed -seed 7          # a different library of the same shape
+```
+
+The file is gitignored, and Bun loads it into the environment of anything it runs, which is how
+`bun dev` passes those values to the server. **The application does not read a `.env` file.** There
+is no dotenv loader in it, and there never was; what reads the file is Bun, before the process
+starts.
+
+A variable already present in the environment wins over the file, so a one-off override needs no
+editing:
+
+```bash
+DATABASE_URL="postgres://verse:verse@localhost:5432/verse?sslmode=disable" bun dev
+```
+
+**The dev servers refuse a database that is not on this machine.** They write: the author server
+saves work, and the public build publishes it. Pointed at a hosted database, that is somebody's real
+work. `VERSE_DEV_ALLOW_REMOTE=1` overrides the check, for the rare case of deliberately developing
+against a hosted database. The seed command carries the same rule under `VERSE_SEED_ALLOW_REMOTE`.
+
+`bun dev` builds the Tailwind stylesheet before starting the server. The stylesheet is a build
+artifact and is not committed, so without it the application renders unstyled; the step is part of
+the command rather than something to remember.
+
+`bun dev:public` publishes the public site into `dist/` and serves it, so the reading surface can
+be inspected at <http://localhost:4000> without a deploy. It serves the same contract the
+deployment does: `/`, `/archive/` and `/share/` resolve to their `index.html`, and an unknown path
+answers with the built `404.html`. The public build reads the published set from the database, so it
+needs a `DATABASE_URL` that has published work in it.
+
+The equivalent manual steps, for a checkout where the scripts are inconvenient:
+
 ```bash
 # 1. Start a local database
 podman compose up -d          # or: podman run -d -p 5432:5432 \
@@ -53,10 +142,6 @@ go run ./cmd/server
 ```
 
 Then open <http://localhost:8080> and enter your passphrase.
-
-> **The application does not read a `.env` file.** There is no dotenv loader. If a `.env` exists in
-> your working directory, nothing reads it. Every variable must be exported into the process
-> environment, or provided by the platform.
 
 ---
 
@@ -618,6 +703,36 @@ use absolute URLs. The default is the reserved placeholder `https://verse.exampl
 deliberately not a real host. The output is a pure function of the published set and the configured
 origin; there is no build timestamp, so two builds from the same input are byte-identical.
 
+### The reader's site, and where its navigation lives
+
+The public site is three screens: a front page, an archive, and a share surface. Its navigation is
+**on the screen**, in a rail on each side of the content, and the two rails point at the reader's
+neighbours in a ring: home, then the archive, then share, and home again. Every screen is one click
+from both of the others.
+
+The brand pill in the corner is the one thing that opens a menu, and that menu points **outward**:
+at the author's other portfolio sites. It is a `<details>` element, so it toggles on click, takes
+focus, and opens on Enter or Space, and the public build ships no JavaScript at all. The site's own
+pages are never in that menu — they are in the rails, where they can be seen.
+
+The portfolio links are configuration, not markup:
+
+```bash
+go run ./cmd/publish -out dist \
+  -base-url https://your-public-origin.example \
+  -links "Studio=https://studio.example,Notes=https://notes.example"
+```
+
+`PUBLIC_LINKS` is read when the flag is absent. The list is comma-separated `Label=URL` pairs; a
+label may contain spaces and a URL may not contain a comma. A link with no label, no URL, or a URL
+that is not an `http` or `https` address stops the build rather than producing an empty menu entry.
+With no links configured the pill is a plain link home, because a button that opens nothing is
+worse than a link.
+
+The share surface shows the **address** of each work rather than only linking to it. The address is
+set in a monospace face and marked `user-select: all`, so one click selects the whole of it and the
+reader copies it with the keystroke they already know. That is a copy button with no script in it.
+
 The build refuses to write if validation fails. Validation checks that the required files exist, that
 no authoring route, asset, htmx attribute, script element, or secret name reached the output, and
 that every internal link resolves. It runs before the previous `dist/` is replaced, so a failed build
@@ -798,6 +913,19 @@ a review, whereas the application refuses to serve content without a valid sessi
 - **Vendored assets.** `static/js/VENDOR.md` records what is vendored, which version, its licence,
   and its checksum. `static/js/VENDOR.sha256` is verified in CI; a modified vendored file fails the
   build.
+- **Static assets are revalidated, not cached.** The authoring side serves its script and stylesheet
+  from fixed, unhashed URLs — `/static/js/editor.js` and `/static/css/output.css` — so they are sent
+  with `Cache-Control: no-cache`. The browser checks with the server on every load and gets a `304`
+  when nothing changed, which costs a request and no body.
+
+  This matters more than it looks. A long cache on an unhashed URL means a browser that loaded the
+  site before a deploy keeps running the previous release's script, and a fix that has already
+  shipped appears to have done nothing. The Focus Mode close control stayed broken for a day after
+  its fix was deployed for exactly this reason.
+
+  Long caching would be safe with content-hashed filenames, the way the public site's stylesheet is
+  already hashed. That is not how the authoring side is built, so it revalidates instead.
+
 - **Health of the commit graph.** A change is validated when its pull request targets `main`, and
   again when it merges into `main`. Superseded runs are canceled automatically. See
   `.github/workflows/ci.yml`.
@@ -832,9 +960,9 @@ to the live service deliberately and knowingly.
 | Symptom                                                                      | Cause                                                                                             | Fix                                                                                                                                                                                                            |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `refusing to start: authentication is not configured`                        | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or either is under its minimum (16 and 32) | Set both in the environment and restart. The message states both minimums                                                                                                                                      |
-| `too many failed attempts` (HTTP 429)                                        | The caller is rate limited; the body is deliberately numberless                                   | Wait for `Retry-After`. If it is you and you have not been guessing, see the rate-limit section above                                                                                                          |     | `refusing to start: authentication is not configured` | `VERSE_AUTHORIZATION` or `VERSE_AUTH_SECRET` is unset, or the secret is under 32 characters | Set both in the environment and restart |
+| `too many failed attempts` (HTTP 429)                                        | The caller is rate limited; the body is deliberately numberless                                   | Wait for `Retry-After`. If it is you and you have not been guessing, see the rate-limit section above                                                                                                          |
 | `database connection failed`                                                 | `DATABASE_URL` unset, unreachable, or the database is asleep                                      | Check the variable; managed databases need a moment to resume                                                                                                                                                  |
-| `DATABASE_URL environment variable not set`                                  | The variable is not in the process environment                                                    | Export it. A `.env` file in the working directory is **not** read                                                                                                                                              |
+| `DATABASE_URL environment variable not set`                                  | The variable is not in the process environment                                                    | Export it, or run `bun dev`, which reads a `.env` file. The application itself never reads one                                                                                                                 |
 | `database migration failed: ... another process has held the migration lock` | Two instances are migrating at once, or one died holding the lock                                 | Usually transient; the wait is bounded at 30s. If it persists, check for an instance stuck in `pg_locks`                                                                                                       |
 | `database schema is not ready: the poems table does not exist`               | The migration runner reported success but the `poems` table is absent                             | A real inconsistency between the runner and the application; check `schema_migrations` and the migration files                                                                                                 |
 | `migration <file> was modified after it was applied`                         | An already-applied `.sql` file was edited                                                         | Restore the original file, or write a new migration. Do not edit history                                                                                                                                       |
@@ -842,6 +970,7 @@ to the live service deliberately and knowingly.
 | `apply migration <file>: ...`                                                | The SQL in a migration failed                                                                     | Nothing was recorded and nothing was left behind; fix the file and re-run                                                                                                                                      |
 | Production stylesheet differs from CI                                        | Render's Bun drifted from the repository's                                                        | Check `BUN_VERSION` on the service; CI asserts all three build paths agree                                                                                                                                     |
 | Deploy used a stale or different build command                               | The dashboard diverged from `render.yaml`                                                         | Re-sync the dashboard from `render.yaml`; CI cannot detect this                                                                                                                                                |
+| A fix is deployed but the browser still behaves as before                    | The browser is running an older script or stylesheet                                              | Reload with the cache bypassed. Static assets are revalidated, so this should only be needed once                                                                                                              |
 | Unstyled page                                                                | The stylesheet was not built                                                                      | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify`                                                                                                                          |
 | Blank page or missing navigation in the console                              | The vendored htmx bundle is missing or its checksum changed                                       | Restore `static/js/htmx.min.js`; verify with `cd static/js && sha256sum -c VENDOR.sha256`                                                                                                                      |
 | `templ generate` reports `expected operand`                                  | The `@if` builtin is not usable in this project; conditionals must use the `@If(...)` helper      | See `templ/helpers.go` and existing templates for the convention                                                                                                                                               |

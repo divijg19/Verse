@@ -3,8 +3,22 @@ package templ
 // The public surface. These components are rendered at build time into static files; nothing here is
 // served by the authoring application, and nothing here imports htmx, authoring JavaScript, CSRF
 // helpers, or a database connection.
+//
+// Two rules govern this file.
+//
+// The first is that the reader's navigation happens on the screen. The rails beside the content
+// carry the site's own pages, so a reader is never more than one click from either of the other
+// screens and never has to open a menu to get there.
+//
+// The second is that the brand pill points outward. Its menu holds the author's other portfolio
+// sites and nothing else. The site never puts its own pages behind a toggle, because a toggle hides
+// them, and a reader who cannot see where they can go will not go.
 
-templ PublicLayout(site PublicSite, title string, description string, content templ.Component) {
+// PublicLayout is the shell every public page is rendered into.
+//
+// The page decides which two navigation pills flank the content, so the rails are a property of
+// where the reader is rather than a property of the template that drew them.
+templ PublicLayout(site PublicSite, page PublicPage, title string, description string, content templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -17,161 +31,202 @@ templ PublicLayout(site PublicSite, title string, description string, content te
 			<link rel="alternate" type="application/rss+xml" title={ site.Title } href="/feed.xml"/>
 		</head>
 		<body>
-			<header class="site-header">
-				<div class="brand-dropdown">
-					<a
-						class="wordmark brand-trigger"
-						href="/"
-						tabindex="0"
-						aria-label={ site.Title }
-					>
-						{ site.Title }
-					</a>
-					<div class="brand-menu">
-						<a href="/">Home</a>
-						<a href="/archive/">Archive</a>
-						<a href="/share/">Share</a>
-						<a href="/feed.xml">RSS feed</a>
-					</div>
-				</div>
-				<nav aria-label="Site">
-					<a href="/archive/">Archive</a>
-					<a href="/share/">Share</a>
-				</nav>
-			</header>
-			<main class="site-main">
-				@content
-			</main>
-			<footer class="site-footer">
-				<p>{ site.Description }</p>
-			</footer>
+			<div class="public-shell">
+				<header class="public-header">
+					@brandPill(site)
+				</header>
+				@rail(page, "left")
+				<main class="public-main">
+					@content
+				</main>
+				@rail(page, "right")
+			</div>
 		</body>
 	</html>
 }
 
-templ PublicIndex(site PublicSite) {
-	@PublicLayout(site, site.Title, site.Description, PublicIndexBody(site))
+// brandPill is the site's mark, and the only thing on the page that opens a menu.
+//
+// The menu holds the author's other portfolio sites. When there are none, the pill is a plain link
+// home rather than a button that opens nothing.
+//
+// The mechanism is a details element rather than a hover rule or a script. A hover rule cannot be
+// reached by a keyboard and does not survive a touch, and the public build ships no script at all;
+// the details element toggles on click, takes focus, and opens on Enter or Space for free.
+templ brandPill(site PublicSite) {
+	if len(site.Links) == 0 {
+		<a class="brand-pill" href="/">
+			<span class="brand-pill-name">{ site.Title }</span>
+		</a>
+	} else {
+		<details class="brand">
+			<summary class="brand-pill">
+				<span class="brand-pill-name">{ site.Title }</span>
+				<span class="brand-caret" aria-hidden="true"></span>
+			</summary>
+			<div class="brand-menu">
+				<p class="brand-menu-heading">Elsewhere</p>
+				<ul class="brand-menu-list">
+					for _, link := range site.Links {
+						<li>
+							<a class="brand-menu-item" href={ link.URL } target="_blank" rel="noopener noreferrer">
+								<span class="brand-menu-label">{ link.Label }</span>
+								<span class="brand-menu-host">{ link.URL }</span>
+							</a>
+						</li>
+					}
+				</ul>
+			</div>
+		</details>
+	}
 }
 
+// rail is one of the two navigation pills that flank the content.
+//
+// The pill's arrow points the way its destination lies: the left rail's points left and the right
+// rail's points right, so the two arrows describe the ring the reader is walking around.
+templ rail(page PublicPage, side string) {
+	if p, ok := publicRailFor(page, side); ok {
+		<nav class={ railClass(side) } aria-label={ railLabel(side) }>
+			<a class="rail-pill" href={ p.Path }>
+				<span class="rail-chevron" aria-hidden="true"></span>
+				<span class="rail-label">{ p.Label }</span>
+			</a>
+		</nav>
+	}
+}
+
+templ PublicIndex(site PublicSite) {
+	@PublicLayout(site, PublicPageHome, site.Title, site.Description, PublicIndexBody(site))
+}
+
+// PublicIndexBody is the front screen, and it is the site's only hero.
+//
+// The hero is the site's own line rather than its name. The name is already in the pill above it,
+// and a page that opens with its own name in large type tells a reader nothing they have not just
+// read. What the line says instead is what the site is for, and the description underneath says
+// what a reader will find in it.
+//
+// The screen does not carry the whole archive: the archive is one click away in the right rail, and
+// a front page that lists everything is a second copy of the archive with a different arrangement.
 templ PublicIndexBody(site PublicSite) {
 	<section class="hero">
-		<p class="eyebrow">Selected work</p>
-		<h1>{ site.Title }</h1>
+		<h1 class="visually-hidden">{ site.Title }</h1>
+		<p class="eyebrow">A literary collection</p>
+		<p class="hero-line">{ site.Tagline }</p>
 		<p class="lede">{ site.Description }</p>
 	</section>
-	<section class="listing" aria-labelledby="latest-heading">
-		<h2 id="latest-heading">Latest</h2>
+
+	<section class="listing" aria-labelledby="recent-heading">
+		<p class="eyebrow" id="recent-heading">Recent</p>
 		if len(site.Works) == 0 {
 			<p class="empty">Nothing published yet.</p>
 		} else {
-			<ol class="work-list">
-				for _, work := range site.Works {
+			<ul class="work-grid">
+				for _, work := range site.RecentWorks(3) {
 					<li>
-						<a href={ work.Path }>
-							<span class="work-title">{ work.Title }</span>
-							<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+						<a class="work-card" href={ work.Path }>
+							<span class="work-card-title">{ work.Title }</span>
+							<time class="work-card-date" datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
 						</a>
 					</li>
 				}
-			</ol>
+			</ul>
 		}
 	</section>
-	<p class="more"><a href="/archive/">All works</a></p>
 }
 
 templ PublicArchive(site PublicSite) {
-	@PublicLayout(site, "Archive — "+site.Title, site.Description, PublicArchiveBody(site))
+	@PublicLayout(site, PublicPageArchive, "Archive — "+site.Title, site.Description, PublicArchiveBody(site))
 }
 
+// PublicArchiveBody is the complete index, and the only place every published work is listed.
+//
+// It is a list rather than the archive's grid because a list is what an index is for: one work per
+// row, in order, each one a line the eye can run down.
 templ PublicArchiveBody(site PublicSite) {
-	<section class="listing">
-		<h1>Archive</h1>
-		if len(site.Works) == 0 {
-			<p class="empty">Nothing published yet.</p>
-		} else {
-			<ol class="work-list">
-				for _, work := range site.Works {
-					<li>
-						<a href={ work.Path }>
-							<span class="work-title">{ work.Title }</span>
-							<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
-						</a>
-					</li>
-				}
-			</ol>
+	<h1 class="visually-hidden">Archive</h1>
+	<p class="eyebrow eyebrow--row">
+		<span>Archive</span>
+		if len(site.Works) > 0 {
+			<span class="count">{ countLabel(len(site.Works)) }</span>
 		}
-	</section>
-	<p class="more"><a href="/">Return home</a></p>
+	</p>
+
+	if len(site.Works) == 0 {
+		<p class="empty">Nothing published yet.</p>
+	} else {
+		<ol class="work-list">
+			for _, work := range site.Works {
+				<li>
+					<a href={ work.Path }>
+						<span class="work-title">{ work.Title }</span>
+						<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+					</a>
+				</li>
+			}
+		</ol>
+	}
 }
 
 templ PublicWorkPage(site PublicSite, work PublicWork) {
-	@PublicLayout(site, work.Title+" — "+site.Title, work.Excerpt, PublicWorkBody(site, work))
+	@PublicLayout(site, PublicPageWork, work.Title+" — "+site.Title, work.Excerpt, PublicWorkBody(site, work))
 }
 
 templ PublicWorkBody(site PublicSite, work PublicWork) {
 	<article class="work">
-		<h1 class="visually-hidden">{ work.Title }</h1>
+		<h1>{ work.Title }</h1>
 		<p class="meta"><time datetime={ work.ISODate() }>{ work.DisplayDate() }</time></p>
-		<div class="poem">{ work.Content }</div>
+		<div class="poem">{ work.Body() }</div>
 	</article>
-	<p class="more"><a href="/archive/">Back to the archive</a></p>
 }
 
 templ PublicNotFound(site PublicSite) {
-	@PublicLayout(site, "Not found — "+site.Title, site.Description, PublicNotFoundBody(site))
+	@PublicLayout(site, PublicPageMissing, "Not found — "+site.Title, site.Description, PublicNotFoundBody(site))
 }
 
 templ PublicNotFoundBody(site PublicSite) {
-	<section class="hero">
-		<p class="eyebrow">404</p>
-		<h1>Page not found</h1>
-		<p class="lede">This page does not exist, or it was never published.</p>
-	</section>
-	<p class="more"><a href="/">Return home</a></p>
+	<h1 class="visually-hidden">Page not found</h1>
+	<p class="eyebrow">404</p>
+	<p class="lede">This page does not exist, or it was never published.</p>
 }
 
 templ PublicShare(site PublicSite) {
-	@PublicLayout(site, "Share — "+site.Title, site.Description, PublicShareBody(site))
+	@PublicLayout(site, PublicPageShare, "Share — "+site.Title, site.Description, PublicShareBody(site))
 }
 
+// PublicShareBody is the surface for sending a work to somebody else.
+//
+// A reader who wants to share something wants the address of it, so the address is the thing on
+// the page rather than something behind a link. It is set in a monospace face and marked so that a
+// single click selects the whole of it, which is a copy button with no script in it.
+//
+// It is deliberately not the archive's list again. The archive lists works by title; this one lists
+// them by address.
 templ PublicShareBody(site PublicSite) {
-	<section class="hero">
-		<p class="eyebrow">Share</p>
-		<h1>Share your work</h1>
-		<p class="lede">Copy a link to any published work to share it. Feed and archive are open to everyone.</p>
-	</section>
+	<h1 class="visually-hidden">Share</h1>
+	<p class="eyebrow">Share</p>
+	<p class="lede">Every published work has its own address. Select one and copy it to send it on.</p>
 
-	<section class="listing">
-		<h2 id="works-heading">Published works</h2>
-		<ol class="work-list">
-			if len(site.Works) == 0 {
-				<p class="empty">Nothing published yet.</p>
-			} else {
-				for _, work := range site.Works {
-					<li>
-						<a href={ work.Path }>
-							<span class="work-title">{ work.Title }</span>
-							<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
-						</a>
-					</li>
-				}
+	if len(site.Works) == 0 {
+		<p class="empty">Nothing published yet.</p>
+	} else {
+		<ul class="share-list">
+			for _, work := range site.Works {
+				<li class="share-item">
+					<a class="share-title" href={ work.Path }>{ work.Title }</a>
+					<span class="share-address">{ site.Address(work.Path) }</span>
+					<time class="share-date" datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+				</li>
 			}
-		</ol>
-	</section>
+		</ul>
 
-	<section class="more-links">
-		<p class="eyebrow">Subscribe</p>
-		<a
-			href="/feed.xml"
-			class="verse-button-ghost"
-		>
-			RSS feed
-		</a>
-		<a
-			href="/archive/"
-			class="verse-button-ghost"
-		>
-			Browse archive
-		</a>
-	</section>
+		<section class="share-feed" aria-labelledby="feed-heading">
+			<p class="eyebrow" id="feed-heading">Follow</p>
+			<p class="share-feed-line">
+				<span class="share-address">{ site.Address("/feed.xml") }</span>
+			</p>
+			<p class="share-feed-note">New work appears in the feed as it is published.</p>
+		</section>
+	}
 }

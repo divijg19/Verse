@@ -7,7 +7,17 @@ import (
 	"testing"
 )
 
-func TestStaticFilesServed(t *testing.T) {
+// TestStaticFilesAreRevalidated asserts that a static asset is rechecked with the server on every
+// request rather than served from a long-lived cache.
+//
+// The author side serves its assets from fixed, unhashed URLs, so a cache long enough to outlive a
+// deploy keeps a browser on the previous release's script and stylesheet. That is not a
+// hypothetical: the Focus Mode close control stayed broken for a day after its fix was deployed,
+// because the browser was still running the older script.
+//
+// Revalidation is what makes a shipped fix visible. http.ServeFile sets Last-Modified and answers a
+// matching If-Modified-Since with 304, so the request costs one round trip and no body.
+func TestStaticFilesAreRevalidated(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
@@ -20,8 +30,17 @@ func TestStaticFilesServed(t *testing.T) {
 		if status != 200 {
 			t.Fatalf("GET %s status = %d, want 200", path, status)
 		}
-		if !strings.Contains(headers.Get("Cache-Control"), "max-age=86400") {
-			t.Fatalf("GET %s missing cache header, got %q", path, headers.Get("Cache-Control"))
+
+		cacheControl := headers.Get("Cache-Control")
+		if !strings.Contains(cacheControl, "no-cache") {
+			t.Fatalf("GET %s Cache-Control = %q, want no-cache so a deployed fix reaches the browser", path, cacheControl)
+		}
+		if strings.Contains(cacheControl, "max-age") {
+			t.Fatalf("GET %s Cache-Control = %q carries a max-age; an unhashed asset URL must be "+
+				"revalidated, not held", path, cacheControl)
+		}
+		if headers.Get("Last-Modified") == "" {
+			t.Fatalf("GET %s has no Last-Modified, so revalidation has nothing to compare against", path)
 		}
 	}
 }

@@ -13,7 +13,12 @@
     "staticcheck": "staticcheck ./cmd/... ./internal/... ./templ/... ./tests/...",
     "vuln": "govulncheck ./...",
     "test": "go test ./... -count=1 -race",
-    "check": "bun format:check && bun fmt:go && bun vet && bun lint && bun staticcheck && bun vuln && bun run test"
+    "dev": "bun scripts/dev.ts all",
+    "dev:author": "bun scripts/dev.ts author",
+    "dev:public": "bun scripts/dev.ts public",
+    "dev:setup": "bun scripts/dev.ts setup",
+    "check": "bun format:check && bun fmt:go && bun vet && bun lint && bun staticcheck && bun test:scripts && bun vuln && bun run test",
+    "test:scripts": "bun test scripts/"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.3.4"

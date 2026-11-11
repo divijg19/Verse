@@ -25,15 +25,55 @@ func TestNavigationMatrix(t *testing.T) {
 		t.Run(tc.surface, func(t *testing.T) {
 			body := renderNavOOB(t, tc.surface)
 
-			for _, path := range []string{"/dashboard", "/editor", "/library", "/caelum", "/share"} {
+			// Find every desktop nav <a> element and verify its data-active attribute.
+			remaining := body
+			for {
+				aStart := strings.Index(remaining, `<a `)
+				if aStart == -1 {
+					break
+				}
+				aEnd := strings.Index(remaining[aStart:], `>`)
+				if aEnd == -1 {
+					break
+				}
+				aEnd = aStart + aEnd + 1
+				aHTML := remaining[aStart : aEnd+1]
+
+				// Extract href
+				hrefIdx := strings.Index(aHTML, `href="`)
+				if hrefIdx == -1 {
+					remaining = remaining[aStart+2:]
+					continue
+				}
+				afterHref := aHTML[hrefIdx+len(`href="`):]
+				endQuote := strings.Index(afterHref, `"`)
+				if endQuote == -1 {
+					remaining = remaining[aStart+2:]
+					continue
+				}
+				path := afterHref[:endQuote]
+
+				// Extract data-active from the same <a> element.
+				activeIdx := strings.Index(aHTML, `data-active="`)
+				if activeIdx == -1 {
+					t.Fatalf("nav button %q missing data-active attribute; HTML: %q", path, aHTML)
+				}
+				afterActive := aHTML[activeIdx+len(`data-active="`):]
+				activeEnd := strings.Index(afterActive, `"`)
+				if activeEnd == -1 {
+					t.Fatalf("nav button %q has unterminated data-active; HTML: %q", path, aHTML)
+				}
+				active := afterActive[:activeEnd]
+
 				want := "false"
 				if path == tc.active {
 					want = "true"
 				}
-				needle := `href="` + path + `" hx-get="` + path + `" hx-target="#screen" hx-swap="innerHTML" class="verse-masthead-link" data-masthead-link data-active="` + want + `"`
-				if !strings.Contains(body, needle) {
-					t.Fatalf("masthead link %q should have data-active=%q; body: %q", path, want, body)
+				if active != want {
+					t.Fatalf("nav button %q has data-active=%q, want %q; HTML: %q", path, active, want, aHTML)
 				}
+
+				remaining = remaining[aStart+2:]
 			}
 		})
 	}
@@ -48,8 +88,8 @@ func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
 	if !strings.Contains(body, `data-mobile-nav-sheet`) {
 		t.Fatalf("mobile nav sheet markup missing from nav render: %q", body)
 	}
-	if !strings.Contains(body, `class="verse-mobile-brand">Verse</a>`) {
-		t.Fatalf("mobile nav brand missing from nav render: %q", body)
+	if !strings.Contains(body, `class="verse-mobile-current-surface">Editor</span>`) {
+		t.Fatalf("mobile nav current surface label missing from nav render: %q", body)
 	}
 	if !strings.Contains(body, `data-mobile-nav-link`) {
 		t.Fatalf("mobile nav link hooks missing from nav render: %q", body)
@@ -65,11 +105,11 @@ func TestNavigationOOBIncludesMobileNavigationShell(t *testing.T) {
 			t.Fatalf("mobile nav should no longer render redundant copy %q in %q", removed, body)
 		}
 	}
-	if !strings.Contains(body, `class="verse-masthead-link"`) {
-		t.Fatalf("masthead link class missing from nav render: %q", body)
+	if !strings.Contains(body, `class="verse-desktop-nav-button"`) {
+		t.Fatalf("desktop nav button class missing from nav render: %q", body)
 	}
-	if !strings.Contains(body, `id="masthead" class="verse-masthead" hx-swap-oob="outerHTML"`) {
-		t.Fatalf("masthead oob shell missing from nav render: %q", body)
+	if !strings.Contains(body, `id="nav-top" hx-swap-oob="outerHTML"`) {
+		t.Fatalf("nav-top slot missing from nav render: %q", body)
 	}
 }
 

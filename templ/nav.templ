@@ -1,63 +1,21 @@
 package templ
 
 templ Nav(surface string) {
-	@masthead(surface, false)
 	@mobileNav(surface, false)
+	@navSlot("nav-top", surface, "up", false)
+	@navSlot("nav-left", surface, "left", false)
+	@navSlot("nav-right", surface, "right", false)
+	@navSlot("nav-bottom", surface, "down", false)
+	@desktopSignOut()
 }
 
 templ NavOOB(surface string) {
-	@masthead(surface, true)
 	@mobileNav(surface, true)
-}
-
-templ masthead(surface string, oob bool) {
-	@If(oob) {
-		<header id="masthead" class="verse-masthead" hx-swap-oob="outerHTML">
-			@mastheadContent(surface)
-		</header>
-	}
-	@If(!oob) {
-		<header id="masthead" class="verse-masthead">
-			@mastheadContent(surface)
-		</header>
-	}
-}
-
-templ mastheadContent(surface string) {
-	<a
-		href="/dashboard"
-		hx-get="/dashboard"
-		hx-target="#screen"
-		hx-swap="innerHTML"
-		class="verse-masthead-brand"
-	>
-		Verse
-	</a>
-	<nav class="verse-masthead-nav" aria-label="Primary">
-		@mastheadLink(surface, "/dashboard", "Dashboard")
-		@mastheadLink(surface, "/editor", "Editor")
-		@mastheadLink(surface, "/library", "Library")
-		@mastheadLink(surface, "/caelum", "Caelum")
-		@mastheadLink(surface, "/share", "Share")
-	</nav>
-	<div class="verse-masthead-actions">
-		@signOut()
-	</div>
-}
-
-templ mastheadLink(surface string, path string, label string) {
-	<a
-		href={ path }
-		hx-get={ path }
-		hx-target="#screen"
-		hx-swap="innerHTML"
-		class="verse-masthead-link"
-		data-masthead-link
-		data-active={ navActiveValue(surface, path) }
-		aria-label={ "Navigate to " + label }
-	>
-		{ label }
-	</a>
+	@navSlot("nav-top", surface, "up", true)
+	@navSlot("nav-left", surface, "left", true)
+	@navSlot("nav-right", surface, "right", true)
+	@navSlot("nav-bottom", surface, "down", true)
+	@desktopSignOut()
 }
 
 templ mobileNav(surface string, oob bool) {
@@ -76,15 +34,7 @@ templ mobileNav(surface string, oob bool) {
 templ mobileNavContent(surface string) {
 	<div class="verse-mobile-nav-bar">
 		<div class="verse-mobile-nav-bar-inner">
-			<a
-				href="/dashboard"
-				hx-get="/dashboard"
-				hx-target="#screen"
-				hx-swap="innerHTML"
-				class="verse-mobile-brand"
-			>
-				Verse
-			</a>
+			<span class="verse-mobile-current-surface">{ navSurfaceLabel(surface) }</span>
 			<button
 				type="button"
 				data-mobile-nav-toggle
@@ -134,6 +84,18 @@ templ signOut() {
 	</form>
 }
 
+// desktopSignOut is the copy in the navigation rail, shown from 1024px up.
+//
+// It has a slot of its own in the shell's grid rather than an auto-placed position, so it sits in
+// the top-right corner instead of wherever the grid happens to put it. The navigation grid is
+// three by three with the content in the middle, and the sign-out is the fourth thing in the
+// frame: it belongs to the chrome, not to the content, and it is out of the way of both.
+templ desktopSignOut() {
+	<div id="nav-signout">
+		@signOut()
+	</div>
+}
+
 templ mobileNavLink(surface string, path string, label string) {
 	<a
 		href={ path }
@@ -148,6 +110,70 @@ templ mobileNavLink(surface string, path string, label string) {
 		<div class="verse-mobile-nav-link-copy">
 			<strong>{ label }</strong>
 		</div>
+	</a>
+}
+
+templ navSlot(id string, surface string, direction string, oob bool) {
+	@If(oob) {
+		<div id={ id } hx-swap-oob="outerHTML">
+			@navButtonFor(surface, direction)
+		</div>
+	}
+	@If(!oob) {
+		<div id={ id }>
+			@navButtonFor(surface, direction)
+		</div>
+	}
+}
+
+templ navButtonFor(surface string, direction string) {
+	@If(direction == "left" && surface == "editor") {
+		@navButton(surface, "/dashboard", "Dashboard")
+	}
+	@If(direction == "left" && surface == "library") {
+		@navButton(surface, "/editor", "Editor")
+	}
+	@If(direction == "left" && (surface == "caelum" || surface == "share")) {
+		@navButton(surface, "/dashboard", "Dashboard")
+	}
+	@If(direction == "right" && surface == "dashboard") {
+		@navButton(surface, "/editor", "Editor")
+	}
+	@If(direction == "right" && (surface == "editor" || surface == "caelum" || surface == "share")) {
+		@navButton(surface, "/library", "Library")
+	}
+	@If(direction == "up" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
+		@navButton(surface, "/caelum", "Caelum")
+	}
+	@If(direction == "up" && surface == "share") {
+		@navButton(surface, "/editor", "Editor")
+	}
+	@If(direction == "down" && (surface == "dashboard" || surface == "editor" || surface == "library")) {
+		@navButton(surface, "/share", "Share")
+	}
+	@If(direction == "down" && surface == "caelum") {
+		@navButton(surface, "/editor", "Editor")
+	}
+}
+
+// navButton is one navigation destination.
+//
+// The chevron is drawn by CSS rather than written as a character. The arrow glyphs were a font's
+// responsibility, and a font without them renders a box where the direction should be.
+templ navButton(surface string, path string, label string) {
+	<a
+		href={ path }
+		hx-get={ path }
+		hx-target="#screen"
+		hx-swap="innerHTML"
+		role="button"
+		aria-label={ "Navigate to " + label }
+		title={ label }
+		class="verse-desktop-nav-button"
+		data-active={ navActiveValue(surface, path) }
+	>
+		<span aria-hidden="true" class="verse-nav-icon"></span>
+		<span class="verse-nav-label">{ label }</span>
 	</a>
 }
 

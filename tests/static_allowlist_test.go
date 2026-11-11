@@ -56,14 +56,11 @@ func TestStaticAllowlistServesExactlyWhatIsReferenced(t *testing.T) {
 	srv := newTestServer(t)
 
 	for _, asset := range allowedStaticAssets {
-		status, _, headers := get(t, srv.URL+asset, nil)
+		status, _, _ := get(t, srv.URL+asset, nil)
 		if status != http.StatusOK {
 			t.Errorf("GET %s = %d, want 200; the allowlist promises this file, so a 404 here means "+
 				"either the file is missing or the list and the templates have diverged", asset, status)
 			continue
-		}
-		if !strings.Contains(headers.Get("Cache-Control"), "max-age=86400") {
-			t.Errorf("GET %s missing the cache header, got %q", asset, headers.Get("Cache-Control"))
 		}
 	}
 }

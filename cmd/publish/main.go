@@ -8,6 +8,13 @@
 //	go run ./cmd/publish -dry-run
 //	go run ./cmd/publish -out dist
 //	go run ./cmd/publish -out dist -base-url https://example.com
+//	go run ./cmd/publish -out dist -links "Studio=https://studio.example"
+//
+// The -links flag fills the brand pill's menu with the author's other portfolio sites. The reader's
+// own navigation is not in that menu; it is on the screen, beside the content.
+//
+// The -tagline flag is the front screen's line: what the site is, rather than a summary of what it
+// holds. -description is the supporting sentence underneath it.
 //
 // Reads DATABASE_URL, like every other command here. Use a read-only serving credential for a real
 // build; the command only issues the publisher's two SELECTs.
@@ -39,7 +46,10 @@ func run() error {
 		"absolute public origin used by sitemap.xml and feed.xml")
 	title := flag.String("title", publish.DefaultTitle, "public site title")
 	description := flag.String("description", publish.DefaultDescription, "public site description")
+	tagline := flag.String("tagline", envOr("PUBLIC_TAGLINE", ""), "the front screen's line")
 	databaseURL := flag.String("database-url", "", "database URL; defaults to DATABASE_URL")
+	links := flag.String("links", envOr("PUBLIC_LINKS", ""),
+		"portfolio sites for the brand pill's menu, as Label=URL pairs separated by commas")
 
 	flag.Parse()
 
@@ -69,10 +79,17 @@ func run() error {
 			publish.DefaultBaseURL)
 	}
 
+	portfolio, err := publish.ParseLinks(*links)
+	if err != nil {
+		return err
+	}
+
 	report, err := publish.Build(ctx, *out, publish.Options{
 		Title:       *title,
 		Description: *description,
+		Tagline:     *tagline,
 		BaseURL:     *baseURL,
+		Links:       portfolio,
 	})
 	if err != nil {
 		return err

@@ -31,7 +31,7 @@ func Build(ctx context.Context, out string, opts Options) (Report, error) {
 		return Report{}, fmt.Errorf("render the public site: %w", err)
 	}
 
-	if err := Validate(files); err != nil {
+	if err := Validate(files, opts.BaseURL); err != nil {
 		return Report{}, fmt.Errorf("the public build failed validation: %w", err)
 	}
 
