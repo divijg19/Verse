@@ -393,19 +393,65 @@ func TestV019SpatialNavigationAcrossScreensE2E(t *testing.T) {
 func assertMastheadNav(t *testing.T, body, activePath string) {
 	t.Helper()
 
-	if !strings.Contains(body, `id="masthead" class="verse-masthead" hx-swap-oob="outerHTML"`) {
-		t.Fatalf("missing masthead oob marker in response body")
+	if !strings.Contains(body, `id="nav-top" hx-swap-oob="outerHTML"`) {
+		t.Fatalf("missing nav-top oob marker in response body")
 	}
 
-	for _, path := range []string{"/dashboard", "/editor", "/library", "/caelum", "/share"} {
+	// Find every desktop nav <a> element and verify its data-active attribute.
+	remaining := body
+	for {
+		btnStart := strings.Index(remaining, `class="verse-desktop-nav-button"`)
+		if btnStart == -1 {
+			break
+		}
+		// Find the opening <a tag before this class attribute.
+		aStart := strings.LastIndex(remaining[:btnStart], `<a `)
+		if aStart == -1 {
+			remaining = remaining[btnStart+1:]
+			continue
+		}
+		aEnd := strings.Index(remaining[aStart:], `>`)
+		if aEnd == -1 {
+			break
+		}
+		aEnd = aStart + aEnd + 1
+		aHTML := remaining[aStart : aEnd+1]
+
+		// Extract href
+		hrefIdx := strings.Index(aHTML, `href="`)
+		if hrefIdx == -1 {
+			remaining = remaining[aStart+2:]
+			continue
+		}
+		afterHref := aHTML[hrefIdx+len(`href="`):]
+		endQuote := strings.Index(afterHref, `"`)
+		if endQuote == -1 {
+			remaining = remaining[aStart+2:]
+			continue
+		}
+		path := afterHref[:endQuote]
+
+		// Extract data-active from the same <a> element.
+		activeIdx := strings.Index(aHTML, `data-active="`)
+		if activeIdx == -1 {
+			t.Fatalf("nav button %q missing data-active attribute; HTML: %q", path, aHTML)
+		}
+		afterActive := aHTML[activeIdx+len(`data-active="`):]
+		activeEnd := strings.Index(afterActive, `"`)
+		if activeEnd == -1 {
+			t.Fatalf("nav button %q has unterminated data-active; HTML: %q", path, aHTML)
+		}
+		active := afterActive[:activeEnd]
+
 		want := "false"
 		if path == activePath {
 			want = "true"
 		}
-		needle := `href="` + path + `" hx-get="` + path + `" hx-target="#screen" hx-swap="innerHTML" class="verse-masthead-link" data-masthead-link data-active="` + want + `"`
-		if !strings.Contains(body, needle) {
-			t.Fatalf("masthead link %q should have data-active=%q; body: %q", path, want, body)
+		if active != want {
+			t.Fatalf("nav button %q has data-active=%q, want %q; HTML: %q", path, active, want, aHTML)
 		}
+
+		remaining = remaining[aStart+2:]
 	}
 }
 

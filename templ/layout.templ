@@ -29,6 +29,8 @@ templ Layout(surface string, content templ.Component) {
 			position: relative;
 			isolation: isolate;
 			display: flex;
+			align-items: start;
+			justify-content: start;
 			flex-direction: column;
 			width: 100%;
 			height: 100%;
@@ -200,74 +202,157 @@ templ Layout(surface string, content templ.Component) {
 			color: rgb(254 202 202);
 		}
 
-		/* Masthead */
-		.verse-masthead {
-			position: relative;
-			z-index: 30;
-			display: flex;
+		/* The navigation buttons are floating pills.
+		 *
+		 * A rounded rectangle in a fixed grid reads as a panel; the same shape with a full radius reads
+		 * as a control that sits above the surface. The chevron leads the label on the left and right
+		 * rails and trails it on the bottom one, so the arrow points away from the content it leaves.
+		 */
+		.verse-desktop-nav-button {
+			display: inline-flex;
+			flex-direction: row;
 			align-items: center;
-			justify-content: space-between;
-			gap: 1rem;
-			padding: 0.7rem 1.5rem;
-			border-bottom: 1px solid rgb(38 38 38);
-			background: rgba(10, 10, 10, 0.82);
-			backdrop-filter: blur(10px);
-		}
-
-		.verse-masthead-brand {
-			font-family: Georgia, Cambria, "Times New Roman", Times, serif;
-			font-size: 1rem;
-			line-height: 1;
+			justify-content: center;
+			gap: 0.45rem;
+			max-width: 100%;
+			min-height: 2.5rem;
+			padding: 0.4rem 1rem;
+			border: 1px solid rgb(38 38 38);
+			border-radius: 999px;
+			background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.42) 100%);
 			color: rgb(245 245 245);
+			font-size: 0.62rem;
+			letter-spacing: 0.13em;
+			text-transform: uppercase;
 			text-decoration: none;
-			letter-spacing: 0.02em;
+			line-height: 1.2;
+			white-space: nowrap;
+			cursor: pointer;
+			transition:
+				border-color 160ms ease,
+				background-color 160ms ease,
+				color 160ms ease,
+				transform 160ms ease,
+				box-shadow 160ms ease;
+			backdrop-filter: blur(4px);
 		}
 
-		.verse-masthead-nav {
+		.verse-desktop-nav-button:hover {
+			border-color: rgb(82 82 82);
+			background: linear-gradient(180deg, rgba(31, 31, 31, 0.88) 0%, rgba(10, 10, 10, 0.4) 100%);
+			color: rgb(245 245 245);
+			transform: translateY(-1px);
+			box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+		}
+
+		.verse-desktop-nav-button:active {
+			transform: translateY(0);
+			box-shadow: none;
+		}
+
+		.verse-desktop-nav-button:focus-visible {
+			outline: none;
+			box-shadow: 0 0 0 2px rgb(168 85 247);
+		}
+
+		.verse-desktop-nav-button[data-active="true"] {
+			border-color: rgba(168, 85, 247, 0.52);
+			background: linear-gradient(180deg, rgba(76, 29, 149, 0.3) 0%, rgba(10, 10, 10, 0.42) 100%);
+			box-shadow: inset 0 1px 0 rgba(216, 180, 254, 0.08);
+		}
+
+		/* The chevron is a square with two of its borders drawn, so its corner points south-east.
+		 * Turning that corner is all a direction costs: -135 degrees is north, -45 is east, 45 is
+		 * south and 135 is west. The measurements were taken from a rendering rather than reasoned out,
+		 * because the two borders meet at a corner and a corner points somewhere surprising.
+		 */
+		.verse-nav-icon {
+			display: block;
+			flex: none;
+			width: 0.42rem;
+			height: 0.42rem;
+			border-right: 1.5px solid currentColor;
+			border-bottom: 1.5px solid currentColor;
+			transform: rotate(-135deg);
+		}
+
+		#nav-left .verse-nav-icon {
+			transform: rotate(135deg);
+		}
+
+		#nav-right .verse-nav-icon {
+			transform: rotate(-45deg);
+		}
+
+		#nav-bottom .verse-nav-icon {
+			transform: rotate(45deg);
+		}
+
+		/* The right rail reverses the order, so its arrow trails the label and points outward. */
+		#nav-right .verse-desktop-nav-button {
+			flex-direction: row-reverse;
+		}
+
+		.verse-nav-label {
+			font-size: 0.62rem;
+			line-height: 1.2;
+			white-space: nowrap;
+		}
+
+		/* Sign out ends the eight-hour session, and it is the only control that does.
+		 *
+		 * The control itself is deliberately quiet: a ghost pill with no fill and muted ink, so it
+		 * sits beside the navigation without competing with it. It brightens on hover and takes an
+		 * accent ring on focus, which is the same vocabulary the navigation buttons use.
+		 */
+		.verse-signout-form {
 			display: flex;
-			align-items: center;
-			gap: 0.25rem;
+			margin: 0;
 		}
 
-		.verse-masthead-link {
+		.verse-signout-button {
 			display: inline-flex;
 			align-items: center;
 			justify-content: center;
-			min-height: 2.25rem;
-			padding: 0.45rem 0.85rem;
-			border-radius: 0.5rem;
-			color: rgb(163 163 163);
-			font-size: 0.82rem;
-			letter-spacing: 0.04em;
-			text-decoration: none;
-			transition: background-color 150ms ease, color 150ms ease;
+			min-height: 1.9rem;
+			padding: 0.3rem 0.75rem;
+			/* The border is a hairline rather than nothing. Without one the control reads as loose
+			 * text in the corner, which is what it looked like before it had a slot of its own. */
+			border: 1px solid rgb(38 38 38);
+			border-radius: 999px;
+			background: transparent;
+			color: rgb(115 115 115);
+			font-family: inherit;
+			font-size: 0.6rem;
+			letter-spacing: 0.18em;
+			text-transform: uppercase;
+			white-space: nowrap;
+			cursor: pointer;
+			transition:
+				border-color 150ms ease,
+				background-color 150ms ease,
+				color 150ms ease;
 		}
 
-		.verse-masthead-link:hover {
-			background: rgba(38, 38, 38, 0.72);
-			color: rgb(245 245 245);
-		}
-
-		.verse-masthead-link[data-active="true"] {
-			background: rgba(76, 29, 149, 0.28);
+		.verse-signout-button:hover {
+			border-color: rgb(82 82 82);
+			background: rgba(23, 23, 23, 0.72);
 			color: rgb(229 229 229);
 		}
 
-		.verse-masthead-actions {
-			display: flex;
-			align-items: center;
-			gap: 0.5rem;
+		.verse-signout-button:focus-visible {
+			outline: none;
+			box-shadow: 0 0 0 2px rgb(168 85 247);
 		}
 
-		.verse-masthead-actions .verse-signout-button {
-			min-height: 2.25rem;
-			padding: 0.45rem 0.85rem;
-			border-radius: 0.5rem;
-			font-size: 0.72rem;
-			letter-spacing: 0.16em;
-			text-transform: uppercase;
-		}
-
+		/* The mobile navigation.
+		 *
+		 * The desktop rails are a grid, and a grid does not fit a phone. Below 1024px the shell
+		 * becomes a single column and the navigation collapses into a sheet behind a pill toggle in
+		 * the top bar. The sheet's links are pills for the same reason the desktop buttons are: the
+		 * two surfaces are the same site, and a reader who moves between them should not have to
+		 * learn a second shape.
+		 */
 		#mobile-nav {
 			position: fixed;
 			inset: 0;
@@ -278,7 +363,7 @@ templ Layout(surface string, content templ.Component) {
 
 		.verse-mobile-nav-bar {
 			position: fixed;
-			top: 0;
+			op: 0;
 			right: 0;
 			left: 0;
 			padding: calc(env(safe-area-inset-top) + 0.65rem) 0.9rem 0;
@@ -292,36 +377,47 @@ templ Layout(surface string, content templ.Component) {
 			gap: 1rem;
 			max-width: 82rem;
 			margin: 0 auto;
-			padding: 0.55rem 0.8rem;
+			padding: 0.4rem 0.5rem 0.4rem 1.1rem;
 			border: 1px solid rgba(38, 38, 38, 0.92);
-			border-radius: 0.875rem;
+			border-radius: 999px;
 			background: rgba(15, 15, 15, 0.82);
 			box-shadow: inset 0 1px 0 rgba(115, 115, 115, 0.06);
 			backdrop-filter: blur(10px);
 			pointer-events: auto;
 		}
 
-		.verse-mobile-brand {
+		.verse-mobile-current-surface {
 			font-family: Georgia, Cambria, "Times New Roman", Times, serif;
-			font-size: 1.05rem;
+			font-size: 0.95rem;
 			line-height: 1;
 			color: rgb(245 245 245);
-			text-decoration: none;
 		}
 
 		.verse-mobile-nav-toggle {
 			display: inline-flex;
 			flex-direction: column;
 			justify-content: center;
-			gap: 0.28rem;
-			width: 2.75rem;
-			height: 2.75rem;
-			padding: 0 0.75rem;
+			gap: 0.26rem;
+			width: 2.4rem;
+			height: 2.4rem;
+			padding: 0 0.68rem;
 			border: 1px solid rgba(64, 64, 64, 0.92);
-			border-radius: 0.875rem;
+			border-radius: 999px;
 			background: rgba(15, 15, 15, 0.82);
 			color: rgb(229 229 229);
 			box-shadow: inset 0 1px 0 rgba(115, 115, 115, 0.06);
+			cursor: pointer;
+			transition: border-color 150ms ease, color 150ms ease;
+		}
+
+		.verse-mobile-nav-toggle:hover {
+			border-color: rgb(115 115 115);
+			color: rgb(245 245 245);
+		}
+
+		.verse-mobile-nav-toggle:focus-visible {
+			outline: none;
+			box-shadow: 0 0 0 2px rgb(168 85 247);
 		}
 
 		.verse-mobile-nav-toggle span {
@@ -359,11 +455,11 @@ templ Layout(surface string, content templ.Component) {
 			max-height: min(22rem, calc(100svh - env(safe-area-inset-top) - 4.5rem));
 			padding: 0.45rem;
 			border: 1px solid rgba(38, 38, 38, 0.92);
-			border-radius: 1rem;
+			border-radius: 1.25rem;
 			background: linear-gradient(180deg, rgba(18, 18, 18, 0.96) 0%, rgba(10, 10, 10, 0.98) 100%);
 			box-shadow:
-			0 24px 70px rgba(0, 0, 0, 0.34),
-			inset 0 1px 0 rgba(115, 115, 115, 0.06);
+				0 24px 70px rgba(0, 0, 0, 0.34),
+				inset 0 1px 0 rgba(115, 115, 115, 0.06);
 			overflow-y: auto;
 		}
 
@@ -376,10 +472,10 @@ templ Layout(surface string, content templ.Component) {
 			display: flex;
 			align-items: center;
 			gap: 0.75rem;
-			min-height: 2.85rem;
-			padding: 0.75rem 0.9rem;
+			min-height: 2.6rem;
+			padding: 0.55rem 1.1rem;
 			border: 1px solid rgb(38 38 38);
-			border-radius: 0.9rem;
+			border-radius: 999px;
 			background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.28) 100%);
 			text-decoration: none;
 			transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease, color 150ms ease;
@@ -403,7 +499,10 @@ templ Layout(surface string, content templ.Component) {
 		}
 
 		.verse-mobile-nav-link-copy strong {
-			font-size: 0.98rem;
+			font-size: 0.76rem;
+			font-weight: 500;
+			letter-spacing: 0.16em;
+			text-transform: uppercase;
 			line-height: 1.2;
 			color: rgb(245 245 245);
 			overflow-wrap: anywhere;
@@ -417,44 +516,24 @@ templ Layout(surface string, content templ.Component) {
 			border-top: 1px solid rgb(38 38 38);
 		}
 
-		.verse-signout-form {
-			display: flex;
-			margin: 0;
-		}
-
-		.verse-signout-button {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
+		/* In the sheet the sign-out control is the only action in its section, so it takes the
+		 * width of that section rather than sitting as a small pill in the corner. */
+		.verse-mobile-nav-actions .verse-signout-button {
 			width: 100%;
-			min-height: 2.85rem;
-			padding: 0.75rem 0.9rem;
-			border: 1px solid rgb(38 38 38);
-			border-radius: 0.9rem;
-			background: linear-gradient(180deg, rgba(23, 23, 23, 0.72) 0%, rgba(10, 10, 10, 0.28) 100%);
-			color: rgb(212 212 212);
-			font-size: 0.98rem;
-			line-height: 1.2;
-			cursor: pointer;
-			transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+			min-height: 2.6rem;
+			font-size: 0.66rem;
+			border-color: rgb(38 38 38);
 		}
 
-		.verse-signout-button:hover {
-			border-color: rgb(82 82 82);
-			background: linear-gradient(180deg, rgba(31, 31, 31, 0.88) 0%, rgba(10, 10, 10, 0.4) 100%);
-			color: rgb(245 245 245);
-		}
-
-		.verse-signout-button:focus-visible {
-			outline: none;
-			box-shadow: 0 0 0 2px rgb(212 212 212);
+		#nav-top, #nav-left, #nav-right, #nav-bottom, #nav-signout {
+			z-index: 40;
+			display: none;
+			position: relative;
+			min-width: 0;
+			min-height: 0;
 		}
 
 		@media (max-width: 1023px) {
-			.verse-masthead {
-				display: none;
-			}
-
 			#mobile-nav {
 				display: block;
 			}
@@ -524,17 +603,85 @@ templ Layout(surface string, content templ.Component) {
 
 		@media (min-width: 1024px) {
 			.verse-app-shell {
+				--verse-desktop-nav-rail-inline: clamp(8rem, 12vw, 9.5rem);
+				--verse-desktop-nav-rail-block: clamp(5rem, 9vh, 6.25rem);
 				--verse-surface-top-space: clamp(2.5rem, 5vh, 4rem);
+				display: grid;
+				grid-template-columns:
+					var(--verse-desktop-nav-rail-inline)
+					minmax(0, 1fr)
+					var(--verse-desktop-nav-rail-inline);
+				grid-template-rows:
+					var(--verse-desktop-nav-rail-block)
+					minmax(0, 1fr)
+					var(--verse-desktop-nav-rail-block);
+				grid-template-areas:
+					". nav-top signout"
+					"nav-left screen nav-right"
+					". nav-bottom .";
+				align-items: stretch;
+				justify-items: stretch;
 			}
 
 			#screen {
+				grid-area: screen;
 				overflow: hidden;
 				padding: 0 1.5rem;
+			}
+
+			#nav-top,
+			#nav-left,
+			#nav-right,
+			#nav-bottom {
+				display: flex;
+				position: relative;
+				min-width: 0;
+				min-height: 0;
+				z-index: 2;
+			}
+
+			#nav-signout {
+				grid-area: signout;
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
+				padding-top: 0.9rem;
+				min-width: 0;
+				z-index: 2;
+			}
+
+			#nav-top {
+				grid-area: nav-top;
+				align-items: flex-start;
+				justify-content: center;
+				padding-top: 0.75rem;
+			}
+
+			#nav-left {
+				grid-area: nav-left;
+				align-items: center;
+				justify-content: center;
+				padding-right: 0.65rem;
+			}
+
+			#nav-right {
+				grid-area: nav-right;
+				align-items: center;
+				justify-content: center;
+				padding-left: 0.65rem;
+			}
+
+			#nav-bottom {
+				grid-area: nav-bottom;
+				align-items: flex-end;
+				justify-content: center;
+				padding-bottom: 0.75rem;
 			}
 		}
 
 		@media (min-width: 1280px) {
 			.verse-app-shell {
+				--verse-desktop-nav-rail-inline: clamp(8.5rem, 11vw, 10rem);
 				--verse-surface-top-space: clamp(2.75rem, 5vh, 4.25rem);
 			}
 

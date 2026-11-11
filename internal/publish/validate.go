@@ -41,6 +41,11 @@ var forbiddenSecretSubstrings = []string{
 // forbiddenAuthoringPaths are checked only where they can act as a route: href, src, and the URL
 // elements of the sitemap and feed. Scanning prose for these would reject a poem that happens to
 // mention the word "library", which is not a leak.
+//
+// The list is checked against this site's own addresses only. An absolute address names another
+// site, and "/library" on somebody else's site is their route and not this application's; the
+// portfolio menu links outward, and a link to https://example.com/library/ is not a leak of
+// anything. The authoring host is a separate check, and it applies to every address.
 var forbiddenAuthoringPaths = []string{
 	"/login",
 	"/logout",
@@ -57,7 +62,12 @@ var forbiddenAuthoringPaths = []string{
 //   - is any authoring route, asset, or secret name present?
 //   - does every internal link resolve to a file in this build?
 //   - does the public HTML contain an executable script element or an event-handler attribute?
-func Validate(files map[string][]byte) error {
+//
+// The base URL is the site's own origin. It is what tells an address that points at this site
+// apart from one that points at somewhere else, and the two are held to different rules.
+func Validate(files map[string][]byte, baseURL string) error {
+	ownHost := hostOf(baseURL)
+
 	for _, required := range requiredOutputs {
 		if _, ok := files[required]; !ok {
 			return fmt.Errorf("the build is missing required output %q", required)
@@ -89,18 +99,18 @@ func Validate(files map[string][]byte) error {
 
 		switch {
 		case strings.HasSuffix(name, ".html"):
-			if err := scanHTML(name, body); err != nil {
+			if err := scanHTML(name, body, ownHost); err != nil {
 				return err
 			}
 			if err := validateLinks(name, body, files); err != nil {
 				return err
 			}
 		case strings.HasSuffix(name, ".json"):
-			if err := scanJSON(name, body); err != nil {
+			if err := scanJSON(name, body, ownHost); err != nil {
 				return err
 			}
 		case strings.HasSuffix(name, ".xml"):
-			if err := scanXML(name, body); err != nil {
+			if err := scanXML(name, body, ownHost); err != nil {
 				return err
 			}
 		}
@@ -121,7 +131,7 @@ func scanForSecrets(name string, body []byte) error {
 
 // scanHTML inspects structure, not text. A poem may contain any sequence of characters; what it
 // cannot do is create an attribute, a script element, or a link, because templ escapes text nodes.
-func scanHTML(name string, body []byte) error {
+func scanHTML(name string, body []byte, ownHost string) error {
 	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("parse %s: %w", name, err)
@@ -143,7 +153,7 @@ func scanHTML(name string, body []byte) error {
 					return fmt.Errorf("%s contains the event-handler attribute %q", name, attr.Key)
 				}
 				if key == "href" || key == "src" {
-					if err := checkPublicURL(name, attr.Val); err != nil {
+					if err := checkPublicURL(name, attr.Val, ownHost); err != nil {
 						return err
 					}
 				}
@@ -161,7 +171,7 @@ func scanHTML(name string, body []byte) error {
 	return walk(doc)
 }
 
-func scanJSON(name string, body []byte) error {
+func scanJSON(name string, body []byte, ownHost string) error {
 	var index struct {
 		Entries []struct {
 			ID   string `json:"id"`
@@ -176,14 +186,14 @@ func scanJSON(name string, body []byte) error {
 		if !strings.HasPrefix(entry.Path, "/w/") || !strings.HasSuffix(entry.Path, "/") {
 			return fmt.Errorf("%s contains the unexpected public path %q", name, entry.Path)
 		}
-		if err := checkPublicURL(name, entry.Path); err != nil {
+		if err := checkPublicURL(name, entry.Path, ownHost); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func scanXML(name string, body []byte) error {
+func scanXML(name string, body []byte, ownHost string) error {
 	decoder := xml.NewDecoder(bytes.NewReader(body))
 	for {
 		token, err := decoder.Token()
@@ -205,26 +215,85 @@ func scanXML(name string, body []byte) error {
 			if err := decoder.DecodeElement(&value, &start); err != nil {
 				return fmt.Errorf("read %s from %s: %w", start.Name.Local, name, err)
 			}
-			if err := checkPublicURL(name, value); err != nil {
+			if err := checkPublicURL(name, value, ownHost); err != nil {
 				return err
 			}
 		}
 	}
 }
 
-func checkPublicURL(name, value string) error {
+// checkPublicURL refuses an address that leaks an authoring route.
+//
+// The rule turns on whose address it is. A path on this site -- "/library", rooted or written out
+// in full -- is this application's route and is a leak wherever it appears. An address naming
+// another host is that host's business: "/library" on somebody else's site is their route, not a
+// leak of this one, and the portfolio menu links outward on purpose. An address naming this site's
+// own host is checked, because on this host the path means exactly what it means everywhere else.
+func checkPublicURL(name, value, ownHost string) error {
 	lower := strings.ToLower(value)
+
+	if strings.Contains(lower, "onrender") {
+		return fmt.Errorf("%s links to the authoring host in %q", name, value)
+	}
+
+	if !addressIsLocal(lower, ownHost) {
+		return nil
+	}
 
 	for _, forbidden := range forbiddenAuthoringPaths {
 		if strings.Contains(lower, forbidden) {
 			return fmt.Errorf("%s links to the authoring path %q", name, value)
 		}
 	}
-	if strings.Contains(lower, "onrender") {
-		return fmt.Errorf("%s links to the authoring host in %q", name, value)
-	}
 
 	return nil
+}
+
+// addressIsLocal reports whether an address resolves on this site.
+//
+// A rooted or relative address is local. An absolute one is local when it names this site's own
+// host, and belongs to somebody else otherwise. A protocol-relative address names a host too, and
+// is local only when that host is this one.
+func addressIsLocal(lower, ownHost string) bool {
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") &&
+		!strings.HasPrefix(lower, "//") {
+		return true
+	}
+
+	host := hostOf(lower)
+	if host == "" {
+		return true
+	}
+	return ownHost == "" || host == ownHost
+}
+
+// hostOf returns the host in an address, or an empty string when it names none.
+func hostOf(address string) string {
+	lower := strings.ToLower(strings.TrimSpace(address))
+
+	afterScheme := lower
+	switch {
+	case strings.HasPrefix(lower, "http://"):
+		afterScheme = lower[len("http://"):]
+	case strings.HasPrefix(lower, "https://"):
+		afterScheme = lower[len("https://"):]
+	case strings.HasPrefix(lower, "//"):
+		afterScheme = lower[len("//"):]
+	default:
+		return ""
+	}
+
+	if slash := strings.IndexAny(afterScheme, "/?#"); slash >= 0 {
+		afterScheme = afterScheme[:slash]
+	}
+	if at := strings.Index(afterScheme, "@"); at >= 0 {
+		afterScheme = afterScheme[at+1:]
+	}
+	if colon := strings.Index(afterScheme, ":"); colon >= 0 {
+		afterScheme = afterScheme[:colon]
+	}
+
+	return afterScheme
 }
 
 func validateLinks(name string, body []byte, files map[string][]byte) error {

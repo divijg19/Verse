@@ -30,9 +30,11 @@ func Render(works []publictempl.PublicWork, opts Options) (map[string][]byte, er
 	site := publictempl.PublicSite{
 		Title:       opts.Title,
 		Description: opts.Description,
+		Tagline:     opts.Tagline,
 		BaseURL:     opts.BaseURL,
 		AssetPath:   assetPath,
 		Works:       works,
+		Links:       opts.Links,
 	}
 
 	files := make(map[string][]byte, len(works)+8)

@@ -238,6 +238,14 @@ jobs:
           go run ./cmd/publish -out /tmp/verse-dist -base-url https://verse.test
           test -f /tmp/verse-dist/404.html
 
+      - name: Test the development scripts
+        # `scripts/dev.ts` is the whole local development workflow -- it starts the database, writes
+        # the .env file, applies the migrations, seeds the library and serves both sites. It is
+        # TypeScript, so the Go suite above cannot reach it, and it had no test at all until it
+        # grew one: it is the one place a hosted connection string could survive on a developer's
+        # machine, which is worth a test more than most.
+        run: bun test scripts/
+
       - name: Run tests
         # No -p 1. Each test package that touches the database has its own schema, so the packages
         # run concurrently without truncating one another. That flag was the only thing

@@ -19,6 +19,13 @@ const (
 	DefaultTitle       = "Verse"
 	DefaultDescription = "A selection of published work."
 
+	// DefaultTagline is the front screen's line.
+	//
+	// It is the site's positioning rather than a summary: the description summarizes what a reader
+	// will find, and the tagline says what the site is. The two are separate because a sentence
+	// that does both does neither.
+	DefaultTagline = "Poems, and the literary devices they are built from."
+
 	// DefaultBaseURL is a reserved placeholder. The public surface is noindex until the domain
 	// decision lands, so a sitemap and feed must exist but must not claim a real host. Set
 	// PUBLIC_BASE_URL (or -base-url) when the site has an address.
@@ -34,7 +41,15 @@ const (
 type Options struct {
 	Title       string
 	Description string
+	Tagline     string
 	BaseURL     string
+
+	// Links are the destinations outside this site, shown in the brand pill's menu.
+	//
+	// They are configuration rather than content for the same reason the title is: the public build
+	// never reads them from the database, so a build is a pure function of its published set and its
+	// options. An empty list is a valid configuration and produces a brand pill with no menu.
+	Links []publictempl.PublicLink
 }
 
 func (o Options) normalized() (Options, error) {
@@ -43,6 +58,9 @@ func (o Options) normalized() (Options, error) {
 	}
 	if strings.TrimSpace(o.Description) == "" {
 		o.Description = DefaultDescription
+	}
+	if strings.TrimSpace(o.Tagline) == "" {
+		o.Tagline = DefaultTagline
 	}
 
 	base := strings.TrimSpace(o.BaseURL)
@@ -63,7 +81,51 @@ func (o Options) normalized() (Options, error) {
 	}
 	o.BaseURL = base
 
+	links, err := normalizeLinks(o.Links)
+	if err != nil {
+		return Options{}, err
+	}
+	o.Links = links
+
 	return o, nil
+}
+
+// normalizeLinks drops empty entries and refuses one that could not work.
+//
+// A link with no label renders an empty menu entry, and a link with no URL renders an entry that
+// goes nowhere. Both are mistakes in the configuration rather than states worth shipping, so the
+// build stops and says which one it was.
+func normalizeLinks(links []publictempl.PublicLink) ([]publictempl.PublicLink, error) {
+	if len(links) == 0 {
+		return nil, nil
+	}
+
+	cleaned := make([]publictempl.PublicLink, 0, len(links))
+	for _, link := range links {
+		label := strings.TrimSpace(link.Label)
+		address := strings.TrimSpace(link.URL)
+		if label == "" && address == "" {
+			continue
+		}
+		if label == "" {
+			return nil, fmt.Errorf("a portfolio link has a URL but no label: %q", address)
+		}
+		if address == "" {
+			return nil, fmt.Errorf("portfolio link %q has no URL", label)
+		}
+		if !strings.HasPrefix(address, "http://") && !strings.HasPrefix(address, "https://") {
+			return nil, fmt.Errorf("portfolio link %q must point at an http or https address, not %q",
+				label, address)
+		}
+
+		cleaned = append(cleaned, publictempl.PublicLink{
+			Label: label,
+			URL:   address,
+			Note:  strings.TrimSpace(link.Note),
+		})
+	}
+
+	return cleaned, nil
 }
 
 // Load reads every published work and maps it to the public view.

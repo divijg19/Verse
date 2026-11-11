@@ -464,9 +464,19 @@ func staticHandler(root string) http.Handler {
 			return
 		}
 
-		if r.Method == http.MethodGet {
-			w.Header().Set("Cache-Control", "public, max-age=86400")
-		}
+		// Static assets are revalidated on every request rather than held in a cache.
+		//
+		// The author side serves its assets from fixed, unhashed URLs: /static/js/editor.js and
+		// /static/css/output.css. A long-lived cache on those URLs means a browser that loaded the
+		// site before a deploy keeps running the previous release's script and stylesheet, so a
+		// fix that has already shipped appears to have done nothing. The Focus Mode close control
+		// stayed broken for a day after its fix was deployed, because the browser was still
+		// running the older script.
+		//
+		// http.ServeFile sets Last-Modified and answers a matching If-Modified-Since with 304, so
+		// revalidation costs one request and no body. Caching these for any longer would need
+		// content-hashed filenames to be safe, and the author side has none.
+		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFile(w, r, file)
 	}))
 }

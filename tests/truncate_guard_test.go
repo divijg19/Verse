@@ -36,6 +36,19 @@ import (
 // to one.
 var executableTruncate = regexp.MustCompile("`[^`\n]*TRUNCATE[^`\n]*`")
 
+// destructiveGates are the gates a destructive statement may sit behind.
+//
+// The disposable-DSN gate is the one the test suite uses: it refuses to run unless the operator has
+// named a throwaway database and acknowledged the destructiveness explicitly.
+//
+// The seed command has its own, because a seed is a local activity rather than a test one. It
+// refuses a database that is not reachable only from this machine, because a seed empties the
+// library and replaces it with generated text.
+//
+// Both are named functions rather than a marker comment, so the check cannot be satisfied by
+// mentioning the word.
+var destructiveGates = []string{"DisposableDSN", "RequireLocalDSN"}
+
 func TestEveryTruncateIsBehindTheDisposableGate(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -76,14 +89,21 @@ func TestEveryTruncateIsBehindTheDisposableGate(t *testing.T) {
 			return nil
 		}
 
-		// A file that gates its destructive work mentions DisposableDSN. This is a per-file check
+		// A file that gates its destructive work names one of the gates. This is a per-file check
 		// rather than a per-statement one on purpose: the gate wraps the whole helper, so the
 		// property is about the file being honest, not about one line's indentation.
-		if !strings.Contains(source, "DisposableDSN") {
+		gated := false
+		for _, gate := range destructiveGates {
+			if strings.Contains(source, gate) {
+				gated = true
+				break
+			}
+		}
+		if !gated {
 			rel, _ := filepath.Rel(root, path)
-			t.Errorf("%s issues a TRUNCATE but never consults testsupport.DisposableDSN.\n"+
-				"  Every destructive statement in this repository must sit behind the disposable\n"+
-				"  database gate, or it can run against a database nobody opted in to destroying.", rel)
+			t.Errorf("%s issues a TRUNCATE but never consults a destructive gate.\n"+
+				"  Every destructive statement in this repository must sit behind a gate, or it can\n"+
+				"  run against a database nobody opted in to destroying. The gates are %v.", rel, destructiveGates)
 		}
 		found += len(executableTruncate.FindAllString(source, -1))
 		return nil
@@ -92,13 +112,13 @@ func TestEveryTruncateIsBehindTheDisposableGate(t *testing.T) {
 		t.Fatalf("walk the repository: %v", err)
 	}
 
-	// The count is asserted exactly, not as a floor. Three: the two poem truncates, one per test
-	// package, and the login_attempts reset. An exact number is what makes a removal visible, and a
-	// floor would happily pass with a statement deleted -- which is the drift this test exists to
-	// catch, repeated in its own assertion.
-	if found != 3 {
-		t.Errorf("found %d executable TRUNCATE statement(s), want exactly 3.\n"+
-			"  A fourth is a new destructive path that must be gated deliberately; a second is a\n"+
+	// The count is asserted exactly, not as a floor. Four: the two poem truncates, one per test
+	// package, the login_attempts reset, and the seed command's reset of the local library. An
+	// exact number is what makes a removal visible, and a floor would happily pass with a statement
+	// deleted -- which is the drift this test exists to catch, repeated in its own assertion.
+	if found != 4 {
+		t.Errorf("found %d executable TRUNCATE statement(s), want exactly 4.\n"+
+			"  A fifth is a new destructive path that must be gated deliberately; a third is a\n"+
 			"  removal that the comment above truncatePoems has not been told about.\n"+
 			"  If the count is right and this is wrong, the pattern has stopped matching and the\n"+
 			"  gate half of this test is vacuous too.", found)

@@ -80,7 +80,7 @@ func TestRenderProducesTheRequiredSurface(t *testing.T) {
 		t.Error("no hashed stylesheet under assets/")
 	}
 
-	if err := publish.Validate(files); err != nil {
+	if err := publish.Validate(files, "https://verse.test"); err != nil {
 		t.Errorf("the rendered build did not validate: %v", err)
 	}
 }
@@ -148,7 +148,7 @@ func TestValidateDoesNotRejectMarkersInsideProse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	if err := publish.Validate(files); err != nil {
+	if err := publish.Validate(files, "https://verse.test"); err != nil {
 		t.Fatalf("validation rejected legitimate prose: %v", err)
 	}
 }
@@ -236,7 +236,7 @@ func TestValidateRejectsLeaksAndBrokenLinks(t *testing.T) {
 	t.Run("missing required file", func(t *testing.T) {
 		files := copyFiles(base)
 		delete(files, "404.html")
-		if err := publish.Validate(files); err == nil {
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
 			t.Fatal("validation accepted a build without 404.html")
 		}
 	})
@@ -244,7 +244,7 @@ func TestValidateRejectsLeaksAndBrokenLinks(t *testing.T) {
 	t.Run("authoring route", func(t *testing.T) {
 		files := copyFiles(base)
 		files["index.html"] = append(files["index.html"], []byte(`<a href="/library">Library</a>`)...)
-		if err := publish.Validate(files); err == nil {
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
 			t.Fatal("validation accepted a link to the authoring library")
 		}
 	})
@@ -252,7 +252,7 @@ func TestValidateRejectsLeaksAndBrokenLinks(t *testing.T) {
 	t.Run("htmx attribute", func(t *testing.T) {
 		files := copyFiles(base)
 		files["index.html"] = append(files["index.html"], []byte(`<div hx-get="/library"></div>`)...)
-		if err := publish.Validate(files); err == nil {
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
 			t.Fatal("validation accepted an htmx attribute")
 		}
 	})
@@ -260,7 +260,7 @@ func TestValidateRejectsLeaksAndBrokenLinks(t *testing.T) {
 	t.Run("script element", func(t *testing.T) {
 		files := copyFiles(base)
 		files["index.html"] = append(files["index.html"], []byte(`<script>alert(1)</script>`)...)
-		if err := publish.Validate(files); err == nil {
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
 			t.Fatal("validation accepted a script element")
 		}
 	})
@@ -269,8 +269,49 @@ func TestValidateRejectsLeaksAndBrokenLinks(t *testing.T) {
 		files := copyFiles(base)
 		files["index.html"] = bytes.ReplaceAll(files["index.html"],
 			[]byte(`href="/archive/"`), []byte(`href="/missing/"`))
-		if err := publish.Validate(files); err == nil {
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
 			t.Fatal("validation accepted a broken internal link")
+		}
+	})
+}
+
+// TestValidateHoldsThisSiteAndOtherSitesToDifferentRules checks the leak rules.
+//
+// The authoring paths are this application's routes, so they are a leak wherever they appear in an
+// address that resolves here. An address naming another host is that host's business: the portfolio
+// menu links outward on purpose, and a link to https://example.com/library/ is not a leak of
+// anything. An address naming this site's own host is checked, because on this host the path means
+// exactly what it means everywhere else.
+func TestValidateHoldsThisSiteAndOtherSitesToDifferentRules(t *testing.T) {
+	base, err := publish.Render(sampleWorks(), testOptions())
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	t.Run("an external address with an authoring-shaped path", func(t *testing.T) {
+		files := copyFiles(base)
+		files["index.html"] = append(files["index.html"],
+			[]byte(`<a href="https://studio.example/library/">Studio</a>`)...)
+		if err := publish.Validate(files, "https://verse.test"); err != nil {
+			t.Fatalf("validation rejected an external address: %v", err)
+		}
+	})
+
+	t.Run("an absolute address on this site with an authoring path", func(t *testing.T) {
+		files := copyFiles(base)
+		files["index.html"] = append(files["index.html"],
+			[]byte(`<a href="https://verse.test/library/">Library</a>`)...)
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
+			t.Fatal("validation accepted an authoring path on this site's own host")
+		}
+	})
+
+	t.Run("the authoring host", func(t *testing.T) {
+		files := copyFiles(base)
+		files["index.html"] = append(files["index.html"],
+			[]byte(`<a href="https://verse.onrender.com/">Authoring</a>`)...)
+		if err := publish.Validate(files, "https://verse.test"); err == nil {
+			t.Fatal("validation accepted a link to the authoring host")
 		}
 	})
 }
