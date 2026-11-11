@@ -7,8 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -68,6 +69,17 @@ var forbiddenAuthoringPaths = []string{
 func Validate(files map[string][]byte, baseURL string) error {
 	ownHost := hostOf(baseURL)
 
+	// The one script the site is allowed to carry is the one this build wrote, so its path is
+	// found rather than assumed: the build names it, the pages point at it, and the validator
+	// checks the two against each other.
+	scriptPath := ""
+	for name := range files {
+		if strings.HasPrefix(name, "assets/public.") && strings.HasSuffix(name, ".js") {
+			scriptPath = "/" + name
+			break
+		}
+	}
+
 	for _, required := range requiredOutputs {
 		if _, ok := files[required]; !ok {
 			return fmt.Errorf("the build is missing required output %q", required)
@@ -82,14 +94,13 @@ func Validate(files map[string][]byte, baseURL string) error {
 		}
 	}
 	if !hasStylesheet {
-		return fmt.Errorf("the build contains no public stylesheet under assets/")
+		return errors.New("the build contains no public stylesheet under assets/")
 	}
 
-	names := make([]string, 0, len(files))
-	for name := range files {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	// The names are collected and sorted because the report and the walk both read better in a
+	// fixed order: a map's iteration order is random, and a validator whose findings arrive in a
+	// different order each run is harder to read and harder to compare.
+	names := slices.Sorted(maps.Keys(files))
 
 	for _, name := range names {
 		body := files[name]
@@ -99,7 +110,7 @@ func Validate(files map[string][]byte, baseURL string) error {
 
 		switch {
 		case strings.HasSuffix(name, ".html"):
-			if err := scanHTML(name, body, ownHost); err != nil {
+			if err := scanHTML(name, body, ownHost, scriptPath); err != nil {
 				return err
 			}
 			if err := validateLinks(name, body, files); err != nil {
@@ -131,7 +142,7 @@ func scanForSecrets(name string, body []byte) error {
 
 // scanHTML inspects structure, not text. A poem may contain any sequence of characters; what it
 // cannot do is create an attribute, a script element, or a link, because templ escapes text nodes.
-func scanHTML(name string, body []byte, ownHost string) error {
+func scanHTML(name string, body []byte, ownHost string, scriptPath string) error {
 	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("parse %s: %w", name, err)
@@ -141,7 +152,21 @@ func scanHTML(name string, body []byte, ownHost string) error {
 	walk = func(node *html.Node) error {
 		if node.Type == html.ElementNode {
 			if node.Data == "script" {
-				return fmt.Errorf("%s contains a script element; the public site ships no JavaScript", name)
+				// The public site ships exactly one script: the archive's search box, which the
+				// publisher writes and points at by its own content-addressed path.
+				//
+				// The permission is narrow on purpose. A script element with no src is an inline
+				// script, and an inline script is the thing the policy this site was built around
+				// forbids; a script element pointing anywhere but at this build's own bundle is a
+				// third-party request, which is the other thing it forbids. So both are refused,
+				// and the only thing allowed is the file this build wrote.
+				src, hasSrc := scriptSource(node)
+				if !hasSrc {
+					return fmt.Errorf("%s contains an inline script element; the public site ships no inline JavaScript", name)
+				}
+				if src != scriptPath {
+					return fmt.Errorf("%s contains a script element pointing at %q, which is not this build's own bundle", name, src)
+				}
 			}
 
 			for _, attr := range node.Attr {
@@ -169,6 +194,19 @@ func scanHTML(name string, body []byte, ownHost string) error {
 	}
 
 	return walk(doc)
+}
+
+// scriptSource reads a script element's source, and reports whether it had one at all.
+//
+// A script element with no src attribute is an inline script, which is a different thing with
+// different consequences, so the two are told apart here rather than by the caller.
+func scriptSource(node *html.Node) (string, bool) {
+	for _, attr := range node.Attr {
+		if attr.Key == "src" {
+			return attr.Val, true
+		}
+	}
+	return "", false
 }
 
 func scanJSON(name string, body []byte, ownHost string) error {

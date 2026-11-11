@@ -27,8 +27,14 @@ templ PublicLayout(site PublicSite, page PublicPage, title string, description s
 			<meta name="robots" content="noindex"/>
 			<title>{ title }</title>
 			<meta name="description" content={ description }/>
+			<!-- The digest of the published set this site was built from. It is what a build reads
+			     to learn whether anything a reader can see has changed since the last deploy. -->
+			<meta name="verse-digest" content={ site.Digest }/>
 			<link rel="stylesheet" href={ site.AssetPath }/>
 			<link rel="alternate" type="application/rss+xml" title={ site.Title } href="/feed.xml"/>
+			<!-- The only script the public site ships: the archive's search box. The site works
+			     without it, because the archive page is the complete list either way. -->
+			<script src={ site.ScriptPath } defer></script>
 		</head>
 		<body>
 			<div class="public-shell">
@@ -160,7 +166,10 @@ templ PublicArchiveBody(site PublicSite) {
 			for _, work := range site.Works {
 				<li>
 					<a href={ work.Path }>
-						<span class="work-title">{ work.Title }</span>
+						<span class="work-text">
+							<span class="work-title">{ work.Title }</span>
+							<span class="work-excerpt">{ work.Excerpt }</span>
+						</span>
 						<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
 					</a>
 				</li>

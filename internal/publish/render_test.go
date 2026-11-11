@@ -117,8 +117,15 @@ func TestRenderEscapesHostileContent(t *testing.T) {
 	}
 
 	page := string(files["w/33333333-3333-3333-3333-333333333333/index.html"])
-	if strings.Contains(page, "<script") {
-		t.Error("the work page contains a script element")
+
+	// The page carries exactly one script: the archive's search bundle, which this build wrote.
+	// The hostile content must not add a second one, and must not have produced an inline script
+	// either, which is the form the content security policy forbids.
+	if got := strings.Count(page, "<script"); got != 1 {
+		t.Errorf("the work page contains %d script elements, want exactly the build's own bundle", got)
+	}
+	if strings.Contains(page, "<script>alert(1)</script>") {
+		t.Error("the work page contains the hostile content's script, unescaped")
 	}
 	if strings.Contains(page, "<img src=x") {
 		t.Error("the work page contains an unescaped image element from content")

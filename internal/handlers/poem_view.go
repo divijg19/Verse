@@ -21,7 +21,19 @@ func PoemViewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	renderSurface(w, r, "library", templ.PoemViewScreen(r.Context(), toPoemView(p)))
+	view := toPoemView(p)
+
+	// The publication state is a separate read, because the live reads filter on published_at
+	// being null and so cannot report it. A surface that shows the state has to ask for it.
+	state, err := services.PublicationState(r.Context(), id)
+	if err != nil {
+		writePoemFetchError(w, r, id, err)
+		return
+	}
+	view.Published = state.Published
+	view.PublishedAt = state.PublishedAt
+
+	renderSurface(w, r, "library", templ.PoemViewScreen(r.Context(), view))
 }
 
 // EditorEditHandler loads a poem into the editor for editing (GET /editor/{id}).

@@ -1,199 +1,145 @@
-function verseBodyScrollLockCount() {
-  return Number(document.body.dataset.verseScrollLocks || "0");
-}
-
-function verseLockBodyScroll() {
-  const next = verseBodyScrollLockCount() + 1;
-  document.body.dataset.verseScrollLocks = String(next);
-  document.body.style.overflow = "hidden";
-}
-
-function verseUnlockBodyScroll() {
-  const next = Math.max(0, verseBodyScrollLockCount() - 1);
-  if (next === 0) {
-    delete document.body.dataset.verseScrollLocks;
-    document.body.style.overflow = "";
-    return;
+(() => {
+  // web/ts/dom.ts
+  function closestElement(target, selector) {
+    return target instanceof Element ? target.closest(selector) : null;
   }
 
-  document.body.dataset.verseScrollLocks = String(next);
-}
-
-window.verseLockBodyScroll = verseLockBodyScroll;
-window.verseUnlockBodyScroll = verseUnlockBodyScroll;
-
-function activeScreenSwapTarget(event) {
-  const screen = document.getElementById("screen");
-  const detail = event && event.detail ? event.detail : null;
-  const target = detail ? detail.target : null;
-  if (!screen || target !== screen) {
-    return null;
+  // web/ts/scroll_lock.ts
+  function bodyScrollLockCount() {
+    return Number(document.body.dataset.verseScrollLocks || "0");
   }
-  return screen;
-}
-
-function restoreScreenTransition(event) {
-  const screen = activeScreenSwapTarget(event);
-  if (!screen) {
-    return;
+  function lockBodyScroll() {
+    document.body.dataset.verseScrollLocks = String(bodyScrollLockCount() + 1);
+    document.body.style.overflow = "hidden";
+  }
+  function unlockBodyScroll() {
+    const next = Math.max(0, bodyScrollLockCount() - 1);
+    if (next === 0) {
+      delete document.body.dataset.verseScrollLocks;
+      document.body.style.overflow = "";
+      return;
+    }
+    document.body.dataset.verseScrollLocks = String(next);
   }
 
-  requestAnimationFrame(() => {
-    screen.classList.remove("opacity-0", "translate-y-2");
+  // web/ts/navigation.ts
+  function activeScreenSwapTarget(event) {
+    const screen = document.getElementById("screen");
+    const detail = event.detail;
+    const target = detail ? detail.target : null;
+    if (!screen || target !== screen) {
+      return null;
+    }
+    return screen;
+  }
+  function restoreScreenTransition(event) {
+    const screen = activeScreenSwapTarget(event);
+    if (!screen) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      screen.classList.remove("opacity-0", "translate-y-2");
+    });
+  }
+  var mobileNavState = {
+    open: false,
+    lastTrigger: null,
+  };
+  function mobileNavRoot() {
+    return document.getElementById("mobile-nav");
+  }
+  function mobileNavSheet() {
+    const root = mobileNavRoot();
+    return root ? root.querySelector("[data-mobile-nav-sheet]") : null;
+  }
+  function mobileNavToggle() {
+    const root = mobileNavRoot();
+    return root ? root.querySelector("[data-mobile-nav-toggle]") : null;
+  }
+  function mobileNavFocusTarget() {
+    const sheet = mobileNavSheet();
+    if (!sheet) {
+      return null;
+    }
+    return (
+      sheet.querySelector("[data-mobile-nav-link][data-active='true']") ||
+      sheet.querySelector("[data-mobile-nav-link]")
+    );
+  }
+  function syncMobileNavButton(expanded) {
+    const toggle = mobileNavToggle();
+    if (!toggle) {
+      return;
+    }
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  }
+  function openMobileNav(node) {
+    const sheet = mobileNavSheet();
+    if (!sheet || mobileNavState.open) {
+      return;
+    }
+    mobileNavState.open = true;
+    mobileNavState.lastTrigger = node ?? mobileNavToggle();
+    sheet.hidden = false;
+    syncMobileNavButton(true);
+    lockBodyScroll();
+    const focusTarget = mobileNavFocusTarget();
+    if (focusTarget) {
+      requestAnimationFrame(() => focusTarget.focus());
+    }
+  }
+  function closeMobileNav() {
+    const sheet = mobileNavSheet();
+    if (sheet) {
+      sheet.hidden = true;
+    }
+    if (mobileNavState.open) {
+      unlockBodyScroll();
+    }
+    mobileNavState.open = false;
+    syncMobileNavButton(false);
+    if (mobileNavState.lastTrigger && mobileNavState.lastTrigger.isConnected) {
+      const focusTarget = mobileNavState.lastTrigger;
+      requestAnimationFrame(() => focusTarget.focus());
+    }
+    mobileNavState.lastTrigger = null;
+  }
+  document.body.addEventListener("htmx:beforeRequest", (event) => {
+    const screen = activeScreenSwapTarget(event);
+    if (!screen) {
+      return;
+    }
+    screen.classList.add("opacity-0", "translate-y-2");
   });
-}
-
-const verseMobileNavState = {
-  open: false,
-  lastTrigger: null,
-};
-
-function verseMobileNavRoot() {
-  return document.getElementById("mobile-nav");
-}
-
-function verseMobileNavSheet() {
-  const root = verseMobileNavRoot();
-  return root ? root.querySelector("[data-mobile-nav-sheet]") : null;
-}
-
-function verseMobileNavToggle() {
-  const root = verseMobileNavRoot();
-  return root ? root.querySelector("[data-mobile-nav-toggle]") : null;
-}
-
-function verseMobileNavFocusTarget() {
-  const sheet = verseMobileNavSheet();
-  if (!sheet) {
-    return null;
-  }
-
-  return (
-    sheet.querySelector("[data-mobile-nav-link][data-active='true']") ||
-    sheet.querySelector("[data-mobile-nav-link]")
-  );
-}
-
-function verseSyncMobileNavButton(expanded) {
-  const toggle = verseMobileNavToggle();
-  if (!toggle) {
-    return;
-  }
-
-  toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
-}
-
-function verseOpenMobileNav(node) {
-  const sheet = verseMobileNavSheet();
-  if (!sheet || verseMobileNavState.open) {
-    return;
-  }
-
-  verseMobileNavState.open = true;
-  verseMobileNavState.lastTrigger = node || verseMobileNavToggle();
-  sheet.hidden = false;
-  verseSyncMobileNavButton(true);
-  verseLockBodyScroll();
-
-  const focusTarget = verseMobileNavFocusTarget();
-  if (focusTarget) {
-    requestAnimationFrame(() => focusTarget.focus());
-  }
-}
-
-function verseCloseMobileNav() {
-  const sheet = verseMobileNavSheet();
-  if (sheet) {
-    sheet.hidden = true;
-  }
-
-  if (verseMobileNavState.open) {
-    verseUnlockBodyScroll();
-  }
-
-  verseMobileNavState.open = false;
-  verseSyncMobileNavButton(false);
-
-  if (
-    verseMobileNavState.lastTrigger &&
-    verseMobileNavState.lastTrigger.isConnected
-  ) {
-    const focusTarget = verseMobileNavState.lastTrigger;
-    requestAnimationFrame(() => focusTarget.focus());
-  }
-  verseMobileNavState.lastTrigger = null;
-}
-
-window.verseOpenMobileNav = verseOpenMobileNav;
-window.verseCloseMobileNav = verseCloseMobileNav;
-
-document.body.addEventListener("htmx:beforeRequest", (event) => {
-  const screen = activeScreenSwapTarget(event);
-  if (!screen) {
-    return;
-  }
-
-  screen.classList.add("opacity-0", "translate-y-2");
-});
-
-document.body.addEventListener("htmx:afterSwap", (event) => {
-  restoreScreenTransition(event);
-
-  if (activeScreenSwapTarget(event)) {
-    verseCloseMobileNav();
-  }
-});
-
-// Ensure the screen is restored even if the request fails or no swap occurs.
-document.body.addEventListener("htmx:afterRequest", restoreScreenTransition);
-
-// Also handle network/response errors explicitly.
-document.body.addEventListener("htmx:responseError", restoreScreenTransition);
-
-document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") {
-    return;
-  }
-
-  if (verseMobileNavState.open) {
-    verseCloseMobileNav();
-  }
-});
-
-window.addEventListener("resize", () => {
-  if (window.innerWidth >= 1024 && verseMobileNavState.open) {
-    verseCloseMobileNav();
-  }
-});
-
-// Delegated listeners for the mobile navigation.
-//
-// Both of these were onclick attributes until v0.4.8, and neither had run since v0.3.7: the content
-// security policy sets script-src 'self' with no 'unsafe-inline' and no nonce anywhere in this
-// application, so every inline attribute was blocked in every browser. The desktop nav is
-// display:none below 1024px, which left the hamburger as the only route to the navigation on a
-// phone, pointing at nothing.
-//
-// The functions below are unchanged. verseOpenMobileNav took the triggering element and uses it
-// only to remember where focus came from, so the matched element is the same argument the inline
-// attribute passed as `this`. verseCloseMobileNav takes none, and the attribute's `this` was already
-// being discarded.
-//
-// The target is checked for being an Element first: a click can land on a text node or the document
-// itself, and calling closest on those is a TypeError rather than a false result. An inline
-// attribute never had to consider it, because the browser passed the element directly.
-document.addEventListener("click", (event) => {
-  if (!(event.target instanceof Element)) {
-    return;
-  }
-
-  const toggle = event.target.closest("[data-mobile-nav-toggle]");
-  if (toggle) {
-    verseOpenMobileNav(toggle);
-    return;
-  }
-
-  if (event.target.closest("[data-mobile-nav-close]")) {
-    verseCloseMobileNav();
-  }
-});
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    restoreScreenTransition(event);
+    if (activeScreenSwapTarget(event)) {
+      closeMobileNav();
+    }
+  });
+  document.body.addEventListener("htmx:afterRequest", restoreScreenTransition);
+  document.body.addEventListener("htmx:responseError", restoreScreenTransition);
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    if (mobileNavState.open) {
+      closeMobileNav();
+    }
+  });
+  window.addEventListener("resize", () => {
+    if (window.innerWidth >= 1024 && mobileNavState.open) {
+      closeMobileNav();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    const toggle = closestElement(event.target, "[data-mobile-nav-toggle]");
+    if (toggle) {
+      openMobileNav(toggle);
+      return;
+    }
+    if (closestElement(event.target, "[data-mobile-nav-close]")) {
+      closeMobileNav();
+    }
+  });
+})();

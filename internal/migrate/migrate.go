@@ -9,13 +9,14 @@
 package migrate
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -415,7 +416,7 @@ func load(fsys fs.FS) ([]migration, error) {
 		})
 	}
 
-	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
+	slices.SortFunc(files, func(a, b migration) int { return cmp.Compare(a.name, b.name) })
 
 	return files, nil
 }
@@ -465,7 +466,7 @@ func checkNoVanished(applied map[string]appliedRecord, files []migration) error 
 		return nil
 	}
 
-	sort.Strings(missing)
+	slices.Sort(missing)
 
 	return fmt.Errorf(
 		"these migrations are recorded as applied but no longer exist: %s; "+

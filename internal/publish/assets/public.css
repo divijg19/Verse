@@ -570,11 +570,49 @@ a:hover {
   text-decoration: none;
 }
 
+.work-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .work-title {
   font-size: var(--text-title);
   line-height: 1.45;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* The excerpt.
+ *
+ * It is the work's body, shortened, and it is here so that a reader scanning the archive can see
+ * what a work is about without opening it. It is also what the search matches against, and a match
+ * on a phrase inside a work would otherwise look arbitrary -- a row titled with something that has
+ * nothing to do with the words that were typed.
+ *
+ * It is the same bounded excerpt the search index carries and the work page's meta description
+ * carries, so nothing here is published that was not already.
+ */
+.work-excerpt {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The matched phrase.
+ *
+ * The colour is the accent rather than a highlighter yellow, because the site has one accent and
+ * the highlight is part of it rather than a new colour. The background is a low-opacity wash of it,
+ * so the text keeps the contrast it had.
+ */
+.work-excerpt mark {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--ink);
+  border-radius: 2px;
+  padding: 0 0.1em;
 }
 
 .work-list time {
@@ -587,13 +625,106 @@ a:hover {
 }
 
 /* ------------------------------------------------------------------------------------------
-   The share surface
-   ------------------------------------------------------------------------------------------
-   A reader comes here to send a work to somebody, so the address is on the page rather than
-   behind a link. It is selectable in one click, which is a copy button without a line of script.
-   ------------------------------------------------------------------------------------------ */
+   The archive's search box.
+ *
+ * The box is inserted by the script rather than being in the markup, so a reader with no script
+ * sees no input at all rather than an input that cannot search. The styling here is therefore for a
+ * box that is already there, and the layout above it is the one the archive would have had without
+ * it.
+ */
+.archive-search-field {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
 
-.share-list {
+.archive-search {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: rgba(18, 18, 22, 0.72);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.archive-search::placeholder {
+  color: var(--muted);
+}
+
+.archive-search:hover {
+  border-color: #525252;
+}
+
+.archive-search:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
+.archive-search-status {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-meta);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+The
+  share
+  surface
+  ------------------------------------------------------------------------------------------
+  A
+  reader
+  comes
+  here
+  to
+  send
+  a
+  work
+  to
+  somebody,
+so
+  the
+  address
+  is
+  on
+  the
+  page
+  rather
+  than
+  behind
+  a
+  link.
+  It
+  is
+  selectable
+  in
+  one
+  click,
+which
+  is
+  a
+  copy
+  button
+  without
+  a
+  line
+  of
+  script.
+  ------------------------------------------------------------------------------------------
+  */
+  .share-list {
   list-style: none;
   margin: 0;
   padding: 0;

@@ -40,6 +40,41 @@ templ PoemViewContent(ctx context.Context, poem PoemView) {
 				color: rgb(229 229 229);
 			}
 
+			.verse-poem-view-publication {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				flex-wrap: wrap;
+			}
+
+			.verse-poem-view-publication-state {
+				display: flex;
+				align-items: baseline;
+				gap: 0.65rem;
+				margin: 0;
+				font-size: 0.62rem;
+				letter-spacing: 0.18em;
+				text-transform: uppercase;
+			}
+
+			.verse-poem-view-publication-badge {
+				color: rgb(163 163 163);
+			}
+
+			.verse-poem-view-publication-badge--draft {
+				color: rgb(115 115 115);
+			}
+
+			.verse-poem-view-publication-when {
+				color: rgb(115 115 115);
+			}
+
+			.verse-poem-view-publication-form {
+				display: flex;
+				margin: 0;
+			}
+
 				.verse-poem-view-article {
 					padding-top: 1.1rem;
 					font-size: 1.08rem;
@@ -85,6 +120,35 @@ templ PoemViewContent(ctx context.Context, poem PoemView) {
 			</div>
 			<p class="pt-5 text-[0.62rem] uppercase tracking-[0.18em] text-neutral-500">{ poem.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }</p>
 			<article class="verse-poem-view-article whitespace-pre-wrap">{ poem.Content }</article>
+		</div>
+		<div class="verse-poem-view-publication">
+			<p class="verse-poem-view-publication-state">
+				if poem.Published {
+					<span class="verse-poem-view-publication-badge">Published</span>
+					if poem.PublishedAt != nil {
+						<span class="verse-poem-view-publication-when">since { poem.PublishedAt.UTC().Format("Jan 2, 2006") }</span>
+					}
+				} else {
+					<span class="verse-poem-view-publication-badge verse-poem-view-publication-badge--draft">Draft</span>
+					<span class="verse-poem-view-publication-when">not on the public site</span>
+				}
+			</p>
+			<form
+				hx-post="/poem/publish"
+				hx-target="#screen"
+				hx-swap="innerHTML"
+				class="verse-poem-view-publication-form"
+			>
+				<input type="hidden" name="id" value={ poem.ID }/>
+				<input type="hidden" name="publish" value={ poem.PublishAction() }/>
+				@CSRFField(ctx)
+				<button
+					type="submit"
+					class={ poem.PublishButtonClass() }
+				>
+					{ poem.PublishActionLabel() }
+				</button>
+			</form>
 		</div>
 		<form
 			hx-post="/poem/delete"

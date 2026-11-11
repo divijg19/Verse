@@ -143,7 +143,9 @@ func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
 		t.Fatalf("layout does not style the viewport from data-editor-overlay-active: %q", layout)
 	}
 
-	js := readStaticFile(t, filepath.Join("static", "js", "editor.js"))
+	// The source is read rather than the compiled bundle: the source is where the behavior is
+	// written, and the bundle's currency is checked separately.
+	js := readRepoFile(t, filepath.Join("web", "ts", "editor.ts"))
 	if strings.Contains(js, `viewport.dataset.editorOverlayOpen`) {
 		t.Fatalf("the viewport state flag reuses data-editor-overlay-open, which is also the open " +
 			"control selector; every click inside an open overlay then matches the viewport ancestor " +
@@ -153,8 +155,8 @@ func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
 	assertContainsAll(t, js,
 		`viewport.dataset.editorOverlayActive = "true";`,
 		`delete viewport.dataset.editorOverlayActive;`,
-		`verseClosest(event.target, "[data-editor-overlay-open]")`,
-		`verseClosest(event.target, "[data-editor-overlay-close]")`,
+		`closestElement(event.target, "[data-editor-overlay-open]")`,
+		`closestElement(event.target, "[data-editor-overlay-close]")`,
 	)
 
 	// The overlay is a native dialog. The backdrop is the dialog's ::backdrop, and the close
@@ -167,6 +169,14 @@ func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
 	)
 
 	assertContainsAll(t, js,
+		`overlay.showModal()`,
+		`overlay.close()`,
+		`editorOverlay.addEventListener("close"`,
+	)
+
+	// And the bundle that actually ships carries the same three.
+	bundle := readRepoFile(t, filepath.Join("static", "js", "editor.js"))
+	assertContainsAll(t, bundle,
 		`overlay.showModal()`,
 		`overlay.close()`,
 		`editorOverlay.addEventListener("close"`,

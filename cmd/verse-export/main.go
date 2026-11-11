@@ -41,6 +41,8 @@ func run() error {
 	out := flag.String("out", "", "write to this file instead of stdout")
 	includeDeleted := flag.Bool("include-deleted", false,
 		"include soft-deleted works; needed for a complete archival copy")
+	public := flag.Bool("public", false,
+		"write only the works a reader can see: published and not deleted")
 	flag.Parse()
 
 	writer, ok := export.ByName(*format)
@@ -57,7 +59,7 @@ func run() error {
 		}
 	}()
 
-	doc, err := export.Build(context.Background(), *includeDeleted)
+	doc, err := export.Build(context.Background(), export.Options{IncludeDeleted: *includeDeleted, PublishedOnly: *public})
 	if err != nil {
 		return err
 	}

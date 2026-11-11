@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -58,7 +60,48 @@ func Connect() error {
 		return err
 	}
 	Pool = pool
+	LogDatabaseLocation("DATABASE_URL")
 	return nil
+}
+
+// LogDatabaseLocation names the database the service is talking to.
+//
+// The host is logged and nothing else. The connection string carries a password, and a password
+// belongs in neither a log nor an incident report.
+//
+// The question is worth answering at boot because the answer is not obvious from the configuration.
+// The service and the database are named independently, so they can end up in different places: the
+// service running in Oregon and the database in Singapore is a 180-millisecond round trip on every
+// query, and nothing in the boot log would say so. One line does.
+//
+// The region is in the host name, so the line answers "where is my database" without the
+// application having to be taught what a region is.
+func LogDatabaseLocation(envVar string) {
+	host := hostOf(os.Getenv(envVar))
+	if host == "" {
+		return
+	}
+	// #nosec G706 -- the host cannot carry a newline. It comes out of net/url's parser, and
+	// that parser rejects ASCII control characters in a URL outright, so a host containing one
+	// never reaches this line. The envVar is a constant from this file rather than request input.
+	log.Printf("database: %s (from %s)", host, envVar) // #nosec G706
+}
+
+// hostOf returns the host in a connection string, without the credentials.
+//
+// It is unexported because the boot log is the only thing in this repository that wants it. The
+// documentation that says which region the database should be in names a host rather than
+// computing one.
+func hostOf(dsn string) string {
+	if dsn == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
 }
 
 // Open creates a pool for the given environment variable, retrying while the database is asleep.

@@ -65,9 +65,9 @@ func ListPublishedPoems(ctx context.Context) ([]models.Poem, error) {
 //
 // Exists because ListPublishedPoems returns a slice, and a slice length is the one thing a caller
 // cannot get wrong and be right: an archive built from a truncated set is not a smaller archive, it
-// is a lie about the size of the library. The dry-run enumerates by querying, and comparing that
+// is a lie about the size of the library. The listing enumerates by querying, and comparing that
 // count against len(ListPublishedPoems) is how a future change that adds a bound gets caught -- by
-// TestTheDryRunCountMatchesThePublishedSet rather than by a reader noticing a missing work years
+// TestTheListingCountMatchesThePublishedSet rather than by a reader noticing a missing work years
 // later.
 func CountPublishedPoems(ctx context.Context) (int, error) {
 	if err := database.Require(); err != nil {

@@ -1,9 +1,12 @@
 package templ
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/divijg19/Verse/internal/presenters"
 )
 
 // PublicWork is one published work as the public site sees it.
@@ -45,30 +48,15 @@ func (w PublicWork) ISODate() string {
 
 // Body returns the work without its title line.
 //
-// The title is the work's first non-blank line, so a page that shows the title as a heading and
-// the work as a body has to take that line out of the body once. The two together are the work
-// verbatim: nothing is reordered, and nothing is dropped except the line the heading is.
+// The title is the work's first non-blank line, so a page that shows the title as a heading and the
+// work as a body has to take that line out of the body once. The body drops that line, and the title
+// and the body together are still the work verbatim.
 //
-// The blank lines that led up to the title go with it, so the body starts where the title ended
-// rather than opening with a gap the reader has to scroll past.
-//
-// The line endings are normalized the same way the title is derived, so a work written on Windows
-// does not carry a stray carriage return into the body.
+// The derivation lives in the presenters package, which is where the title comes from in the first
+// place. Two implementations of "the body without the title" would be two places for them to
+// disagree, and a disagreement here is a work whose first line is shown twice.
 func (w PublicWork) Body() string {
-	normalized := strings.ReplaceAll(w.Content, "\r\n", "\n")
-	lines := strings.Split(normalized, "\n")
-
-	for i, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		rest := lines[i+1:]
-		return strings.TrimLeft(strings.Join(rest, "\n"), "\n")
-	}
-
-	// A work with no line in it at all has no title and no body.
-	return ""
+	return presenters.BodyWithoutTitle(w.Content)
 }
 
 // PublicLink is one destination outside this site.
@@ -166,7 +154,15 @@ type PublicSite struct {
 	Tagline     string
 	BaseURL     string
 	AssetPath   string
+	ScriptPath  string
 	Works       []PublicWork
+
+	// Digest identifies the published set this site was built from.
+	//
+	// It is in the page because the deployed site is then the record of what was last deployed:
+	// a build can fetch the live index, read the digest out of it, and learn whether anything a
+	// reader can see has changed without keeping a list of its own.
+	Digest string
 
 	// Links are the destinations outside this site, shown in the brand pill's menu.
 	Links []PublicLink
@@ -181,12 +177,38 @@ func (s PublicSite) Address(path string) string {
 	return strings.TrimRight(s.BaseURL, "/") + path
 }
 
+// PublishedOrder compares two works by the order a reader met them in.
+//
+// It returns a negative number when a comes first, so it is what slices.SortFunc wants.
+//
+// Newest first, with the identifier as the tiebreak. The tiebreak is not decoration:
+// published_at can tie -- every row written by one transaction carries the same instant -- and an
+// order that is not total produces different output for the same input between two builds, which
+// defeats the byte-identical output this project relies on.
+//
+// It is one function because it is one rule, and it was written out three times: once in the
+// publisher's database path, once in its file path, and once here. The first two were held together
+// by a test that compares the two paths byte for byte. This third copy was not covered by anything,
+// and it decides which works the front page shows -- so a change to the rule in one place could have
+// reordered the front page while every test still passed.
+//
+// The publisher's paths use it to order the works they produce, and the front page uses it to find
+// the most recent three.
+func PublishedOrder(a, b PublicWork) int {
+	if !a.PublishedAt.Equal(b.PublishedAt) {
+		if a.PublishedAt.After(b.PublishedAt) {
+			return -1
+		}
+		return 1
+	}
+	return cmp.Compare(b.ID, a.ID)
+}
+
 // RecentWorks returns the most recently published works, up to a limit.
 //
 // The works are chosen by publication date rather than taken from the front of the slice, so the
 // answer does not depend on the caller having sorted the set first. The publisher does sort it, and
-// the tiebreak matches the publisher's own: the same instant falls back to the identifier, so two
-// works published together keep a fixed order between builds.
+// it sorts it by PublishedOrder, which is the same rule.
 //
 // The input slice is not modified.
 func (s PublicSite) RecentWorks(limit int) []PublicWork {
@@ -197,12 +219,7 @@ func (s PublicSite) RecentWorks(limit int) []PublicWork {
 	ordered := make([]PublicWork, len(s.Works))
 	copy(ordered, s.Works)
 
-	sort.Slice(ordered, func(i, j int) bool {
-		if !ordered[i].PublishedAt.Equal(ordered[j].PublishedAt) {
-			return ordered[i].PublishedAt.After(ordered[j].PublishedAt)
-		}
-		return ordered[i].ID > ordered[j].ID
-	})
+	slices.SortFunc(ordered, PublishedOrder)
 
 	if len(ordered) < limit {
 		return ordered

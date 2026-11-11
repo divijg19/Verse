@@ -32,7 +32,11 @@ import (
 const Format = "verse-export"
 
 // FormatVersion is the current layout version.
-const FormatVersion = 1
+//
+// It was 1 until v0.5.0, when the publication instant was added to the work record. Version 1 files
+// are still readable: the publication instant is simply absent from them, and a reader that wants it
+// has to know that a work in a version 1 file was published by some other means.
+const FormatVersion = 2
 
 // Document is the whole export.
 //
@@ -42,6 +46,7 @@ type Document struct {
 	Format     string    `json:"format"`
 	Version    int       `json:"version"`
 	ExportedAt time.Time `json:"exported_at"`
+	Digest     string    `json:"digest"`
 	Poems      []Poem    `json:"poems"`
 }
 
@@ -56,6 +61,14 @@ type Poem struct {
 	CreatedAt time.Time  `json:"created_at"`
 	DeletedAt *time.Time `json:"deleted_at"`
 	Versions  []Version  `json:"versions"`
+
+	// PublishedAt is when the work was published, or nil when it is a draft.
+	//
+	// This was missing until v0.5.0, and it made the export lossy in the one respect that
+	// mattered: the file could not say which works were public, so a consumer of the export could
+	// not rebuild the public site from it. The instant was in the database the whole time; the
+	// export simply did not carry it.
+	PublishedAt *time.Time `json:"published_at"`
 }
 
 // Version is one retained revision.
@@ -270,12 +283,36 @@ func countVersions(d Document) int {
 	return n
 }
 
+// Options control what an export contains.
+type Options struct {
+	// IncludeDeleted includes soft-deleted works.
+	//
+	// They are excluded by default because a routine export should be the current body of work;
+	// -include-deleted exists for the archival case, and is documented as the lossless one.
+	IncludeDeleted bool
+
+	// PublishedOnly restricts the export to works that are published and live, and to the current
+	// text of those works.
+	//
+	// This is a different artifact from the archival export rather than a flag on it. It holds only
+	// what a reader can see, so it can be handed to a build system or uploaded to a store without
+	// a second thought about what it leaks. A work that is published and then soft-deleted is
+	// excluded: the publisher's own filter excludes it, and an export that included it would be
+	// publishing a work the site does not.
+	//
+	// The retained revisions are excluded too, and that is the part that is easy to get wrong. A
+	// revision is a superseded draft: it is the text a work used to say, and a reader has never
+	// seen it. Carrying them would make the published export hold more than the published set, and
+	// the published set is the whole claim this mode makes -- the artifact crosses a trust
+	// boundary into a build environment, so anything in it is in the hands of that environment.
+	//
+	// The archival export is the one that keeps them. Losing superseded text is what an archive
+	// must never do; the published export is not an archive.
+	PublishedOnly bool
+}
+
 // Build assembles a Document from the database.
-//
-// includeDeleted controls whether soft-deleted works are included. They are excluded by default
-// because a routine export should be the current body of work; -include-deleted exists for the
-// archival case, and is documented as the lossless one.
-func Build(ctx context.Context, includeDeleted bool) (Document, error) {
+func Build(ctx context.Context, opts Options) (Document, error) {
 	doc := Document{
 		Format:     Format,
 		Version:    FormatVersion,
@@ -288,10 +325,35 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 	}
 	p := database.Pool
 
-	rows, err := p.Query(ctx, `
-        SELECT `+models.PoemColumnsIncludingDeleted+`
-        FROM poems
-        ORDER BY created_at, id`)
+	// The filter is in the query, not in the loop below.
+	//
+	// It used to be in the loop, which meant the query returned every row in the table and the
+	// export decided in Go which of them to keep. For the published export that read every draft's
+	// full text out of the database -- five times more content than it kept, on this library --
+	// and put it in memory, on every publish action and every artifact build, in order to throw it
+	// away.
+	//
+	// Two reasons to push it down. It is less data over the wire and less work in Go. And it is
+	// one spelling of the published predicate rather than two: the Go form below was the same rule
+	// as models.PublishedFilter written a third way, and the test that refuses a second spelling
+	// cannot see a rule written in Go at all.
+	//
+	// The published filter is models.PublishedFilter rather than a second literal, for the reason
+	// that constant exists: this predicate is the boundary of the author/viewer split.
+	query := `
+        SELECT ` + models.ExportPoemColumns + `
+        FROM poems`
+
+	switch {
+	case opts.PublishedOnly:
+		query += ` WHERE ` + models.PublishedFilter
+	case !opts.IncludeDeleted:
+		query += ` WHERE deleted_at IS NULL`
+	}
+
+	query += ` ORDER BY created_at, id`
+
+	rows, err := p.Query(ctx, query)
 	if err != nil {
 		return doc, fmt.Errorf("read poems: %w", err)
 	}
@@ -299,11 +361,8 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 
 	for rows.Next() {
 		var p Poem
-		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.DeletedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.DeletedAt, &p.PublishedAt); err != nil {
 			return doc, fmt.Errorf("read poem: %w", err)
-		}
-		if p.DeletedAt != nil && !includeDeleted {
-			continue
 		}
 		doc.Poems = append(doc.Poems, p)
 	}
@@ -319,39 +378,55 @@ func Build(ctx context.Context, includeDeleted bool) (Document, error) {
 	// that returned the same rows, which described an approach this code does not use and would be a
 	// poor guide to anyone following it: the join is unnecessary when the versions are grouped in
 	// Go anyway, and joining poems to versions would re-read every poem body.
-	versionRows, err := p.Query(ctx, `
+	if opts.PublishedOnly {
+		// The published export carries no history, so it does not read any.
+		//
+		// The query used to run and its result was discarded, which was a full scan of the whole
+		// revision history on every publish for data the export does not carry. See the
+		// PublishedOnly field's comment for why it carries none.
+		for i := range doc.Poems {
+			doc.Poems[i].Versions = []Version{}
+		}
+	} else {
+		versionRows, err := p.Query(ctx, `
         SELECT pv.poem_id, pv.id, pv.content, pv.recorded_at
         FROM poem_versions pv
         ORDER BY pv.poem_id, pv.seq`)
-	if err != nil {
-		return doc, fmt.Errorf("read retained revisions: %w", err)
-	}
-	defer versionRows.Close()
-
-	byPoem := map[string][]Version{}
-	for versionRows.Next() {
-		var poemID string
-		var v Version
-		if err := versionRows.Scan(&poemID, &v.ID, &v.Content, &v.RecordedAt); err != nil {
-			return doc, fmt.Errorf("read retained revision: %w", err)
+		if err != nil {
+			return doc, fmt.Errorf("read retained revisions: %w", err)
 		}
-		byPoem[poemID] = append(byPoem[poemID], v)
-	}
-	if err := versionRows.Err(); err != nil {
-		return doc, fmt.Errorf("read retained revisions: %w", err)
+		defer versionRows.Close()
+
+		byPoem := map[string][]Version{}
+		for versionRows.Next() {
+			var poemID string
+			var v Version
+			if err := versionRows.Scan(&poemID, &v.ID, &v.Content, &v.RecordedAt); err != nil {
+				return doc, fmt.Errorf("read retained revision: %w", err)
+			}
+			byPoem[poemID] = append(byPoem[poemID], v)
+		}
+		if err := versionRows.Err(); err != nil {
+			return doc, fmt.Errorf("read retained revisions: %w", err)
+		}
+
+		// Oldest first, so a reader sees the history of a poem in the order it happened.
+		for i := range doc.Poems {
+			versions := byPoem[doc.Poems[i].ID]
+			if versions == nil {
+				// Empty, never null: a consumer reading the file back must be able to tell "no
+				// history" from "field absent", which is the kind of ambiguity that only surfaces
+				// during a restore.
+				versions = []Version{}
+			}
+			doc.Poems[i].Versions = versions
+		}
 	}
 
-	// Oldest first, so a reader sees the history of a poem in the order it happened.
-	for i := range doc.Poems {
-		versions := byPoem[doc.Poems[i].ID]
-		if versions == nil {
-			// Empty, never null: a consumer reading the file back must be able to tell "no
-			// history" from "field absent", which is the kind of ambiguity that only surfaces
-			// during a restore.
-			versions = []Version{}
-		}
-		doc.Poems[i].Versions = versions
-	}
+	// The digest covers the published set whichever way this export was filtered, so that a
+	// consumer can compare a full export with a public one and get the same answer about whether
+	// anything a reader can see has changed.
+	doc.Digest = PublishedDigest(doc.Poems)
 
 	return doc, nil
 }

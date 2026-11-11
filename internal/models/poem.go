@@ -81,6 +81,18 @@ const PoemColumns = "id, content, created_at"
 // answer being sought. See the DeletedAt comment on Poem.
 const PoemColumnsIncludingDeleted = PoemColumns + ", deleted_at"
 
+// ExportPoemColumns is every column the export writes, in the order the export scans them.
+//
+// The export is the only read that wants all three of the instant columns at once: the creation
+// instant, the soft-delete instant and the publication instant. The first two were the whole of the
+// schema once; the third arrived with the author/viewer split and the export was not taught about
+// it, which made the export lossy in the one respect that mattered most -- it could not say which
+// works were public.
+//
+// A separate constant rather than a variant flag on the others, because this list belongs to one
+// caller and the others to several. A flag here would invite a scan that did not match the columns.
+const ExportPoemColumns = PoemColumns + ", deleted_at, published_at"
+
 // PublishedPoemColumns is PoemColumns plus published_at, for the publisher's read.
 //
 // Separate from the other two lists rather than a variant flag, because it is the only read that is

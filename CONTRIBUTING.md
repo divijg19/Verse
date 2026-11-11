@@ -54,8 +54,9 @@ run` does not enforce the formatters section, so the formatting gate is load-bea
     be dropped in favor of relying on the linter.
 
     ```
-    bun run format:check   # bun fmt, repo-wide: JS, CSS, JSON, YAML, Markdown
+    bun fmt --check        # bun fmt, repo-wide: JS, CSS, JSON, YAML, Markdown
     bun run fmt:go         # golangci-lint fmt --diff, for Go
+    bun check              # the TypeScript type checker
     bun run vet            # go vet
     bun run lint           # golangci-lint, including misspell and gosec
     bun run staticcheck    # whole-program analysis
@@ -63,10 +64,23 @@ run` does not enforce the formatters section, so the formatting gate is load-bea
     bun run test           # go test, race-enabled
     ```
 
-    `bun run check` runs all of them in that order. The scripts pin the tool versions CI installs,
+    `bun run qa` runs all of them in that order. The scripts pin the tool versions CI installs,
     so a local pass means the same thing CI means; there is no Makefile to keep in step. The
     database-backed tests still need the two environment variables above, or they skip and the exit
     status stays zero.
+
+    Two of those are not scripts, and that is deliberate.
+
+    `bun fmt --check` and `bun check` are built into Bun. The first is the formatter for
+    JavaScript, CSS, JSON, YAML and Markdown; the second is a full TypeScript type checker that
+    reads the repository's `tsconfig.json` and reports the same errors `tsc --noEmit` does. Using
+    them means the repository does not carry the TypeScript compiler as a dependency for the sake
+    of checking seven files, and the type checker is always the same version as the bundler that
+    compiles the sources.
+
+    The script is named `qa` rather than `check` because `bun check` is a built-in command, and a
+    script of the same name would shadow it — so `bun run qa` would check the types with something
+    else entirely, and the name would look right while doing the wrong thing.
 
     `staticcheck` is a separate gate deliberately. `golangci-lint`'s staticcheck is per-package; the
     standalone binary also catches unused identifiers across package boundaries, which is how two

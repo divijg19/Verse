@@ -34,6 +34,13 @@
  * templ/ holds the class names, because that is where the markup is. internal/ is included because
  * Go code renders markup too: internal/handlers/dashboard.go and templ/heatmap_helpers.go both contain
  * class attributes, and a class only ever written from Go would otherwise be missing.
+ *
+ * web/ts is included for the same reason. The browser code is TypeScript now, and it renders markup
+ * too: the archive's search box builds its own elements and sets their class names. None of them is
+ * a Tailwind utility today -- the public site has a stylesheet of its own -- but a class only ever
+ * written from TypeScript would be missing in exactly the same way, and the failure is silent: the
+ * element appears with no style and nothing says why.
  */
 @source "../../templ";
 @source "../../internal";
+@source "../../web/ts";

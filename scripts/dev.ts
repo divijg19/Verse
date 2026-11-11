@@ -88,8 +88,9 @@ function presentKeys(contents: string): Set<string> {
   const keys = new Set<string>();
   for (const line of contents.split("\n")) {
     const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(line);
-    if (match) {
-      keys.add(match[1]);
+    const name = match?.[1];
+    if (name) {
+      keys.add(name);
     }
   }
   return keys;
@@ -101,7 +102,7 @@ function presentKeys(contents: string): Set<string> {
 // may be a bare connection string or a line from an env file.
 function databaseHostOf(dsn: string): string {
   const line = /^\s*(?:export\s+)?DATABASE_URL\s*=\s*"?([^"\n]+)"?/m.exec(dsn);
-  const value = line ? line[1] : dsn;
+  const value = line?.[1] ?? dsn;
   try {
     return new URL(value).hostname;
   } catch {
@@ -325,7 +326,7 @@ function requireLocalDatabase(): void {
   process.exit(1);
 }
 
-async function setup(): void {
+async function setup(): Promise<void> {
   startDatabase();
   mergeEnv();
   ensureTestDatabase();
@@ -435,7 +436,8 @@ function startServer(
 // The path is normalized before it is joined onto the root, and the result is checked to still be
 // inside the root, so a request cannot escape the served directory.
 function resolveRequest(root: string, urlPath: string): string | null {
-  const withoutQuery = urlPath.split("?")[0].split("#")[0];
+  const [beforeQuery = ""] = urlPath.split("?");
+  const [withoutQuery = ""] = beforeQuery.split("#");
 
   let decoded: string;
   try {
@@ -491,6 +493,13 @@ async function buildPublic(): Promise<boolean> {
   if (templ !== 0) {
     return false;
   }
+
+  // The bundles are rebuilt before the site is published, because the public one is embedded in
+  // the publish binary: a TypeScript edit that did not reach it would ship the old script.
+  const bundles = await run(["bun", "scripts/build_js.ts"]);
+  if (bundles !== 0) {
+    return false;
+  }
   const publish = await run([
     "go",
     "run",
@@ -503,10 +512,22 @@ async function buildPublic(): Promise<boolean> {
   return publish === 0;
 }
 
+// The generated stylesheet.
+//
+// It is build output, so watching it would make the build trigger itself: the Tailwind step writes
+// it, the write fires the watcher, and the watcher runs the Tailwind step again.
+const generatedStylesheet = join(
+  import.meta.dir,
+  "..",
+  "static",
+  "css",
+  "output.css",
+);
+
 // isWatched decides whether a changed path should trigger a rebuild.
 //
 // The generated Go files are excluded: the build regenerates them, and watching them would make the
-// build trigger itself.
+// build trigger itself. The generated stylesheet is excluded for the same reason.
 //
 // The public stylesheet is included. It is a committed hand-written file under internal/, and it is
 // the whole of the reader site's appearance: a change to it changes the output of the build, so it
@@ -519,17 +540,27 @@ function isWatched(filename: string | Buffer | null): boolean {
   if (filename.endsWith("_templ.go")) {
     return false;
   }
+  if (resolve(import.meta.dir, "..", filename) === generatedStylesheet) {
+    return false;
+  }
   return (
     filename.endsWith(".templ") ||
     filename.endsWith(".go") ||
-    filename.endsWith(".css")
+    filename.endsWith(".css") ||
+    filename.endsWith(".ts")
   );
 }
 
 // watchSources calls onChange when a source file changes, and returns a function that stops
 // watching.
-function watchSources(onChange: () => void): () => void {
-  const roots = ["templ", "internal", "cmd"].map((dir) =>
+function watchSources(
+  onChange: () => void,
+  accepts: (filename: string) => boolean = () => true,
+): () => void {
+  // The static directory is watched for the authoring stylesheet's source. It is not a build
+  // output directory -- the one generated file in it is excluded above -- but it does hold
+  // static/css/input.css, which is where the authoring site's stylesheet starts.
+  const roots = ["templ", "internal", "cmd", "web/ts", "static"].map((dir) =>
     join(import.meta.dir, "..", dir),
   );
 
@@ -539,6 +570,9 @@ function watchSources(onChange: () => void): () => void {
     .map((dir) =>
       watch(dir, { recursive: true }, (_event, filename) => {
         if (!isWatched(filename)) {
+          return;
+        }
+        if (typeof filename === "string" && !accepts(filename)) {
           return;
         }
         if (timer) {
@@ -556,6 +590,53 @@ function watchSources(onChange: () => void): () => void {
       watcher.close();
     }
   };
+}
+
+// rebuildAssetsOnChange rebuilds the served assets whenever a source file changes.
+//
+// The authoring site serves its stylesheet and its two bundles from disk, so a rebuild is what
+// makes an edit visible in the browser. Until v0.5.0 there was nothing to rebuild here: the
+// bundles were hand-written, and editing one was picked up on the next reload.
+//
+// That stopped being true when the bundles became compiled output. The TypeScript sources are the
+// thing an author edits, and the served file is what the browser fetches, so an edit to
+// web/ts/editor.ts left static/js/editor.js stale until the script was run by hand. That is the
+// whole regression, and this is the whole fix.
+//
+// The rebuilds are serialised for the same reason the public site's are: an edit during a build
+// queues one more build rather than starting a second one alongside it.
+function rebuildAssetsOnChange(): () => void {
+  let building = false;
+  let queued = false;
+
+  const rebuild = async () => {
+    if (building) {
+      queued = true;
+      return;
+    }
+    building = true;
+
+    // The stylesheet first: it is what every page has, and a failure there is worth seeing
+    // before the bundles are tried.
+    await buildStylesheet();
+    await run(["bun", "scripts/build_js.ts"]);
+
+    building = false;
+    if (queued) {
+      queued = false;
+      await rebuild();
+    }
+  };
+
+  // Only the asset inputs. A Go file or a template changes what the server serves, and the
+  // server is not restarted here -- that is a separate, pre-existing limitation -- so rebuilding
+  // the assets in response to one would rebuild files that did not change.
+  return watchSources(
+    () => {
+      void rebuild();
+    },
+    (filename) => filename.endsWith(".ts") || filename.endsWith(".css"),
+  );
 }
 
 // rebuildOnChange rebuilds the public site whenever a source file changes.
@@ -620,8 +701,22 @@ async function authorMode(): Promise<void> {
   }
 
   const proc = startServer(["go", "run", "./cmd/server"], "author", false);
+  const stopWatching = rebuildAssetsOnChange();
+
   banner([["authoring site", `http://localhost:${authorPort}`]]);
-  process.exit(await proc.exited);
+  console.log(
+    "  it rebuilds the stylesheet and the bundles when they change. ctrl-c to stop.\n",
+  );
+
+  const stop = () => {
+    stopWatching();
+    proc.kill("SIGTERM");
+    process.exit(0);
+  };
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
+
+  await new Promise<void>(() => undefined);
 }
 
 async function publicMode(): Promise<void> {
