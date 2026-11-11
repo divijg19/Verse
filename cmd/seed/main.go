@@ -12,8 +12,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -39,7 +39,7 @@ func run() error {
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		return fmt.Errorf("DATABASE_URL is not set")
+		return errors.New("DATABASE_URL is not set")
 	}
 	if err := seed.RequireLocalDSN(dsn); err != nil {
 		return err

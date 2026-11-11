@@ -1,0 +1,142 @@
+# Deploy the public site.
+#
+# The public site is built from an artifact the authoring environment produced, not from the
+# database.
+#
+# That is the whole reason this workflow exists in this shape. A build that read the database would
+# need a database credential in the build environment, and a credential in a build command is a
+# credential in a build log -- which is how the serving password was exposed once already. So the
+# authoring environment writes the published set out as a file, stores it, and asks for a deploy
+# here. This workflow reads the file and builds the site from it.
+#
+# The consequence is that the workflow holds no database credential at all. It holds one Cloudflare
+# token that can read one key in one namespace, and one that can deploy the Worker.
+#
+# Two repository variables carry the addresses:
+#
+#   PUBLIC_SITE_URL      the site's own origin, which the sitemap and the feed are written against
+#   PUBLIC_ARTIFACT_KEY  the key the published set is stored under
+#
+# and four secrets carry the credentials:
+#
+#   CLOUDFLARE_ACCOUNT_ID       the account the namespace and the Worker are in
+#   CLOUDFLARE_KV_NAMESPACE_ID   the namespace the published set is stored in
+#   CLOUDFLARE_KV_READ_TOKEN     the token that reads the published set
+#   CLOUDFLARE_API_TOKEN         the token that deploys the Worker
+
+name: Publish the public site
+
+on:
+  # Every fifteen minutes, so a publication reaches the site even if the dispatch was missed.
+  schedule:
+    - cron: "*/15 * * * *"
+
+  # The authoring side asks for an immediate publish when a work is published.
+  repository_dispatch:
+    types: [publish]
+
+  # And an operator can ask for one by hand.
+  workflow_dispatch:
+
+concurrency:
+  # One publish at a time. Two deployments writing the same Worker would race, and the loser would
+  # deploy a site built from an older artifact.
+  group: publish-the-public-site
+  cancel-in-progress: false
+
+env:
+  PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+  PUBLIC_ARTIFACT_KEY: ${{ vars.PUBLIC_ARTIFACT_KEY || 'verse-public.json' }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.x"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "latest"
+
+      - name: Install Bun dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Fetch the published set
+        id: fetch
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_KV_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_KV_NAMESPACE_ID }}
+          CLOUDFLARE_KV_READ_TOKEN: ${{ secrets.CLOUDFLARE_KV_READ_TOKEN }}
+          # The digest the authoring side published, when it published one. A dispatch carries it;
+          # a scheduled run does not, because a scheduled run has nothing particular to wait for.
+          EXPECTED_DIGEST: ${{ github.event.client_payload.digest }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CLOUDFLARE_KV_NAMESPACE_ID}" ]; then
+            echo "::warning::CLOUDFLARE_KV_NAMESPACE_ID is not set, so there is nothing to deploy"
+            echo "fetched=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The command prints the published set's digest on stdout and everything else on the log,
+          # so the digest is read without parsing a message.
+          #
+          # The store is eventually consistent: a value written a moment ago may not be readable
+          # from everywhere for up to a minute. So a dispatched publish waits for the artifact it
+          # was dispatched for, rather than building the one that happened to be there. The wait is
+          # inside the command, where the store's address already is.
+          if digest="$(go run ./cmd/verse-artifact --out verse-public.json --expect "${EXPECTED_DIGEST}")"; then
+            echo "the published set's digest is $digest"
+            echo "fetched=true" >> "$GITHUB_OUTPUT"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          else
+            # A missing published set is not a failure. It means the author has not published
+            # anything yet, or the store is empty, and there is nothing to deploy.
+            echo "::notice::no published set is available yet; there is nothing to deploy"
+            echo "fetched=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report whether anything a reader can see has changed
+        id: report
+        if: steps.fetch.outputs.fetched == 'true'
+        run: |
+          set -euo pipefail
+
+          # The live site carries the digest it was built from, so the two can be compared
+          # without this workflow keeping a list of its own.
+          live_digest="$(curl --fail --silent --location "${PUBLIC_SITE_URL}/" 2>/dev/null \
+            | grep -o 'name="verse-digest" content="[^"]*"' \
+            | sed -e 's/.*content="//' -e 's/"$//' || true)"
+
+          if [ -n "$live_digest" ] && [ "$live_digest" = "${{ steps.fetch.outputs.digest }}" ]; then
+            echo "::notice::the live site was built from this published set; there is nothing to deploy"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the public site
+        # The build reads the artifact. It has no database credential, so it cannot reach the
+        # database even by accident, and it produces the same bytes the authoring environment would.
+        if: steps.report.outputs.deploy == 'true'
+        run: |
+          go run ./cmd/publish -from verse-public.json -out dist -base-url "${PUBLIC_SITE_URL}"
+
+      - name: Deploy
+        if: steps.report.outputs.deploy == 'true'
+        run: bunx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

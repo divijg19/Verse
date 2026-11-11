@@ -112,7 +112,17 @@ func TestActivityBucketsOnTheUTCDayUnderANonUTCSession(t *testing.T) {
 func TestStreakCountsTheUTCDayUnderANonUTCSession(t *testing.T) {
 	useSessionInZone(t, nonUTC)
 
-	today := clock.TodayUTC()
+	// The clock is pinned, so "today" is the same today for the test and for the code it is
+	// measuring.
+	//
+	// It used to be read from the wall clock, once for the work's instant and once for the
+	// streak, and the two reads were a midnight boundary apart in the one second of the day when
+	// UTC rolls over. A test that fails once a day, in a one-second window, is a test that fails
+	// every few months for no reason anyone can see.
+	today := time.Date(2026, time.March, 4, 0, 0, 0, 0, time.UTC)
+	restore := clock.SetNow(func() time.Time { return today.Add(21 * time.Hour) })
+	defer restore()
+
 	// Late in the UTC day, so at +05:30 it is already tomorrow.
 	insertPoemAt(t, "Tonight", time.Date(today.Year(), today.Month(), today.Day(), 20, 0, 0, 0, time.UTC))
 

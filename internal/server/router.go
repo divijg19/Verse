@@ -369,6 +369,7 @@ func NewRouter() (*chi.Mux, error) {
 		priv.Post("/poem", handlers.SavePoemHandler)
 		priv.Post("/poem/update", handlers.UpdatePoemHandler)
 		priv.Post("/poem/delete", handlers.DeletePoemHandler)
+		priv.Post("/poem/publish", handlers.PublishPoemHandler)
 		// History and restore. The route sits inside the authenticated group like every other
 		// mutation, and the retained versions are as sensitive as the work itself.
 		priv.Get("/poem/{id}/history", handlers.PoemHistoryHandler)

@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -47,11 +48,10 @@ func WriteDir(out string, files map[string][]byte) (err error) {
 		}
 	}()
 
-	names := make([]string, 0, len(files))
-	for name := range files {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	// The names are collected and sorted because the report and the walk both read better in a
+	// fixed order: a map's iteration order is random, and a validator whose findings arrive in a
+	// different order each run is harder to read and harder to compare.
+	names := slices.Sorted(maps.Keys(files))
 
 	for _, name := range names {
 		relative, pathErr := safeRelativePath(name)

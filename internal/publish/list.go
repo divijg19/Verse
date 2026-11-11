@@ -1,20 +1,17 @@
 // Package publish implements the author/viewer split's publication surface.
 //
-// It exists in v0.4.12 as the *enumeration* half of publication and nothing else. There is no
-// cmd/publish, no public templ layer, and no code in this repository that writes to published_at --
-// and that absence is the point, because the first step of an irreversible operation should be the
-// one that can be run without consequences.
+// It has two halves. The listing reports what is published right now, and the build renders that
+// published set into the reader's static site.
 //
-// The order the split is built in is chosen so the risky part is never first. D4's reasoning is that
-// publication is hard to reverse: a redeploy removes the file, but search engines have cached it and
-// inbound links persist. So this release provides the way to see exactly what publishing would expose,
-// and stops. The write, and the static site that serves it, come after this has been run against a
-// real library and read by the person whose work it is.
+// The split between them is the whole point of the arrangement. Publication is the operation in this
+// project that a redeploy cannot undo -- a redeploy removes the file, but search engines have cached
+// it and inbound links persist -- so it is an explicit act the author performs, on the work's own
+// screen, and everything here reads a set that act has already produced.
 //
-// The dry-run is non-destructive by construction rather than by convention: every function here takes
-// a context and returns data, nothing opens a transaction, and nothing executes a statement that is
-// not a SELECT. TestDryRunWritesNothing checks that from the database's own point of view rather than
-// by trusting this comment.
+// The listing is non-destructive by construction rather than by convention: every function here
+// takes a context and returns data, nothing opens a transaction, and nothing executes a statement
+// that is not a SELECT. TestTheListingWritesNothing checks that from the database's own point of
+// view rather than by trusting this comment.
 package publish
 
 import (
@@ -26,7 +23,7 @@ import (
 	"github.com/divijg19/Verse/internal/services"
 )
 
-// Entry is one work as the publisher would see it.
+// Entry is one published work, as the publisher sees it.
 type Entry struct {
 	// ID is the work's UUID, which is also its public URL path. It is stable for the life of the
 	// work and is not derived from the text, so editing a work cannot change its address.
@@ -39,22 +36,22 @@ type Entry struct {
 	// the work's name by the one tool whose purpose is to tell them what they are about to publish.
 	// The narrow and wide widths exist to lay out a page; this is not a page.
 	//
-	// No "Untitled" fallback, unlike WorkTitle. A blank title in a dry-run is information -- it means
-	// a row that is empty or whitespace, which validateContent should have prevented -- and silently
-	// renaming it "Untitled" would hide exactly the oddity the author is looking for. Empty here means
-	// empty, and TestDryRunReportsAnUntitleableWorkBlank makes that explicit.
+	// No "Untitled" fallback, unlike WorkTitle. A blank title in the listing is information -- it
+	// means a row that is empty or whitespace, which validateContent should have prevented -- and
+	// silently renaming it "Untitled" would hide exactly the oddity the author is looking for.
+	// Empty here means empty, and TestTheListingReportsAnUntitleableWorkBlank makes that explicit.
 	Title string
 
 	// SizeBytes is the length of the work's content in bytes.
 	//
 	// Present because the author's decision needs it. A library of four thousand one-line notes and a
 	// library of twelve long poems are very different things to put a name on the internet, and a
-	// dry-run that prints four thousand identical short rows gives a reader no way to tell the two
+	// listing that prints four thousand identical short rows gives a reader no way to tell the two
 	// apart before deciding.
 	//
 	// Byte length rather than rune count, because that is what a reader will download and what the
-	// static site will serve. Computed in Go from the exact content the publisher would write, not
-	// estimated in SQL, so the number reported is the number that would be deployed.
+	// static site will serve. Computed in Go from the exact content the publisher writes, not
+	// estimated in SQL, so the number reported is the number that is deployed.
 	SizeBytes int
 
 	// CreatedAt is when the author wrote the work.
@@ -65,7 +62,7 @@ type Entry struct {
 	PublishedAt time.Time
 }
 
-// Result is what a dry-run reports.
+// Result is what the listing reports.
 type Result struct {
 	// Entries are the works that would be published, in the publisher's own order.
 	Entries []Entry
@@ -92,7 +89,7 @@ func (r Result) Complete() bool {
 	return r.Count == r.Counted
 }
 
-// reader is the shape dryRun needs, named so a test can supply a deliberately wrong one.
+// reader is the shape the listing needs, named so a test can supply a deliberately wrong one.
 //
 // The alternative is a *pgxpool.Pool and a query in this package, which would be a second copy of the
 // publisher's query -- and the publisher's query is the security boundary of the split, so a second
@@ -100,21 +97,26 @@ func (r Result) Complete() bool {
 // keeps one definition of "published" in the codebase.
 type reader func(context.Context) ([]models.Poem, error)
 
-// countFn counts the same set. Injectable for the same reason, and because asserting that dryRun
-// reports the database's count rather than its own slice length is only meaningful if the two are
-// able to differ.
+// countFn counts the same set. Injectable for the same reason, and because asserting that the
+// listing reports the database's count rather than its own slice length is only meaningful if the
+// two are able to differ.
 type countFn func(context.Context) (int, error)
 
-// DryRun reports what publishing now would expose, and changes nothing.
+// List reports what is published right now, and changes nothing.
 //
-// This is the gate in front of the irreversible half. It exists because D4 established that
-// publication is the operation in this project that a redeploy cannot undo, and an operation you
-// cannot undo should not be the first thing you run.
-func DryRun(ctx context.Context) (Result, error) {
-	return dryRun(ctx, services.ListPublishedPoems, services.CountPublishedPoems)
+// It was a dry run once: a way to see what publishing would expose, before anything in this
+// repository wrote to published_at. Publication is an explicit act now -- the author presses a
+// button on the work's own screen -- so the useful question is no longer "what would this expose"
+// but "what is out there", which is what an operator needs when the site and the library disagree.
+//
+// The name changed with the question. A dry run describes an operation that did not happen; this
+// reports a state that is.
+func List(ctx context.Context) (Result, error) {
+	return list(ctx, services.ListPublishedPoems, services.CountPublishedPoems)
 }
 
-func dryRun(ctx context.Context, read reader, count countFn) (Result, error) {
+// list is List with its reads injected.
+func list(ctx context.Context, read reader, count countFn) (Result, error) {
 	works, err := read(ctx)
 	if err != nil {
 		return Result{}, err

@@ -82,7 +82,7 @@ func TestEveryQueryPathFailsCleanlyWithoutAPool(t *testing.T) {
 	if _, err := services.ActivityDays(t.Context(), time.Now()); !errors.Is(err, database.ErrNotInitialized) {
 		t.Errorf("ActivityDays() = %v, want ErrNotInitialized", err)
 	}
-	if _, err := export.Build(t.Context(), true); !errors.Is(err, database.ErrNotInitialized) {
+	if _, err := export.Build(t.Context(), export.Options{IncludeDeleted: true}); !errors.Is(err, database.ErrNotInitialized) {
 		t.Errorf("export.Build() = %v, want ErrNotInitialized", err)
 	}
 }

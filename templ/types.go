@@ -9,6 +9,47 @@ type PoemView struct {
 	CreatedAt time.Time
 	Title     string
 	Snippet   string
+
+	// Published is whether the work is on the public site.
+	Published bool
+
+	// PublishedAt is when it was published, or nil while it is a draft.
+	PublishedAt *time.Time
+}
+
+// PublishAction is the value the publication form submits.
+//
+// It is "1" to publish and "0" to unpublish, which is the same shape as the flag the handler
+// reads. The two halves of the toggle live together for the same reason the two do in the
+// handler: a work is either on the public site or it is not.
+func (v PoemView) PublishAction() string {
+	if v.Published {
+		return "0"
+	}
+	return "1"
+}
+
+// PublishActionLabel is the text on the publication button.
+//
+// It says what the button will do, not what the work is currently. A button labeled "Publish" on
+// a published work reads as a claim rather than an action.
+func (v PoemView) PublishActionLabel() string {
+	if v.Published {
+		return "Unpublish"
+	}
+	return "Publish"
+}
+
+// PublishButtonClass is the button's class.
+//
+// Publishing is the affirmative action and is the filled button; unpublishing is the withdrawal and
+// is the quieter one. A screen with two equally loud buttons is a screen where neither is the
+// obvious one.
+func (v PoemView) PublishButtonClass() string {
+	if v.Published {
+		return "verse-button-secondary"
+	}
+	return "verse-button"
 }
 
 // PoemVersionView is one superseded revision, as rendered in a poem's history.

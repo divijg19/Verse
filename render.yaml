@@ -1,7 +1,19 @@
 # Verse — private authoring service.
 #
 # Responsibilities: authoring only. The public reading site is a static artifact served separately
-# (see RUNNING.md), and this service must never hold a Cloudflare credential.
+# (see RUNNING.md), and this service must never hold the credential that deploys it.
+#
+# It does hold a Cloudflare credential, and the distinction is the point. Since v0.5.0 the published
+# set travels from here to the deployment as a file in a Workers KV namespace, and this service is
+# the only place the published set can be read from, so this service is the only place that can
+# write it. The token it holds can write one key in one namespace and nothing else: it cannot
+# deploy, cannot read, and cannot reach the Worker. The deploy credential lives in the deployment
+# environment, which holds no database credential, and the two never meet.
+#
+# The rule the previous wording expressed was real and is still real -- a credential that could
+# deploy the reading site would let a compromise of the authoring service rewrite what every
+# reader sees, including the site's own code. What changed is the shape of the credential, not the
+# boundary it was protecting.
 #
 # Note the health check. Without an explicit path, Render probes "/", which is the dashboard: a full
 # private page render issuing two database queries on every probe, which is two of the pool's five
@@ -33,6 +45,19 @@ services:
   - type: web
     name: verse
     runtime: go
+
+    # The region this service runs in.
+    #
+    # It is written down rather than left to the platform's default, because the default is not
+    # visible anywhere in this repository and the dashboard has diverged from this file before. A
+    # region that is only known to Render is a region that cannot be checked.
+    #
+    # It is here for a second reason. The database is a separate service with its own region, and
+    # the two are named independently: a service in Oregon talking to a database in Singapore pays a
+    # 180-millisecond round trip on every query, and nothing about the configuration says so. Pinning
+    # the service's region makes the pair checkable, and the boot log names the database's host so
+    # the pairing is visible at runtime.
+    region: oregon
     # This file is the source of truth for how the service is deployed. The Render dashboard must
     # mirror it. They diverged once already: the dashboard's build command was a copy of an older
     # revision of this file, so Render was running an unlocked dependency install where the
@@ -134,3 +159,28 @@ services:
       - key: VERSE_AUTH_SECRET
         sync: false # HMAC key for session and CSRF tokens; minimum 32 characters
         generateValue: false
+
+      # The publish pipeline. These are the credentials that put the published set where the
+      # deployment can find it, and ask for the deployment that turns it into the reading site.
+      # See RUNNING.md for the whole arrangement.
+      - key: CLOUDFLARE_ACCOUNT_ID
+        # The account the KV namespace is in.
+        sync: false
+
+      - key: CLOUDFLARE_KV_NAMESPACE_ID
+        # The namespace the published set is written to.
+        sync: false
+
+      - key: CLOUDFLARE_KV_WRITE_TOKEN
+        # Writes one key in that namespace and nothing else. It cannot deploy the site and cannot
+        # read the namespace back; the deploy credential is not this one.
+        sync: false
+
+      - key: GITHUB_REPOSITORY
+        # owner/name of the repository the deploy is requested in.
+        value: divijg19/Verse
+
+      - key: GITHUB_DISPATCH_TOKEN
+        # Dispatches the deploy workflow in that repository and nothing else. It needs
+        # Contents: write, which is what the dispatch endpoint requires.
+        sync: false

@@ -124,6 +124,29 @@ jobs:
           fi
           echo "templ artifacts match their sources (generator ${templ_version})"
 
+      - name: Type-check the TypeScript
+        # Bun's bundler strips types and never checks them, so a type error in a source file is
+        # invisible to the build. This step is the only place the types are checked, which is why
+        # it is a step and not a comment.
+        #
+        # `bun check` is Bun's own type checker, not a script in package.json: it reads the
+        # tsconfig and reports the same errors `tsc --noEmit` does, down to the codes
+        # --strict-family flags produce. Using it means the repository does not carry the
+        # TypeScript compiler as a dependency for the sake of checking seven files, and the
+        # version of the checker is the version of the bundler that compiles the sources.
+        run: bun check
+
+      - name: Verify committed JavaScript bundles are current
+        # The compiled bundles are committed so `go build` works without a TypeScript toolchain and
+        # so the static allowlist has something to serve on a fresh checkout. That makes a stale
+        # bundle the failure mode: edit a .ts file, run a test that reads the stale .js, and ship the
+        # old script with a passing build. This step converts that from silent drift into a build
+        # failure.
+        #
+        # The comparison is byte for byte against a fresh build, formatted the same way. A bundle
+        # that has drifted from its source is not a bundle that is nearly right.
+        run: bun scripts/build_js.ts --check
+
       - name: Build Tailwind CSS
         run: bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
 
@@ -202,16 +225,28 @@ jobs:
         run: staticcheck ./cmd/... ./internal/... ./templ/... ./tests/...
 
       - name: Build
-        # All three commands, not just the one the service runs. cmd/verse-export was built by
-        # nothing here: the Verify job built only ./cmd/server, the Container job built cmd/migrate,
-        # and a compile break in the export CLI would therefore have merged green and failed only
-        # for an author who reached for it. It is the tool that holds the copy of the work this
-        # project exists to preserve, so it was the worst candidate for the gap.
+        # Every command, not just the one the service runs.
+        #
+        # cmd/verse-export was built by nothing here: the Verify job built only ./cmd/server, the
+        # Container job built cmd/migrate, and a compile break in the export CLI would therefore
+        # have merged green and failed only for an author who reached for it. It is the tool that
+        # holds the copy of the work this project exists to preserve, so it was the worst candidate
+        # for the gap.
+        #
+        # cmd/verse-publish and cmd/verse-artifact are the other two ends of the public site: one
+        # writes the published set and asks for a deploy, the other fetches what it wrote.
+        #
+        # The public-site builder is named publish rather than verse-publish, because
+        # cmd/verse-publish is a different command. The two names were the same until v0.5.0 added
+        # the command that pushes the artifact, and a binary called verse-publish that is not
+        # cmd/verse-publish is the kind of thing that costs an hour.
         run: |
           go build -tags netgo -ldflags="-s -w" -o verse ./cmd/server
           go build -tags netgo -ldflags="-s -w" -o migrate ./cmd/migrate
           go build -tags netgo -ldflags="-s -w" -o verse-export ./cmd/verse-export
-          go build -tags netgo -ldflags="-s -w" -o verse-publish ./cmd/publish
+          go build -tags netgo -ldflags="-s -w" -o publish ./cmd/publish
+          go build -tags netgo -ldflags="-s -w" -o verse-publish ./cmd/verse-publish
+          go build -tags netgo -ldflags="-s -w" -o verse-artifact ./cmd/verse-artifact
 
       - name: Create the disposable test database
         # The truncating tests must target a database whose name marks it disposable, so they can
@@ -234,7 +269,7 @@ jobs:
         # wiring and the validation gate in the same environment that runs the migrations. An empty
         # library is a valid input: the index must still say there is nothing published.
         run: |
-          go run ./cmd/publish -dry-run
+          go run ./cmd/publish -list
           go run ./cmd/publish -out /tmp/verse-dist -base-url https://verse.test
           test -f /tmp/verse-dist/404.html
 

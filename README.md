@@ -131,7 +131,9 @@ verse/
 |   ├── server/        the application, and the migration run at its boot
 |   ├── migrate/       the standalone migration runner, same migrations
 |   ├── publish/       the static public-site builder
-|   └── verse-export/  the standalone export command
+|   ├── verse-export/  the standalone export command
+|   ├── verse-publish/ writes the published set and asks for a deploy
+|   └── verse-artifact/ fetches the published set the deployment builds from
 |
 ├── internal/
 |   ├── server/        routes, security headers, sessions, CSRF
@@ -257,6 +259,12 @@ load-bearing, since a work can be published and then deleted — and it lives in
 **The authoring app is unaffected by it.** Every read in the author's library filters `deleted_at IS
 NULL` only, so a draft is a row the author sees, opens, and can search for exactly as before. The
 public site is built by `cmd/publish` from the published set; see `internal/publish`.
+
+**Publishing is an act, not a statement.** The work's own screen carries the control, and it says
+which state the work is in. The published set then travels as a file: the authoring environment
+writes it out and stores it, and the deployment environment reads it and builds from it. That is
+what keeps the database credential out of the build environment — and therefore out of every build
+log, which is where a serving password was exposed once already.
 
 **`poem_versions` has no pruning.** Nothing updates or deletes a row, and there is no purge path.
 Restoring a revision is an ordinary edit, which records what it replaced, so the history is

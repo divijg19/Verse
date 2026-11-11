@@ -26,7 +26,7 @@ func ExportHandler(w http.ResponseWriter, r *http.Request) {
 	// Soft-deleted works are included by default here, unlike the command's default. The reasoning
 	// is the opposite: a download clicked in a browser is an archival act, and an archive that
 	// silently omitted the deleted works would be a partial copy of the thing it claims to preserve.
-	doc, err := export.Build(r.Context(), true)
+	doc, err := export.Build(r.Context(), export.Options{IncludeDeleted: true})
 	if err != nil {
 		fail500(w, r, "failed to build the export", err)
 		return

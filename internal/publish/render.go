@@ -22,7 +22,12 @@ func Render(works []publictempl.PublicWork, opts Options) (map[string][]byte, er
 		return nil, err
 	}
 
-	assetPath, assetBytes, err := publicAsset()
+	assetPath, assetBytes, err := publicStylesheet()
+	if err != nil {
+		return nil, err
+	}
+
+	scriptPath, scriptBytes, err := publicScript()
 	if err != nil {
 		return nil, err
 	}
@@ -33,6 +38,8 @@ func Render(works []publictempl.PublicWork, opts Options) (map[string][]byte, er
 		Tagline:     opts.Tagline,
 		BaseURL:     opts.BaseURL,
 		AssetPath:   assetPath,
+		ScriptPath:  scriptPath,
+		Digest:      opts.Digest,
 		Works:       works,
 		Links:       opts.Links,
 	}
@@ -71,6 +78,7 @@ func Render(works []publictempl.PublicWork, opts Options) (map[string][]byte, er
 	}
 
 	files[strings.TrimPrefix(assetPath, "/")] = assetBytes
+	files[strings.TrimPrefix(scriptPath, "/")] = scriptBytes
 	files["robots.txt"] = robotsTXT()
 
 	if files["search.json"], err = searchJSON(works); err != nil {

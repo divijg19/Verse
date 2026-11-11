@@ -92,7 +92,7 @@ func TestExportIsByteIdenticalAcrossTheTimestampMigration(t *testing.T) {
 func exportWithPinnedTimestamp(t *testing.T) []byte {
 	t.Helper()
 
-	doc, err := export.Build(context.Background(), true)
+	doc, err := export.Build(context.Background(), export.Options{IncludeDeleted: true})
 	if err != nil {
 		t.Fatalf("build the export: %v", err)
 	}

@@ -2,11 +2,14 @@ package publish
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
+	"time"
 
+	"github.com/divijg19/Verse/internal/export"
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	publictempl "github.com/divijg19/Verse/templ"
@@ -43,6 +46,12 @@ type Options struct {
 	Description string
 	Tagline     string
 	BaseURL     string
+
+	// Digest identifies the published set the site is built from.
+	//
+	// It is written into every page, so the deployed site is the record of what was last
+	// deployed and a build can compare against it without keeping a list of its own.
+	Digest string
 
 	// Links are the destinations outside this site, shown in the brand pill's menu.
 	//
@@ -128,16 +137,122 @@ func normalizeLinks(links []publictempl.PublicLink) ([]publictempl.PublicLink, e
 	return cleaned, nil
 }
 
-// Load reads every published work and maps it to the public view.
+// source is one work, as the publisher sees it, before it becomes a public work.
 //
-// The completeness check is the same one the dry-run makes: a list and a count read by separate
-// queries must agree. A public archive built from a truncated list is not a smaller archive; it is a
-// site that looks complete and is missing work.
-func Load(ctx context.Context) ([]publictempl.PublicWork, error) {
-	return load(ctx, services.ListPublishedPoems, services.CountPublishedPoems)
+// Both the database and the export file are read into sources, and one function turns sources into
+// public works. That is the point of the type: the two paths cannot disagree about a title, a path
+// or an excerpt, because there is only one place that decides them.
+type source struct {
+	// ID is the work's stable identifier.
+	ID string
+
+	// Content is the work, verbatim.
+	Content string
+
+	// PublishedAt is when it was published. It is never zero: a source is a published work.
+	//
+	// There is no creation instant here, though the database has one and the export carries it.
+	// The public site does not show it: a reader meets a work when it was published, and the
+	// archive is ordered by that. The field was here because the export has it, which is the
+	// wrong reason to carry a value.
+	PublishedAt time.Time
 }
 
+// publicWorks turns published sources into the public view, in the order a reader met them in.
+//
+// This is the one place a work becomes a page. The database path and the export-file path both come
+// through here, so a build from a file and a build from the database produce the same bytes -- and
+// TestTheTwoPathsRenderIdenticalBytes is what holds them to it.
+//
+// The ordering happens here rather than in each path, and by the shared rule. It was written out
+// three times: once per path and once for the front page, and the two path copies were held
+// together by the byte-identity test while the third -- which decides what the front page shows --
+// was covered by nothing. There is now one comparator, and it is the one all three use.
+func publicWorks(sources []source) []publictempl.PublicWork {
+	works := make([]publictempl.PublicWork, 0, len(sources))
+	for _, s := range sources {
+		title := presenters.FirstNonEmptyLine(s.Content)
+		if title == "" {
+			title = "Untitled"
+		}
+
+		works = append(works, publictempl.PublicWork{
+			ID:          s.ID,
+			Path:        "/w/" + url.PathEscape(s.ID) + "/",
+			Title:       title,
+			Content:     s.Content,
+			Excerpt:     excerpt(s.Content),
+			PublishedAt: s.PublishedAt.UTC(),
+		})
+	}
+
+	slices.SortFunc(works, publictempl.PublishedOrder)
+
+	return works
+}
+
+// excerpt is the plain-text summary a work contributes to the feed, the search index and the meta
+// description.
+//
+// It is drawn from the body rather than from the whole work. The title is already the heading on
+// the page and the title of the document, so an excerpt that began with it repeated it in every
+// summary -- and since every work's title is its first line, the old excerpt was the title followed
+// by the whole poem run together on one line.
+//
+// The cut is on a word boundary, because cutting mid-word leaves a reader with a fragment and an
+// ellipsis, and the fragment says nothing.
+func excerpt(content string) string {
+	body := presenters.BodyWithoutTitle(content)
+	return presenters.TruncateAtWord(presenters.FlattenContent(body), ExcerptRunes)
+}
+
+// Load reads every published work and maps it to the public view.
+//
+// The completeness check is the same one the listing makes: a list and a count read by separate
+// queries must agree. A public archive built from a truncated list is not a smaller archive; it is a
+// site that looks complete and is missing work.
+func Load(ctx context.Context) ([]publictempl.PublicWork, string, error) {
+	sources, err := loadSources(ctx, services.ListPublishedPoems, services.CountPublishedPoems)
+	if err != nil {
+		return nil, "", err
+	}
+	return publicWorks(sources), digest(sources), nil
+}
+
+// digest computes the published set's digest.
+//
+// The export computes the same digest over the same three facts -- an identifier, a publication
+// instant and a body -- and one implementation of it is worth a conversion rather than a second
+// algorithm that could disagree with the first.
+//
+// The digest is what the site records, so that a build can compare the published set it is about to
+// deploy with the one the live site was built from.
+func digest(sources []source) string {
+	poems := make([]export.Poem, 0, len(sources))
+	for _, s := range sources {
+		publishedAt := s.PublishedAt
+		poems = append(poems, export.Poem{
+			ID:          s.ID,
+			Content:     s.Content,
+			PublishedAt: &publishedAt,
+		})
+	}
+	return export.PublishedDigest(poems)
+}
+
+// load reads the published set and maps it to the public view.
 func load(ctx context.Context, read reader, count countFn) ([]publictempl.PublicWork, error) {
+	sources, err := loadSources(ctx, read, count)
+	if err != nil {
+		return nil, err
+	}
+	return publicWorks(sources), nil
+}
+
+// loadSources reads the published set, without mapping it.
+//
+// The mapping is a separate step so that the database path and the export-file path can share it.
+func loadSources(ctx context.Context, read reader, count countFn) ([]source, error) {
 	poems, err := read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read published works: %w", err)
@@ -156,12 +271,12 @@ func load(ctx context.Context, read reader, count countFn) ([]publictempl.Public
 			len(poems), counted)
 	}
 
-	works := make([]publictempl.PublicWork, 0, len(poems))
+	sources := make([]source, 0, len(poems))
 	seen := make(map[string]struct{}, len(poems))
 	for _, poem := range poems {
 		id := strings.TrimSpace(poem.ID)
 		if id == "" {
-			return nil, fmt.Errorf("a published work has an empty id")
+			return nil, errors.New("a published work has an empty id")
 		}
 		if _, duplicate := seen[id]; duplicate {
 			return nil, fmt.Errorf("published work %q appears twice; paths would collide", id)
@@ -174,29 +289,15 @@ func load(ctx context.Context, read reader, count countFn) ([]publictempl.Public
 					"impossible, so refusing to guess a date", id)
 		}
 
-		title := presenters.FirstNonEmptyLine(poem.Content)
-		if title == "" {
-			title = "Untitled"
-		}
-
-		works = append(works, publictempl.PublicWork{
+		sources = append(sources, source{
 			ID:          id,
-			Path:        "/w/" + url.PathEscape(id) + "/",
-			Title:       title,
 			Content:     poem.Content,
-			Excerpt:     presenters.TruncateRunes(presenters.FlattenContent(poem.Content), ExcerptRunes),
 			PublishedAt: poem.PublishedAt.UTC(),
 		})
 	}
 
-	// The query already orders by published_at DESC, id DESC. Sorting again makes the output
-	// deterministic even when the reader is injected, and the id tiebreak makes the order total.
-	sort.Slice(works, func(i, j int) bool {
-		if !works[i].PublishedAt.Equal(works[j].PublishedAt) {
-			return works[i].PublishedAt.After(works[j].PublishedAt)
-		}
-		return works[i].ID > works[j].ID
-	})
-
-	return works, nil
+	// The query already orders by published_at DESC, id DESC, so the rows arrive in the right
+	// order. The order is applied again -- by publicWorks, which both paths go through -- because
+	// the reader is injectable here and a test may supply one that does not sort.
+	return sources, nil
 }

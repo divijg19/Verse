@@ -345,7 +345,7 @@ func TestMarkdownExportIsReadable(t *testing.T) {
 // buildExport builds an export against the connected test database.
 func buildExport(t *testing.T, includeDeleted bool) export.Document {
 	t.Helper()
-	doc, err := export.Build(context.Background(), includeDeleted)
+	doc, err := export.Build(context.Background(), export.Options{IncludeDeleted: includeDeleted})
 	if err != nil {
 		t.Fatalf("build export: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestExportIssuesAConstantNumberOfQueries(t *testing.T) {
 	tracer.queries = nil
 	tracer.mu.Unlock()
 
-	doc, err := export.Build(context.Background(), true)
+	doc, err := export.Build(context.Background(), export.Options{IncludeDeleted: true})
 	if err != nil {
 		t.Fatalf("build export: %v", err)
 	}

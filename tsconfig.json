@@ -1,0 +1,55 @@
+{
+  // The repository's TypeScript configuration.
+  //
+  // There was no tsconfig until v0.5.0: the two TypeScript files that existed were written
+  // against Bun's defaults and never type-checked. This file is the whole of the configuration, and
+  // the settings in it are chosen rather than inherited.
+  //
+  // WHAT "target" DOES AND DOES NOT DO HERE
+  //
+  // Bun's bundler strips types and leaves the syntax alone. It does not downlevel: a `??` written
+  // in a source file is a `??` in the output, whatever this file says, and that was measured rather
+  // than assumed -- the same source built at target ES2017 and at ES2022 produced identical output.
+  //
+  // So "target" here is a statement of intent and a check on the *library* surface, because "lib" is
+  // what decides which standard-library functions type-check. Setting "lib" to ES2020 makes
+  // Object.hasOwn and Array.prototype.at type errors, which is the guard that matters: those are
+  // ES2022, a reader on a phone from 2021 does not have them, and the bundler was not going to
+  // rewrite them.
+  //
+  // ES2020 is the floor, and it is the floor for the public site rather than for the authoring
+  // site, because the public site is read by people whose devices are not the author's.
+  //
+  // "erasableSyntaxOnly" is there because Bun transpiles file by file: an enum, a namespace or a
+  // parameter property has no meaning to a per-file transpiler. The setting makes that a type error
+  // rather than a surprise at build time.
+  //
+  // "verbatimModuleSyntax" is the companion to it: a type-only import must say so, because Bun
+  // cannot know whether an imported name is a type and elide it.
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": ["bun"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+
+    // Bun emits. Nothing here is emitted by tsc, which only ever checks.
+    "noEmit": true
+  },
+  "include": ["web/ts/**/*.ts", "scripts/**/*.ts"]
+}

@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -92,19 +93,63 @@ func TestThePublicationMigrationIsNonDestructive(t *testing.T) {
 	database.Pool = scratch
 	defer func() { database.Pool = previous }()
 
-	before := exportWithPinnedTimestamp(t)
+	before := storedRows(t, scratch)
 	if _, err := scratch.Exec(ctx, normalize, pgx.QueryExecModeSimpleProtocol); err != nil {
 		t.Fatalf("apply %s: %v", publishedAtMigration, err)
 	}
-	after := exportWithPinnedTimestamp(t)
+	after := storedRows(t, scratch)
 
 	if bytes.Equal(before, after) {
 		return
 	}
-	t.Errorf("the export changed across %s: %d bytes before, %d after\n  first difference at byte %d\n  before: %q\n  after:  %q",
+	t.Errorf("the stored rows changed across %s: %d bytes before, %d after\n  first difference at byte %d\n  before: %q\n  after:  %q",
 		publishedAtMigration, len(before), len(after), firstDifference(before, after),
 		windowAround(before, firstDifference(before, after)),
 		windowAround(after, firstDifference(before, after)))
+}
+
+// storedRows reads the values the publication migration must not change.
+//
+// The export was the probe here until v0.5.0, when the export learned the publication instant. It
+// cannot be the probe any more: it cannot be built against a schema that does not have the column
+// yet, and against one that does it produces a different file -- so the comparison would be
+// measuring the export's own change rather than the migration's.
+//
+// The claim under test is narrower than the export and is about the data, so the data is read
+// directly. These four columns exist on both sides of the migration, which is exactly the set the
+// migration promised not to touch.
+func storedRows(t *testing.T, pool *pgxpool.Pool) []byte {
+	t.Helper()
+
+	rows, err := pool.Query(context.Background(), `
+        SELECT id, content, created_at, deleted_at
+        FROM poems
+        ORDER BY id`)
+	if err != nil {
+		t.Fatalf("read the stored rows: %v", err)
+	}
+	defer rows.Close()
+
+	var out bytes.Buffer
+	for rows.Next() {
+		var id, content string
+		var createdAt time.Time
+		var deletedAt *time.Time
+		if err := rows.Scan(&id, &content, &createdAt, &deletedAt); err != nil {
+			t.Fatalf("scan a stored row: %v", err)
+		}
+
+		deleted := "live"
+		if deletedAt != nil {
+			deleted = deletedAt.UTC().Format(time.RFC3339Nano)
+		}
+		fmt.Fprintf(&out, "%s\x00%s\x00%s\x00%s\x00",
+			id, content, createdAt.UTC().Format(time.RFC3339Nano), deleted)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read the stored rows: %v", err)
+	}
+	return out.Bytes()
 }
 
 // TestThePublicationMigrationPublishesNothing is the half of the migration's safety argument that
@@ -288,7 +333,7 @@ func TestThePublishedFilterExcludesDraftsAndDeletedWorks(t *testing.T) {
 		}
 	}
 
-	// COUNT and the list must agree, or one of them is wrong and the dry-run's cross-check is
+	// COUNT and the list must agree, or one of them is wrong and the listing's cross-check is
 	// comparing two different sets.
 	count, err := services.CountPublishedPoems(ctx)
 	if err != nil {

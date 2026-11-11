@@ -23,7 +23,8 @@ requires a passphrase to enter. It is not a blog, a social network, or a reader-
 | templ CLI  | v0.3.1100       | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file            |
 | Bun        | `latest`        | Stylesheet build. CI, the `Dockerfile`, Render, and Workers Builds all name the same policy; CI asserts the repository paths agree |
 | Node       | 24              | Workers Builds only, pinned by `.node-version`. Not needed for local development                                                   |
-| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses                                                                                         |
+| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses. Put it in the same region as the service -- see below                                  |
+| TypeScript | 7.x             | Type checking only, and only through Bun's built-in `bun check` -- there is no `tsc` dependency                                    |
 
 ---
 
@@ -684,19 +685,54 @@ If you add a static asset, add it to the same assertions. The allowlist in
 
 ### Building and deploying the public site
 
-The public archive is a static build, not a second web service. It reads the published set through
-the same query the dry-run uses, renders every page in memory, validates the result, and writes the
-output directory. Readers never hold a database credential, and the deployed files do not depend on
-Render or Neon at request time.
+The public archive is a static build, not a second web service. It reads the published set, renders
+every page in memory, validates the result, and writes the output directory. Readers never hold a
+database credential, and the deployed files do not depend on Render or Neon at request time.
+
+**The published set travels as a file.** The authoring environment holds the database, so it is the
+only place the published set can be read from. It writes that set out as an export and pushes it; the
+deployment environment fetches the file and builds the site from it.
+
+That arrangement is not a preference. A build that reached into the database would need a database
+credential in the build environment, and a credential in a build command is a credential in a build
+log -- which is how the serving password was exposed once already. The build environment now holds
+no database credential at all, and a deploy does not fail because the database is unreachable.
 
 ```bash
-# What would be published, without writing anything.
-go run ./cmd/publish -dry-run
+# In the authoring environment: write the published set and push it.
+go run ./cmd/verse-publish --out verse-public.json
+
+# In the deployment environment: build the site from the artifact.
+go run ./cmd/publish -from verse-public.json -out dist -base-url https://your-public-origin.example
+```
+
+The two produce the same bytes. `TestTheTwoPathsRenderIdenticalBytes` holds them to it, byte for
+byte across every output, so the file path is not a second publisher with its own idea of what is
+public.
+
+The export is the works a reader can see and nothing else: `cmd/verse-export --public` and
+`cmd/verse-publish` both apply the publisher's own filter, so a draft cannot reach the artifact even
+by accident. The artifact carries a digest of that published set, and every page records it, so the
+live site is the record of what was last deployed and a build can tell whether anything a reader can
+see has changed.
+
+The deployment is a GitHub Actions workflow, `.github/workflows/publish.yml`. It runs every fifteen
+minutes, on a dispatch from the authoring side, or by hand. It fetches the artifact, compares the
+digest with the live site's, and deploys only when they differ.
+
+```bash
+# What is published right now. Writes nothing.
+go run ./cmd/publish -list
 
 # Build into dist/. Use the read-only serving credential, not the migration credential.
 DATABASE_URL="postgres://verse_app:...@host/db?sslmode=require" \
   go run ./cmd/publish -out dist -base-url https://your-public-origin.example
 ```
+
+The listing was the dry run once -- a way to see what publishing would expose, before anything in
+this repository wrote to `published_at`. Publication is an explicit act now, so the useful question
+is no longer "what would this expose" but "what is out there", which is what an operator needs
+when the site and the library disagree. The name moved with the question.
 
 `-base-url` (or `PUBLIC_BASE_URL`) is required for a real deployment: `sitemap.xml` and `feed.xml`
 use absolute URLs. The default is the reserved placeholder `https://verse.example`, which is
@@ -743,28 +779,93 @@ editing a work cannot change its address. A future `works`/slug migration is add
 URLs must keep resolving, either directly or through a redirect. `search.json` carries only an id, a
 path, a title, a date, and a bounded excerpt; full body text is not published twice.
 
+**The archive lists a title and an excerpt.** The excerpt is the same bounded summary the search
+index and the work page's meta description carry, so nothing is published that was not already. It
+is there so that a reader scanning the archive can see what a work is about without opening it, and
+so that a search match on a phrase inside a work is explicable: the matched phrase is marked in the
+excerpt.
+
+The excerpt is rendered by the server, not by the script. The script adds the search box and the
+highlight; the list itself is the complete list of published work whether the script loads or not,
+and it says the same thing either way.
+
 Until the domain decision (D7) lands, `robots.txt` disallows every crawler and every page carries
 `<meta name="robots" content="noindex">`. Deploy on a platform subdomain, not a custom domain.
 
 The public site deploys to Cloudflare Workers Static Assets as the Worker `verse`. `wrangler.jsonc`
-is committed, so Workers Builds never runs Wrangler's interactive setup. The committed `name` must
-stay identical to the Worker name in the Cloudflare dashboard.
+is committed, so the deploy never runs Wrangler's interactive setup. The committed `name` must stay
+identical to the Worker name in the Cloudflare dashboard.
 
-Workers Builds settings:
+### The publish pipeline
 
-| Setting         | Value                                                                                |
-| --------------- | ------------------------------------------------------------------------------------ |
-| Build command   | `go run ./cmd/publish -out dist -base-url https://verse.divijganjoo2003.workers.dev` |
-| Deploy command  | `bunx wrangler deploy`                                                               |
-| Preview command | `bunx wrangler preview`                                                              |
-| Build variable  | `DATABASE_URL` — encrypted variable; never written into either command               |
-| Build variable  | `BUN_VERSION=latest`                                                                 |
-| Node version    | `24`, from the committed `.node-version`                                             |
+The pipeline has three parts, and each of them holds exactly one credential:
 
-The build reads the published set over the read-only serving credential. `DATABASE_URL` must come
-from an encrypted variable only: the command is echoed into the build log, and a serving password
-was exposed that way once before. If a credential has appeared in a build log, rotate it; removing
-it from the command does not un-expose it.
+| Part                | Holds                                      | Does                              |
+| ------------------- | ------------------------------------------ | --------------------------------- |
+| The authoring app   | a KV-write token, a GitHub dispatch token  | stores the set, asks for a deploy |
+| The deploy workflow | a KV-read token, a Cloudflare deploy token | fetches the set, builds, deploys  |
+| The build           | nothing                                    | renders the set                   |
+
+The published set travels as a file. The authoring environment holds the database, so it is the
+only place the set can be read from; it writes the set out, stores it, and asks for a deploy. The
+workflow fetches the file and builds from it.
+
+That is what keeps the database out of the build environment, and the database credential out of
+every build log.
+
+**The store is a Workers KV namespace.** R2 is the more natural fit for a file, but R2 speaks the
+S3 API and every S3 request is signed with SigV4. The SDK that signs it correctly adds twelve
+modules to a module graph that had nineteen lines; the KV REST API needs a bearer token and one
+HTTP call, and adds nothing. The artifact is a few kilobytes against KV's twenty-five-megabyte
+limit.
+
+**The deploy is requested by a dispatch.** The workflow runs every fifteen minutes, on a
+`repository_dispatch` from the authoring side, or by hand. Publishing a work dispatches it, so a
+publication reaches the site in seconds rather than in a quarter of an hour; the schedule is the
+safety net for a dispatch that was missed.
+
+The dispatch carries the digest of the published set it was dispatched for. KV is eventually
+consistent -- a value written a moment ago may not be readable from everywhere for up to a minute --
+so the workflow waits for the artifact it was dispatched for rather than building the one that
+happened to be there.
+
+### What the operator sets
+
+On the **authoring service** (Render):
+
+| Variable                     | What it is                                                |
+| ---------------------------- | --------------------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`      | the account the namespace is in                           |
+| `CLOUDFLARE_KV_NAMESPACE_ID` | the namespace the published set is stored in              |
+| `CLOUDFLARE_KV_WRITE_TOKEN`  | a token that can write one key in that namespace          |
+| `GITHUB_REPOSITORY`          | `owner/name` of the repository the deploy is requested in |
+| `GITHUB_DISPATCH_TOKEN`      | a token that can dispatch a workflow in that repository   |
+
+The GitHub token needs `Contents: write` on that one repository. That is the permission the
+dispatch endpoint requires, and it is more than the workflow itself needs -- the workflow reads the
+repository and nothing else. A token that can only read is not enough: the dispatch endpoint has no
+narrower permission to give.
+
+On the **repository** (GitHub Actions):
+
+| Secret                       | What it is                                      |
+| ---------------------------- | ----------------------------------------------- |
+| `CLOUDFLARE_ACCOUNT_ID`      | the account the namespace and the Worker are in |
+| `CLOUDFLARE_KV_NAMESPACE_ID` | the namespace the published set is stored in    |
+| `CLOUDFLARE_KV_READ_TOKEN`   | a token that can read one key in that namespace |
+| `CLOUDFLARE_API_TOKEN`       | a token that can deploy the Worker              |
+
+| Variable              | What it is                                            |
+| --------------------- | ----------------------------------------------------- |
+| `PUBLIC_SITE_URL`     | the site's own origin, which the sitemap and feed use |
+| `PUBLIC_ARTIFACT_KEY` | the key the published set is stored under             |
+
+The two Cloudflare tokens are separate because the two sides are separate: the one that writes can
+do nothing but write, and the one that reads can do nothing but read. A single token would mean the
+deployment could overwrite the artifact it is about to build from.
+
+The worker itself still deploys through `bunx wrangler deploy`, and `wrangler.jsonc` is committed so
+the deploy never runs Wrangler's interactive setup.
 
 Preview builds must use the Preview command (`bunx wrangler preview`), not the deploy command.
 Previews run against a branch-specific internal script, so `wrangler deploy` reports a misleading
@@ -773,13 +874,112 @@ name mismatch against production.
 A manual deploy uses the same committed configuration:
 
 ```bash
-DATABASE_URL="..." go run ./cmd/publish -out dist -base-url https://verse.divijganjoo2003.workers.dev
+go run ./cmd/publish -from verse-public.json -out dist -base-url https://verse.divijganjoo2003.workers.dev
 bunx wrangler deploy
 ```
 
 Keep the previous `dist/` (or the previous deployment) until the new one has been checked. Rolling
-back is redeploying the last known-good build, not a database operation. There is no
-`repository_dispatch`, no publish button, and no PAT in this release.
+back is redeploying the last known-good build, not a database operation.
+
+To publish by hand -- which is what to reach for when the automatic path did not run:
+
+```bash
+go run ./cmd/verse-publish --out verse-public.json
+```
+
+It writes the published set, stores it, and asks for a deploy.
+
+### Checking the push path without Cloudflare or GitHub
+
+Two environment variables override the addresses the push path talks to:
+
+| Variable                    | What it is                     |
+| --------------------------- | ------------------------------ |
+| `VERSE_CLOUDFLARE_API_BASE` | the root of the Cloudflare API |
+| `VERSE_GITHUB_API_BASE`     | the root of the GitHub API     |
+
+They exist so that the whole path can be exercised against a local stand-in, which is how it is
+verified. **They must point at the local machine.** An override is a redirection: it says where the
+published set is written and where the deploy is requested, so an unrestricted one would be a way to
+point the artifact at somebody else's host and to carry the dispatch token to it. A non-loopback
+address is refused rather than honored.
+
+Unset, they mean the real APIs, which is the normal arrangement.
+
+### The database and the service belong in the same region
+
+The service runs in Oregon. The database runs wherever its project was created, and a project cannot
+change region after it is created -- moving it means creating a new one and migrating.
+
+The two are named independently, so they can end up in different places, and the cost of that is not
+obvious from the configuration. A service in Oregon talking to a database in Singapore pays roughly a
+180-millisecond round trip on every query, on a page that issues several, and nothing about the
+deployment would say so.
+
+The boot log answers it:
+
+```
+verse starting, version 9ff1ff9
+database: ep-whatever-pooler.us-west-2.aws.neon.tech (from DATABASE_URL)
+```
+
+The host is logged and nothing else; the connection string carries a password, and a password belongs
+in neither a log nor an incident report. The region is in the host name, so one line answers "where
+is my database".
+
+`render.yaml` pins the service's region explicitly rather than leaving it to the platform's default,
+because the default is not visible anywhere in this repository -- and the dashboard and this file
+have diverged before.
+
+### Publishing a work
+
+A work reaches the public site when the author publishes it. The work's own screen carries the
+control, and it says which state the work is in, because the difference between published and
+draft is the difference between a reader seeing a work and not.
+
+Publication is an explicit act. Nothing publishes anything by accident: the column has no default,
+the migration that added it left every existing row null, and the publisher's read is the only place
+the column is consulted.
+
+A work in the recycle bin cannot be published. The publisher's filter excludes it, so publishing one
+would set a state the site would never show and the author would never be able to undo; the action
+refuses and says why.
+
+### The TypeScript build
+
+The browser code is TypeScript, compiled by Bun and committed. The compiled files are in the
+repository because `go build` must not depend on a code-generation step, and because the static
+allowlist test asserts that `/static/js/editor.js` is served -- a file that is only produced by a
+build step is not there on a fresh checkout.
+
+```bash
+bun scripts/build_js.ts             # rebuild the bundles
+bun scripts/build_js.ts --check     # fail if they are stale
+bun check                           # check the types
+```
+
+Bun's bundler strips types and never checks them, so the type check is a separate step and it is a
+step and not a comment. It found twenty-one issues in the JavaScript it replaced, including one
+unguarded `EventTarget` in the editor's backdrop handler.
+
+`bun check` is Bun's own type checker, not a script in `package.json`. It reads the repository's
+`tsconfig.json` and reports the same errors `tsc --noEmit` does, down to the codes the strict
+settings produce. Using it means the repository does not carry the TypeScript compiler as a
+dependency for the sake of checking seven files, and the type checker is always the same version
+as the bundler that compiles the sources. The `qa` script runs it.
+
+`bun run dev:author` rebuilds the stylesheet and the bundles when they change. It did not until
+v0.5.0, and the reason was the port: the bundles used to be hand-written, so editing one was
+picked up on the next reload, and they are compiled output now, so an edit to `web/ts/editor.ts`
+left `static/js/editor.js` stale until the build was run by hand.
+
+Bun does not downlevel. A `??` written in a source file is a `??` in the output, whatever the
+tsconfig says, so the transpile floor is held by the `lib` setting -- an ES2022 library call is a
+type error -- and by the rule that the source stays inside ES2020.
+
+The public site's one script is the archive's search box. It is inserted by the script rather than
+being in the markup, so a reader with no script sees no input at all rather than an input that
+cannot search, and the archive page is the complete list of published work either way.
 
 ### `render.yaml` is the source of truth; the dashboard must mirror it
 

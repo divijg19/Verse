@@ -54,6 +54,10 @@ var privateRoutes = []struct {
 	{http.MethodGet, "/export"},
 	{http.MethodHead, "/export"},
 	{http.MethodPost, "/poem/undelete"},
+	// Added in v0.5.0, when publishing became an act the author performs rather than a statement
+	// they run by hand. It changes what the public can see, so it sits behind the session like every
+	// other mutating route.
+	{http.MethodPost, "/poem/publish"},
 }
 
 func TestPrivateRoutesRequireAuthentication(t *testing.T) {

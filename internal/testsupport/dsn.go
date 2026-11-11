@@ -5,6 +5,7 @@
 package testsupport
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -107,7 +108,7 @@ func DatabaseName(dsn string) (string, error) {
 	// reports a confusing name back to the developer.
 	name := strings.Trim(u.Path, "/")
 	if name == "" {
-		return "", fmt.Errorf("no database name in the URL path")
+		return "", errors.New("no database name in the URL path")
 	}
 
 	return name, nil
