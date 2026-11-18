@@ -764,9 +764,25 @@ that is not an `http` or `https` address stops the build rather than producing a
 With no links configured the pill is a plain link home, because a button that opens nothing is
 worse than a link.
 
-The share surface shows the **address** of each work rather than only linking to it. The address is
-set in a monospace face and marked `user-select: all`, so one click selects the whole of it and the
-reader copies it with the keystroke they already know. That is a copy button with no script in it.
+The share surface offers three actions for each published work: **Copy Text**, **Copy Link** and
+**Card Export**. The same three actions appear on the authoring side's Share screen, backed by one
+shared TypeScript module, so the two surfaces cannot disagree about what a name means.
+
+The page still works with no script. Each title is a real link and each address is plain selectable
+text in a monospace face with `user-select: all`, so a reader can copy it by hand. The script adds the
+buttons on top; it does not add the information. It is the site's one script, shared with the
+archive's search box, so the one-script rule is unchanged.
+
+Copy Text puts the work's title and full body on the clipboard. The body is **not** published a
+second time: the script fetches the work's own page and reads the `.poem` element from it. Card
+Export draws a 1200x630 PNG on a canvas from the same text and saves it locally, with no request to
+any other origin.
+
+On the authoring side, the Share screen has a work picker. The three actions use a small
+authenticated endpoint to read the selected work when an action needs its text. Copy Link is
+disabled for a draft, because a link to an unpublished work would lead nowhere; it says so rather
+than handing out an address that will 404. The endpoint builds that address from `PUBLIC_BASE_URL`,
+which is why the authoring service needs the reader's origin set.
 
 The build refuses to write if validation fails. Validation checks that the required files exist, that
 no authoring route, asset, htmx attribute, script element, or secret name reached the output, and

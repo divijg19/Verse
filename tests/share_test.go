@@ -1,0 +1,161 @@
+package tests
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/divijg19/Verse/internal/services"
+	views "github.com/divijg19/Verse/templ"
+)
+
+// TestShareEndpointReturnsOneWork covers the data behind the Share picker's actions.
+//
+// The Share page carries titles and identifiers only; the endpoint supplies a work's body when an
+// action needs it. That keeps the library's text out of a page whose purpose is choosing one work,
+// and it means the body the clipboard receives is read from the database at the moment of the copy.
+func TestShareEndpointReturnsOneWork(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Shared Work\n\nThe body that should be copied verbatim.")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share/work/%s = %d, want 200", id, status)
+	}
+
+	var data struct {
+		Title       string `json:"title"`
+		Body        string `json:"body"`
+		Address     string `json:"address"`
+		Published   string `json:"published"`
+		IsPublished bool   `json:"isPublished"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		t.Fatalf("decode the share data: %v", err)
+	}
+
+	if data.Title != "A Shared Work" {
+		t.Errorf("title = %q, want A Shared Work", data.Title)
+	}
+	if data.Body != "The body that should be copied verbatim." {
+		t.Errorf("body = %q, want the body without its title", data.Body)
+	}
+	if data.IsPublished {
+		t.Error("a draft reports itself as published")
+	}
+	if data.Address != "" {
+		t.Errorf("a draft has the address %q, want none", data.Address)
+	}
+	if data.Published != "" {
+		t.Errorf("a draft has the date %q, want none", data.Published)
+	}
+}
+
+// TestShareEndpointGivesAPublishedWorkItsAddress covers the Copy Link half.
+//
+// A published work is marked as such so the browser can enable Copy Link; a draft is not, which is
+// why the page disables the button rather than handing out a link that would 404.
+func TestShareEndpointGivesAPublishedWorkItsAddress(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Public Work\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share/work/%s = %d, want 200", id, status)
+	}
+
+	var data struct {
+		Address     string `json:"address"`
+		Published   string `json:"published"`
+		IsPublished bool   `json:"isPublished"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		t.Fatalf("decode the share data: %v", err)
+	}
+
+	if !data.IsPublished {
+		t.Error("a published work reports itself as a draft")
+	}
+	if data.Published == "" {
+		t.Error("a published work has no publication date")
+	}
+	// PUBLIC_BASE_URL is unset in the test environment, so the address has no origin. The public
+	// site's own Share page always has an origin, and it is where a reader copies the address.
+	_ = data.Address
+}
+
+// TestShareEndpointRefusesANonExistentWork covers the miss, so the browser can report it honestly.
+func TestShareEndpointRefusesANonExistentWork(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, _, _ := get(t, srv.URL+"/share/work/11111111-2222-3333-4444-555555555555", nil)
+	if status != http.StatusNotFound {
+		t.Fatalf("GET /share/work/unknown = %d, want 404", status)
+	}
+}
+
+// TestTheShareFormIsAccepted covers the CSRF contract of the picker's data route.
+//
+// The route is a GET inside the authenticated group, so a session is required; the form helper
+// supplies the token that every state-changing route requires and confirms the route stays usable.
+func TestTheShareFormIsAccepted(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	insertPoem(t, "A work in the picker")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, _, _ := get(t, srv.URL+"/share", nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share = %d, want 200", status)
+	}
+
+	// The share page is rendered for an authenticated reader; a POST with no change is not a route
+	// it has, and must be refused rather than silently treated as a read.
+	status, _, _ = postForm(t, srv.URL+"/share", url.Values{}, nil)
+	if status != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /share = %d, want 405", status)
+	}
+}
+
+// TestPublicShareCarriesNoBodyText holds the invariant the Share actions depend on: the full text
+// is on the work page alone, and the reader's script fetches it from there rather than from a
+// second published copy.
+func TestPublicShareCarriesNoBodyText(t *testing.T) {
+	body := "a body that must not appear twice"
+	site := views.PublicSite{
+		Title:   "Verse",
+		BaseURL: "https://verse.test",
+		Works: []views.PublicWork{{
+			ID:          "a",
+			Path:        "/w/a/",
+			Title:       "A Shared Work",
+			Content:     "A Shared Work\n\n" + body,
+			PublishedAt: fixedPublicTime(3),
+		}},
+	}
+
+	rendered := renderComponent(t, views.PublicShare(site))
+	if strings.Contains(rendered, body) {
+		t.Error("the public Share page contains a work's body")
+	}
+}

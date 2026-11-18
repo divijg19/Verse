@@ -65,8 +65,9 @@ interface Bundle {
 const bundles: Bundle[] = [
   { source: "web/ts/editor.ts", output: "static/js/editor.js" },
   { source: "web/ts/navigation.ts", output: "static/js/navigation.js" },
+  { source: "web/ts/share.ts", output: "static/js/share.js" },
   {
-    source: "web/ts/public_search.ts",
+    source: "web/ts/public.ts",
     output: "internal/publish/assets/public.js",
   },
 ];

@@ -359,6 +359,9 @@ func NewRouter() (*chi.Mux, error) {
 		priv.Get("/caelum", handlers.CaelumHandler)
 		priv.Get("/library", handlers.LibraryHandler)
 		priv.Get("/share", handlers.ShareHandler)
+		// One work's share data for the picker. It returns the body of a single work, so it stays
+		// inside the authenticated group like every other read of work text.
+		priv.Get("/share/work/{id}", handlers.ShareWorkHandler)
 
 		// Work and editor routes.
 		priv.Get("/poems", handlers.PoemsHandler)
@@ -429,6 +432,7 @@ var staticAssets = map[string]string{
 	"js/editor.js":     "js/editor.js",
 	"js/htmx.min.js":   "js/htmx.min.js",
 	"js/navigation.js": "js/navigation.js",
+	"js/share.js":      "js/share.js",
 }
 
 // staticHandler serves the asset directory, and only the assets named in staticAssets.

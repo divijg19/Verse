@@ -21,7 +21,7 @@ func TestStaticFilesAreRevalidated(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	paths := []string{"/static/js/navigation.js"}
+	paths := []string{"/static/js/navigation.js", "/static/js/share.js"}
 	if _, err := os.Stat("static/css/output.css"); err == nil {
 		paths = append(paths, "/static/css/output.css")
 	}

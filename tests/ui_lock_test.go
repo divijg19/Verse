@@ -14,7 +14,7 @@ import (
 )
 
 func TestSharedScreenLayoutLocksViewport(t *testing.T) {
-	body := renderComponent(t, views.Layout("share", views.Share()))
+	body := renderComponent(t, views.Layout("share", views.Share(nil)))
 
 	assertContainsAll(t, body,
 		`<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">`,
@@ -138,7 +138,7 @@ func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
 // still worked because its handler calls the close function directly. The state flag and the
 // control selector must stay separate names.
 func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
-	layout := renderComponent(t, views.Layout("share", views.Share()))
+	layout := renderComponent(t, views.Layout("share", views.Share(nil)))
 	if !strings.Contains(layout, `[data-editor-overlay-active="true"] #screen {`) {
 		t.Fatalf("layout does not style the viewport from data-editor-overlay-active: %q", layout)
 	}
@@ -295,28 +295,53 @@ func TestCaelumUsesCompactPromptSurface(t *testing.T) {
 }
 
 func TestShareUsesCompactModeSurface(t *testing.T) {
-	body := renderComponent(t, views.Share())
+	works := []views.ShareWorkOption{
+		{ID: "aaaa", Title: "A Published Work", Published: true},
+		{ID: "bbbb", Title: "A Draft Work", Published: false},
+	}
+	body := renderComponent(t, views.Share(works))
 
 	assertContainsAll(t, body,
 		`>Share</h1>`,
 		`class="verse-surface-heading verse-mobile-screen-title"`,
 		`class="verse-share-panel verse-panel"`,
-		`>Quiet Copy</p>`,
+		`>Copy Text</p>`,
+		`>Copy Link</p>`,
 		`>Card Export</p>`,
-		`>Private Link</p>`,
+		`id="share-work-picker"`,
+		`data-published="true"`,
+		`data-published="false"`,
 		`>Open Library</button>`,
 		`>Write Again</button>`,
 	)
 
 	for _, removed := range []string{
+		`>Quiet Copy</p>`,
+		`>Private Link</p>`,
+		`>Soon</span>`,
 		`>Share Studio</p>`,
 		`>Until Then</p>`,
-		`This surface now reads as a complete destination`,
-		`Keep writing and refining.`,
 	} {
 		if strings.Contains(body, removed) {
-			t.Fatalf("share should stay compact without redundant copy, found %q in %q", removed, body)
+			t.Fatalf("share should not carry %q", removed)
 		}
+	}
+}
+
+// TestShareBundleIsLoadedByTheLayout asserts the Share actions are loaded globally.
+//
+// A script tag inside a page swapped into #screen is not executed by HTMX, so a page-local tag
+// would work on a full load and silently fail on navigation. The layout loads the bundle once,
+// and the bundle re-initializes after each swap.
+func TestShareBundleIsLoadedByTheLayout(t *testing.T) {
+	layout := renderComponent(t, views.Layout("share", views.Share(nil)))
+	if !strings.Contains(layout, `<script src="/static/js/share.js"></script>`) {
+		t.Fatal("the layout does not load the Share bundle")
+	}
+
+	source := readRepoFile(t, filepath.Join("web", "ts", "share.ts"))
+	if !strings.Contains(source, `htmx:afterSwap`) {
+		t.Fatal("the Share bundle does not re-initialize after an HTMX swap")
 	}
 }
 

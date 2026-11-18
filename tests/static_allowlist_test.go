@@ -36,6 +36,7 @@ var allowedStaticAssets = []string{
 	"/static/js/editor.js",
 	"/static/js/htmx.min.js",
 	"/static/js/navigation.js",
+	"/static/js/share.js",
 }
 
 // explicitlyNotServed are files that live in the asset directory and are deliberately not served.

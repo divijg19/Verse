@@ -38,6 +38,9 @@ var privateRoutes = []struct {
 	{http.MethodGet, "/caelum"},
 	{http.MethodGet, "/library"},
 	{http.MethodGet, "/share"},
+	// The Share picker's work data. Added in v0.5.0's successor: it returns one work verbatim, so
+	// it stays behind the session like every other read of work text.
+	{http.MethodGet, "/share/work/some-id"},
 	{http.MethodGet, "/poems"},
 	{http.MethodGet, "/poem/some-id"},
 	{http.MethodGet, "/prompt"},

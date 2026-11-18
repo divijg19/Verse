@@ -52,6 +52,22 @@ func (v PoemView) PublishButtonClass() string {
 	return "verse-button"
 }
 
+// ShareWorkOption is one work in the Share screen's picker.
+//
+// It carries only what the picker needs: an identifier for the endpoint, a title for the label, and
+// whether the work is published, because Copy Link is meaningless for a draft. The body is fetched
+// from the endpoint when an action actually needs it rather than embedded in every option.
+type ShareWorkOption struct {
+	// ID is the work's identifier, used to fetch its share data.
+	ID string
+
+	// Title is the work's title, truncated to a width that fits a picker option.
+	Title string
+
+	// Published is whether the work has a public address.
+	Published bool
+}
+
 // PoemVersionView is one superseded revision, as rendered in a poem's history.
 type PoemVersionView struct {
 	ID         string

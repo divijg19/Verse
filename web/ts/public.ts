@@ -1,20 +1,19 @@
-// The archive's search box.
+import { copyText, savePNG, type ShareWork } from "./share_card";
+
+// The public site's one script.
 //
-// The public site ships no JavaScript by default, and the archive page is the complete list of
-// published work whether this file loads or not. That is the fallback: with the script blocked, or
-// with the index unreachable, the reader still has every work.
+// The public site ships no JavaScript by default: the archive is the complete list of published
+// work, every work has its own page, and the Share page shows each work's address. All of that is in
+// the markup and works with the script blocked. What this file adds is convenience on top of it --
+// narrowing the archive, and copying a work's text, address or card.
 //
-// What this file adds is a way to narrow that list without a round trip. The index it reads is
-// search.json, which the publisher already writes and which carries an id, a path, a title, a date
-// and a bounded excerpt for each published work -- and nothing else. The full text of a work is not
-// published twice.
+// It is still one script, because the validator permits exactly one and refuses an inline script or
+// a foreign one. The three Share actions use the shared module, so the reader's site and the
+// author's private site cannot disagree about what "Copy Text" or "Card Export" means.
 //
-// The box is inserted by this script rather than being in the markup, because a search input that
-// cannot search is worse than no search input: a reader who cannot type into it has no way to tell
-// that the page is not broken. A page with no script has no box at all.
-//
-// The reader's own navigation and the site's design are untouched by any of this. Nothing here
-// changes what is published or how a work is rendered; it only hides list entries that do not match.
+// A work's body is never put in a second published file. Copy Text and Card Export fetch the work's
+// own page and read the .poem element from it. That is a same-origin request to a page the reader
+// could open anyway, and it keeps the promise that full body text is not published twice.
 
 /** One entry in the search index. */
 interface VerseSearchEntry {
@@ -255,3 +254,112 @@ async function main(): Promise<void> {
 }
 
 void main();
+
+// ---------------------------------------------------------------------------------------------
+// Share
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Loads a work's body from its own page.
+ *
+ * The body is not in the search index and is not duplicated anywhere else in the build, so the
+ * work page is the single source. Reading it with DOMParser rather than an HTML string means templ's
+ * escaping is undone exactly as it would be by the browser, and no text is ever evaluated as markup.
+ */
+async function loadWork(
+  path: string,
+  title: string,
+  address: string,
+  published: string,
+): Promise<ShareWork | null> {
+  try {
+    const response = await fetch(path, { headers: { accept: "text/html" } });
+    if (!response.ok) {
+      return null;
+    }
+
+    const page = new DOMParser().parseFromString(
+      await response.text(),
+      "text/html",
+    );
+    const body = page.querySelector(".poem")?.textContent;
+    if (body === null || body === undefined) {
+      return null;
+    }
+
+    return { title, body, address, published };
+  } catch {
+    return null;
+  }
+}
+
+/** Reports the outcome beside the button that caused it. */
+function report(button: HTMLButtonElement, message: string): void {
+  const card = button.closest<HTMLElement>(".share-item");
+  const status = card?.querySelector<HTMLElement>(".share-status");
+  if (status) {
+    status.textContent = message;
+  }
+}
+
+/** Wires one work's three actions. */
+function wireCard(card: HTMLElement): void {
+  const title = card.querySelector(".share-title")?.textContent?.trim() ?? "";
+  const link = card.querySelector<HTMLAnchorElement>("a.share-title");
+  const path = link?.getAttribute("href") ?? "";
+  const address =
+    card.querySelector(".share-address")?.textContent?.trim() ?? "";
+  const published = card.querySelector("time")?.getAttribute("datetime") ?? "";
+
+  const actions = card.querySelectorAll<HTMLButtonElement>(
+    "button[data-share-action]",
+  );
+  for (const button of actions) {
+    button.addEventListener("click", async () => {
+      const action = button.getAttribute("data-share-action");
+
+      if (action === "link") {
+        const ok = await copyText(address);
+        report(
+          button,
+          ok ? "Address copied." : "Could not copy; select the address above.",
+        );
+        return;
+      }
+
+      // Text and card both need the body, which lives on the work's own page.
+      const work = await loadWork(path, title, address, published);
+      if (!work) {
+        report(button, "The work could not be loaded.");
+        return;
+      }
+
+      if (action === "text") {
+        const ok = await copyText(`${work.title}\n\n${work.body}`);
+        report(
+          button,
+          ok
+            ? "Text copied."
+            : "Could not copy; open the work to select its text.",
+        );
+        return;
+      }
+
+      if (action === "card") {
+        const ok = await savePNG(work);
+        report(
+          button,
+          ok ? "Card saved." : "This browser could not save the card.",
+        );
+      }
+    });
+  }
+}
+
+function shareMain(): void {
+  for (const card of document.querySelectorAll<HTMLElement>(".share-item")) {
+    wireCard(card);
+  }
+}
+
+void shareMain();

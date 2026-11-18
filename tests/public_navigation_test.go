@@ -302,12 +302,13 @@ func TestPublicPagesCarryNoAuthoringClassNames(t *testing.T) {
 	}
 }
 
-// TestPublicShareShowsTheAddressOfEachWork checks the share surface.
+// TestPublicShareOffersTheThreeActions checks the share surface.
 //
-// A reader who wants to share a work wants its address. The page shows the address as text, not
-// only as a link behind a title, and the text is selectable in one click so it can be copied
-// without a script.
-func TestPublicShareShowsTheAddressOfEachWork(t *testing.T) {
+// The reader gets the same three actions as the author: Copy Text, Copy Link and Card Export. The
+// address is still on the page in smaller text, as the fallback for a reader with no script; the
+// buttons are the primary path. Full body text is not in the markup, because it is not published
+// twice -- the actions read it from the work's own page.
+func TestPublicShareOffersTheThreeActions(t *testing.T) {
 	site := views.PublicSite{
 		Title:   "Verse",
 		BaseURL: "https://verse.test",
@@ -322,12 +323,23 @@ func TestPublicShareShowsTheAddressOfEachWork(t *testing.T) {
 		`class="share-item"`,
 		`class="share-address">https://verse.test/w/a/</span>`,
 		`>The First Work</a>`,
+		`data-share-action="text"`,
+		`data-share-action="link"`,
+		`data-share-action="card"`,
+		`>Copy Text</button>`,
+		`>Copy Link</button>`,
+		`>Card Export</button>`,
 	)
 
-	// The stylesheet marks the address selectable in one click. The class is what carries it.
+	// The address stays selectable in one click for the no-script fallback.
 	styles := readStaticFile(t, "../internal/publish/assets/public.css")
 	if !strings.Contains(styles, "user-select: all;") {
 		t.Error("the share address is not marked selectable in one click")
+	}
+
+	// No work body may appear in the Share page: it lives on the work page alone.
+	if strings.Contains(body, "Verse</h1>") {
+		t.Error("the Share page publishes a work's body twice")
 	}
 }
 

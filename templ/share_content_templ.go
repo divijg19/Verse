@@ -9,7 +9,7 @@ package templ
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func ShareContent() templ.Component {
+func ShareContent(works []ShareWorkOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -26,12 +26,76 @@ func ShareContent() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-4\"><style>\n\t\t\t.verse-share-panel {\n\t\t\t\tmin-width: 0;\n\t\t\t\tpadding: 1rem 1.1rem;\n\t\t\t}\n\n\t\t\t.verse-share-modes {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(3, minmax(0, 1fr));\n\t\t\t\tgap: 0.75rem;\n\t\t\t\tpadding-top: 0.85rem;\n\t\t\t}\n\n\t\t\t.verse-share-mode {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tgap: 0.75rem;\n\t\t\t\tpadding: 0.85rem 0.95rem;\n\t\t\t}\n\n\t\t\t.verse-share-mode > :first-child {\n\t\t\t\tmin-width: 0;\n\t\t\t}\n\n\t\t\t.verse-share-mode p {\n\t\t\t\toverflow-wrap: anywhere;\n\t\t\t}\n\n\t\t\t.verse-share-badge {\n\t\t\t\tdisplay: inline-flex;\n\t\t\t\talign-items: center;\n\t\t\t\tflex-shrink: 0;\n\t\t\t\talign-self: flex-start;\n\t\t\t\tborder-radius: 999px;\n\t\t\t\tpadding: 0.28rem 0.6rem;\n\t\t\t\tbackground: rgba(64, 64, 64, 0.65);\n\t\t\t\tfont-size: 0.54rem;\n\t\t\t\tletter-spacing: 0.16em;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t\tcolor: rgb(163 163 163);\n\t\t\t}\n\n\t\t\t.verse-share-actions {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-wrap: wrap;\n\t\t\t\tgap: 0.75rem;\n\t\t\t\tpadding-top: 0.9rem;\n\t\t\t}\n\n\t\t\t@media (max-width: 1023px) {\n\t\t\t\t.verse-share-modes {\n\t\t\t\t\tgrid-template-columns: 1fr;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\t@media (max-width: 639px) {\n\t\t\t\t.verse-share-panel {\n\t\t\t\t\tpadding: 1rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-share-actions > * {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><section class=\"verse-share-panel verse-panel\"><p class=\"verse-eyebrow\">Share</p><div class=\"verse-share-modes\"><div class=\"verse-share-mode verse-panel-soft\"><p class=\"font-serif text-[1rem] leading-snug text-neutral-100\">Quiet Copy</p><span class=\"verse-share-badge\">Soon</span></div><div class=\"verse-share-mode verse-panel-soft\"><p class=\"font-serif text-[1rem] leading-snug text-neutral-100\">Card Export</p><span class=\"verse-share-badge\">Soon</span></div><div class=\"verse-share-mode verse-panel-soft\"><p class=\"font-serif text-[1rem] leading-snug text-neutral-100\">Private Link</p><span class=\"verse-share-badge\">Soon</span></div></div><div class=\"verse-share-actions\"><button hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-button-secondary\">Open Library</button> <button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-button-ghost\">Write Again</button></div></section></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"space-y-4\"><style>\n\t\t\t.verse-share-panel {\n\t\t\t\tmin-width: 0;\n\t\t\t\tpadding: 1rem 1.1rem;\n\t\t\t}\n\n\t\t\t.verse-share-picker {\n\t\t\t\tdisplay: flex;\n\t\t\t\tmin-width: 0;\n\t\t\t\tflex-direction: column;\n\t\t\t\tgap: 0.45rem;\n\t\t\t\tpadding-top: 0.85rem;\n\t\t\t}\n\n\t\t\t.verse-share-picker label {\n\t\t\t\tfont-size: 0.62rem;\n\t\t\t\tletter-spacing: 0.18em;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t\tcolor: rgb(115 115 115);\n\t\t\t}\n\n\t\t\t.verse-share-picker select {\n\t\t\t\twidth: 100%;\n\t\t\t\tmin-width: 0;\n\t\t\t\tbox-sizing: border-box;\n\t\t\t\tpadding: 0.6rem 0.7rem;\n\t\t\t\tborder: 1px solid rgb(38 38 38);\n\t\t\t\tborder-radius: 0.5rem;\n\t\t\t\tbackground: rgba(10, 10, 10, 0.6);\n\t\t\t\tcolor: rgb(245 245 245);\n\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", serif;\n\t\t\t\tfont-size: 0.95rem;\n\t\t\t}\n\n\t\t\t.verse-share-modes {\n\t\t\t\tdisplay: grid;\n\t\t\t\tgrid-template-columns: repeat(3, minmax(0, 1fr));\n\t\t\t\tgap: 0.75rem;\n\t\t\t\tpadding-top: 0.85rem;\n\t\t\t}\n\n\t\t\t.verse-share-mode {\n\t\t\t\tdisplay: flex;\n\t\t\t\talign-items: center;\n\t\t\t\tjustify-content: space-between;\n\t\t\t\tgap: 0.75rem;\n\t\t\t\tmin-width: 0;\n\t\t\t\tpadding: 0.85rem 0.95rem;\n\t\t\t\tcursor: pointer;\n\t\t\t\ttext-align: left;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 0.95rem;\n\t\t\t\ttransition: border-color 150ms ease, background-color 150ms ease;\n\t\t\t}\n\n\t\t\t.verse-share-mode:hover:not(:disabled) {\n\t\t\t\tborder-color: rgb(82 82 82);\n\t\t\t}\n\n\t\t\t.verse-share-mode:disabled {\n\t\t\t\tcursor: not-allowed;\n\t\t\t\topacity: 0.5;\n\t\t\t}\n\n\t\t\t.verse-share-mode:focus-visible {\n\t\t\t\toutline: none;\n\t\t\t\tbox-shadow: 0 0 0 2px rgb(168 85 247);\n\t\t\t}\n\n\t\t\t.verse-share-mode p {\n\t\t\t\toverflow-wrap: anywhere;\n\t\t\t}\n\n\t\t\t.verse-share-link-hint {\n\t\t\t\tmargin: 0.5rem 0 0;\n\t\t\t\tfont-size: 0.7rem;\n\t\t\t\tcolor: rgb(115 115 115);\n\t\t\t}\n\n\t\t\t.verse-share-status {\n\t\t\t\tmin-height: 1.2rem;\n\t\t\t\tmargin: 0.85rem 0 0;\n\t\t\t\tfont-size: 0.7rem;\n\t\t\t\tletter-spacing: 0.1em;\n\t\t\t\ttext-transform: uppercase;\n\t\t\t\tcolor: rgb(168 85 247);\n\t\t\t}\n\n\t\t\t.verse-share-actions {\n\t\t\t\tdisplay: flex;\n\t\t\t\tflex-wrap: wrap;\n\t\t\t\tgap: 0.75rem;\n\t\t\t\tpadding-top: 0.9rem;\n\t\t\t}\n\n\t\t\t@media (max-width: 1023px) {\n\t\t\t\t.verse-share-modes {\n\t\t\t\t\tgrid-template-columns: 1fr;\n\t\t\t\t}\n\t\t\t}\n\n\t\t\t@media (max-width: 639px) {\n\t\t\t\t.verse-share-panel {\n\t\t\t\t\tpadding: 1rem;\n\t\t\t\t}\n\n\t\t\t\t.verse-share-actions > * {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t}\n\t\t</style><section class=\"verse-share-panel verse-panel\"><p class=\"verse-eyebrow\">Share</p><div class=\"verse-share-picker\"><label for=\"share-work-picker\">Choose a work</label> <select id=\"share-work-picker\" name=\"work\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if len(works) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<option value=\"\">No works yet</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			for _, work := range works {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<option value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var2 string
+				templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(work.ID).Resolve(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/share_content.templ`, Line: 125, Col: 30}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" data-published=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var3 string
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(publishedAttr(work.Published)).Resolve(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/share_content.templ`, Line: 125, Col: 79}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var4 string
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(work.Title)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/share_content.templ`, Line: 125, Col: 94}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select></div><div class=\"verse-share-modes\"><button type=\"button\" data-share-action=\"text\" class=\"verse-share-mode verse-panel-soft\"><p class=\"font-serif text-[1rem] leading-snug text-neutral-100\">Copy Text</p></button> <button type=\"button\" data-share-action=\"link\" class=\"verse-share-mode verse-panel-soft\"><p class=\"font-serif text-[1rem] leading-snug text-neutral-100\">Copy Link</p></button> <button type=\"button\" data-share-action=\"card\" class=\"verse-share-mode verse-panel-soft\"><p class=\"font-serif text-[1rem] leading-snug text-neutral-100\">Card Export</p></button></div><p class=\"verse-share-link-hint\" hidden>Publish this work first to copy its public link.</p><p class=\"verse-share-status\" role=\"status\" aria-live=\"polite\"></p><div class=\"verse-share-actions\"><button hx-get=\"/library\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-button-secondary\">Open Library</button> <button hx-get=\"/editor\" hx-target=\"#screen\" hx-swap=\"innerHTML\" class=\"verse-button-ghost\">Write Again</button></div></section></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		return nil
 	})
+}
+
+// publishedAttr is the picker option's flag for whether the work has a public address.
+func publishedAttr(published bool) string {
+	if published {
+		return "true"
+	}
+	return "false"
 }
 
 var _ = templruntime.GeneratedTemplate
