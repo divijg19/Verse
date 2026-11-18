@@ -84,6 +84,12 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 			min-width: 0;
 			min-height: 0;
 			flex-direction: column;
+			/* The dashboard shell is flex: 1, so the activity column fills the viewport. Without
+			 * this the card stretches to that height and its border runs far below the heatmap --
+			 * measured at 641px of card against 400px of heatmap, with 204px of empty card.
+			 * Sizing to the content leaves the card's own padding as the only space below the grid.
+			 */
+			align-self: start;
 			overflow: hidden;
 			padding: 1.2rem 1.25rem;
 		}

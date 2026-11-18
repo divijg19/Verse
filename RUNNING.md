@@ -17,14 +17,13 @@ requires a passphrase to enter. It is not a blog, a social network, or a reader-
 
 ## Requirements
 
-| Tool       | Version         | Notes                                                                                                                              |
-| ---------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Go         | 1.27.0 or newer | Declared in `go.mod`                                                                                                               |
-| templ CLI  | v0.3.1100       | Must match `go.mod`. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file            |
-| Bun        | `latest`        | Stylesheet build. CI, the `Dockerfile`, Render, and Workers Builds all name the same policy; CI asserts the repository paths agree |
-| Node       | 24              | Workers Builds only, pinned by `.node-version`. Not needed for local development                                                   |
-| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses. Put it in the same region as the service -- see below                                  |
-| TypeScript | 7.x             | Type checking only, and only through Bun's built-in `bun check` -- there is no `tsc` dependency                                    |
+| Tool       | Version         | Notes                                                                                                                           |
+| ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Go         | 1.27.0 or newer | Declared in `go.mod`                                                                                                            |
+| templ CLI  | v0.3.1118       | Derived from `go.mod` by CI. Generated `*_templ.go` files are committed, so the CLI is only needed when editing a `.templ` file |
+| Bun        | `latest`        | Stylesheet build. CI, the `Dockerfile`, `render.yaml` and `.bun-version` all name the same policy; CI asserts they agree        |
+| PostgreSQL | 16 or newer     | Any instance; Neon is what production uses. Put it in the same region as the service -- see below                               |
+| TypeScript | 7.x             | Type checking only, and only through Bun's built-in `bun check` -- there is no `tsc` dependency                                 |
 
 ---
 
@@ -987,26 +986,39 @@ The two have already diverged once. The dashboard's build command was a copy of 
 `render.yaml`, so Render was building with an unlocked dependency install where the repository
 specified `--frozen-lockfile` — and nothing noticed, because nothing compared them.
 
-When changing how the service is built, change `render.yaml` **and** the dashboard setting, in the
-same commit. CI checks the repository's Bun pins against each other; it cannot see the Render or
-Workers Builds dashboards.
+When changing how the service is built, change `render.yaml` and `.bun-version` in the same commit.
+CI checks all four repository declarations against each other; it cannot see the Render dashboard.
 
-### Toolchain: Bun floats `latest`, Node is pinned on Workers Builds, Go cannot be pinned
+### Toolchain: Bun floats `latest`, Go cannot be pinned
 
-|      | CI and `Dockerfile`                                                 | Render                                       | Workers Builds                                        |
-| ---- | ------------------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
-| Bun  | `latest`, asserted equal across CI, `Dockerfile`, and `render.yaml` | `latest`, via `BUN_VERSION` in `render.yaml` | `latest`, via `BUN_VERSION`                           |
-| Node | —                                                                   | —                                            | `24`, via the committed `.node-version`               |
-| Go   | `1.27.x` from `go.mod`, asserted equal to the `Dockerfile`          | **latest stable 1.x** — not pinnable         | build image default (`1.27.x`); `go.mod` sets a floor |
+|     | CI and `Dockerfile`                                                                | Render                                              |
+| --- | ---------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Bun | `latest`, asserted equal across CI, `Dockerfile`, `render.yaml` and `.bun-version` | `latest`, via `.bun-version` in the repository root |
+| Go  | `1.27.x` from `go.mod`, asserted equal to the `Dockerfile`                         | **latest stable 1.x** — not pinnable                |
 
-Render's default Bun depends on when the service was created, and this one defaulted to `1.3.4` while
-the repository was on `1.3.5` and then `1.4.2`. Production was therefore building the stylesheet with
-a package manager version no other build path used. `BUN_VERSION: latest` fixes that, and CI now fails
-if the three repository paths disagree — including when the policy is _absent_, which was the state
-that produced `1.3.4`. The trade-off is deliberate: a build is not reproducible across time, because
-all paths resolve `latest` when they run. A literal pin remains accepted by the gate, but every path
-must name the same literal; mixing `latest` with a pin is what the gate rejects. Workers Builds uses
-the same `latest` policy; its dashboard variable is not visible to CI.
+Render selects its Bun version in this order: a `BUN_VERSION` environment variable set in the
+dashboard, then a `.bun-version` file in the repository root, then a default that depends on when
+the service was created. This service was created on 2025-12-08, whose default is `1.3.4` — so for
+several releases production built the stylesheet with a package manager no other path used, while
+`BUN_VERSION: latest` sat in `render.yaml` and appeared to fix it.
+
+It did not. `render.yaml` only takes effect when the live service is linked to the Blueprint and
+synced from it; this service was created manually, so the declaration was inert. `.bun-version` is
+read from the repository itself and is therefore the mechanism that works here. It contains
+`latest`, and CI fails if the four repository declarations disagree — including when one is absent,
+which was the state that produced `1.3.4`.
+
+**Operator note:** a `BUN_VERSION` variable in the Render dashboard takes precedence over
+`.bun-version`. If one is set to an older version, remove it or change it to `latest`, or the file
+will be ignored and the service will keep using the dashboard value.
+
+There is no Node pin any more. Node was needed only by Cloudflare Workers Builds, which are switched
+off; the deploy runs in GitHub Actions and `bun` carries its own runtime. `.node-version` has been
+deleted.
+
+The trade-off of `latest` is deliberate: a build is not reproducible across time, because all paths
+resolve `latest` when they run. A literal pin remains accepted by the gate, but every path must name
+the same literal; mixing `latest` with a pin is what the gate rejects.
 
 Go is a genuine, accepted difference. Render's native Go runtime always tracks the latest stable 1.x
 and, in their words, "you can't pin to a specific Go version unless you deploy a Docker image." CI

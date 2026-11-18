@@ -39,7 +39,7 @@ bun run templ        # regenerates with the go.mod version; then commit the resu
 ```
 
 CI regenerates and fails if the result differs, so this cannot be forgotten. The version is derived
-from `go.mod` (currently `v0.3.1100`); match it, or the diff will be unreadable.
+from `go.mod` (currently `v0.3.1118`); match it, or the diff will be unreadable.
 
 ## Style
 
