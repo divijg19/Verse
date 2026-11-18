@@ -110,10 +110,6 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 				background: rgb(147 51 234);
 			}
 
-			.verse-heatmap-stable {
-				min-height: calc(1.5rem + var(--verse-heatmap-cell) + 1.125rem + (var(--verse-heatmap-cell) * 6) + (var(--verse-heatmap-gap) * 5));
-			}
-
 			@media (max-width: 767px) {
 				.verse-heatmap-shell {
 					--verse-heatmap-cell: 1.6rem;
@@ -161,7 +157,7 @@ templ Heatmap(month time.Time, days []HeatmapDay) {
 				}
 			}
 		</style>
-		<div class="verse-heatmap-shell verse-heatmap-stable">
+		<div class="verse-heatmap-shell">
 			<div class="verse-heatmap-content">
 				<div class="verse-heatmap-nav">
 					<a
