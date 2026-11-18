@@ -740,7 +740,7 @@ which
 
 .share-item {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--rule);
   border-radius: 1rem;
@@ -749,6 +749,58 @@ which
     rgba(23, 23, 23, 0.66) 0%,
     rgba(10, 10, 10, 0.34) 100%
   );
+}
+
+/* The three actions, in the author's mode-card language.
+ *
+ * They are rendered as buttons rather than inserted by the script, so the page says what it offers
+ * even when the script is blocked. Without the script they do nothing, and the address below the
+ * title is the fallback: the reader can still select it and copy it by hand.
+ */
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.share-action {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(23, 23, 23, 0.72) 0%,
+    rgba(10, 10, 10, 0.42) 100%
+  );
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-eyebrow);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.share-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.share-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.share-status {
+  min-height: 1rem;
+  margin: 0;
+  font-size: var(--text-meta);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .share-title {
@@ -764,10 +816,16 @@ which
   line-height: 1.6;
   color: var(--muted);
   overflow-wrap: anywhere;
-  /* One click selects the whole address. The cursor says so before the click happens. */
+  /* One click selects the whole address. The cursor says so before the click happens. It is the
+   * fallback when the script is blocked, so it stays selectable rather than being replaced. */
   user-select: all;
   -webkit-user-select: all;
   cursor: text;
+}
+
+.share-item .share-address {
+  font-size: 0.68rem;
+  color: rgb(115 115 115);
 }
 
 .share-address:hover {

@@ -1,5 +1,9 @@
 package templ
 
-templ Share() {
-	@Screen("Share", ShareContent())
+// Share is the author's sharing screen.
+//
+// The works come from the handler because the picker needs them; the bodies do not, because they are
+// fetched only when an action needs one.
+templ Share(works []ShareWorkOption) {
+	@Screen("Share", ShareContent(works))
 }

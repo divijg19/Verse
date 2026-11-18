@@ -206,16 +206,17 @@ templ PublicShare(site PublicSite) {
 
 // PublicShareBody is the surface for sending a work to somebody else.
 //
-// A reader who wants to share something wants the address of it, so the address is the thing on
-// the page rather than something behind a link. It is set in a monospace face and marked so that a
-// single click selects the whole of it, which is a copy button with no script in it.
+// It uses the same three actions as the author's Share screen -- Copy Text, Copy Link and Card
+// Export -- because the two surfaces must mean the same thing by those names. The page works
+// without the script: each title is a real link and each address is plain selectable text. The
+// script adds the buttons' behaviour on top; it does not add the information.
 //
-// It is deliberately not the archive's list again. The archive lists works by title; this one lists
-// them by address.
+// The address is deliberately still on the page, in smaller type under the title. It is the
+// no-script fallback and the honest account of where the link points.
 templ PublicShareBody(site PublicSite) {
 	<h1 class="visually-hidden">Share</h1>
 	<p class="eyebrow">Share</p>
-	<p class="lede">Every published work has its own address. Select one and copy it to send it on.</p>
+	<p class="lede">Send a work on: copy its text, its address, or a card made from it.</p>
 
 	if len(site.Works) == 0 {
 		<p class="empty">Nothing published yet.</p>
@@ -224,8 +225,14 @@ templ PublicShareBody(site PublicSite) {
 			for _, work := range site.Works {
 				<li class="share-item">
 					<a class="share-title" href={ work.Path }>{ work.Title }</a>
-					<span class="share-address">{ site.Address(work.Path) }</span>
 					<time class="share-date" datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
+					<span class="share-address">{ site.Address(work.Path) }</span>
+					<div class="share-actions" role="group" aria-label={ "Share " + work.Title }>
+						<button type="button" class="share-action" data-share-action="text">Copy Text</button>
+						<button type="button" class="share-action" data-share-action="link">Copy Link</button>
+						<button type="button" class="share-action" data-share-action="card">Card Export</button>
+					</div>
+					<p class="share-status" role="status" aria-live="polite"></p>
 				</li>
 			}
 		</ul>

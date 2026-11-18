@@ -184,3 +184,8 @@ services:
         # Dispatches the deploy workflow in that repository and nothing else. It needs
         # Contents: write, which is what the dispatch endpoint requires.
         sync: false
+
+      - key: PUBLIC_BASE_URL
+        # The reader's origin, used to build the address that Copy Link puts on the clipboard.
+        # No credential; the public site is public.
+        value: https://verse.divijganjoo2003.workers.dev

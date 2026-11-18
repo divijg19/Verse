@@ -1,11 +1,39 @@
 package templ
 
-templ ShareContent() {
+templ ShareContent(works []ShareWorkOption) {
 	<div class="space-y-4">
 		<style>
 			.verse-share-panel {
 				min-width: 0;
 				padding: 1rem 1.1rem;
+			}
+
+			.verse-share-picker {
+				display: flex;
+				min-width: 0;
+				flex-direction: column;
+				gap: 0.45rem;
+				padding-top: 0.85rem;
+			}
+
+			.verse-share-picker label {
+				font-size: 0.62rem;
+				letter-spacing: 0.18em;
+				text-transform: uppercase;
+				color: rgb(115 115 115);
+			}
+
+			.verse-share-picker select {
+				width: 100%;
+				min-width: 0;
+				box-sizing: border-box;
+				padding: 0.6rem 0.7rem;
+				border: 1px solid rgb(38 38 38);
+				border-radius: 0.5rem;
+				background: rgba(10, 10, 10, 0.6);
+				color: rgb(245 245 245);
+				font-family: Georgia, Cambria, "Times New Roman", serif;
+				font-size: 0.95rem;
 			}
 
 			.verse-share-modes {
@@ -20,29 +48,46 @@ templ ShareContent() {
 				align-items: center;
 				justify-content: space-between;
 				gap: 0.75rem;
+				min-width: 0;
 				padding: 0.85rem 0.95rem;
+				cursor: pointer;
+				text-align: left;
+				font-family: inherit;
+				font-size: 0.95rem;
+				transition: border-color 150ms ease, background-color 150ms ease;
 			}
 
-			.verse-share-mode > :first-child {
-				min-width: 0;
+			.verse-share-mode:hover:not(:disabled) {
+				border-color: rgb(82 82 82);
+			}
+
+			.verse-share-mode:disabled {
+				cursor: not-allowed;
+				opacity: 0.5;
+			}
+
+			.verse-share-mode:focus-visible {
+				outline: none;
+				box-shadow: 0 0 0 2px rgb(168 85 247);
 			}
 
 			.verse-share-mode p {
 				overflow-wrap: anywhere;
 			}
 
-			.verse-share-badge {
-				display: inline-flex;
-				align-items: center;
-				flex-shrink: 0;
-				align-self: flex-start;
-				border-radius: 999px;
-				padding: 0.28rem 0.6rem;
-				background: rgba(64, 64, 64, 0.65);
-				font-size: 0.54rem;
-				letter-spacing: 0.16em;
+			.verse-share-link-hint {
+				margin: 0.5rem 0 0;
+				font-size: 0.7rem;
+				color: rgb(115 115 115);
+			}
+
+			.verse-share-status {
+				min-height: 1.2rem;
+				margin: 0.85rem 0 0;
+				font-size: 0.7rem;
+				letter-spacing: 0.1em;
 				text-transform: uppercase;
-				color: rgb(163 163 163);
+				color: rgb(168 85 247);
 			}
 
 			.verse-share-actions {
@@ -70,20 +115,43 @@ templ ShareContent() {
 		</style>
 		<section class="verse-share-panel verse-panel">
 			<p class="verse-eyebrow">Share</p>
-			<div class="verse-share-modes">
-				<div class="verse-share-mode verse-panel-soft">
-					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Quiet Copy</p>
-					<span class="verse-share-badge">Soon</span>
-				</div>
-				<div class="verse-share-mode verse-panel-soft">
-					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Card Export</p>
-					<span class="verse-share-badge">Soon</span>
-				</div>
-				<div class="verse-share-mode verse-panel-soft">
-					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Private Link</p>
-					<span class="verse-share-badge">Soon</span>
-				</div>
+			<div class="verse-share-picker">
+				<label for="share-work-picker">Choose a work</label>
+				<select id="share-work-picker" name="work">
+					if len(works) == 0 {
+						<option value="">No works yet</option>
+					} else {
+						for _, work := range works {
+							<option value={ work.ID } data-published={ publishedAttr(work.Published) }>{ work.Title }</option>
+						}
+					}
+				</select>
 			</div>
+			<div class="verse-share-modes">
+				<button
+					type="button"
+					data-share-action="text"
+					class="verse-share-mode verse-panel-soft"
+				>
+					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Text</p>
+				</button>
+				<button
+					type="button"
+					data-share-action="link"
+					class="verse-share-mode verse-panel-soft"
+				>
+					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Link</p>
+				</button>
+				<button
+					type="button"
+					data-share-action="card"
+					class="verse-share-mode verse-panel-soft"
+				>
+					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Card Export</p>
+				</button>
+			</div>
+			<p class="verse-share-link-hint" hidden>Publish this work first to copy its public link.</p>
+			<p class="verse-share-status" role="status" aria-live="polite"></p>
 			<div class="verse-share-actions">
 				<button
 					hx-get="/library"
@@ -104,4 +172,12 @@ templ ShareContent() {
 			</div>
 		</section>
 	</div>
+}
+
+// publishedAttr is the picker option's flag for whether the work has a public address.
+func publishedAttr(published bool) string {
+	if published {
+		return "true"
+	}
+	return "false"
 }
