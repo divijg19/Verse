@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/divijg19/Verse/internal/handlers"
 	"github.com/divijg19/Verse/internal/services"
 )
 
@@ -97,7 +99,6 @@ func proposalFor(t *testing.T, srv *httptest.Server, content, suggestion string)
 func TestConcurrentAppliesWriteOnce(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	srv := newTestServer(t)
 	original := "A Work\n\nThe original body."
@@ -146,7 +147,6 @@ func TestConcurrentAppliesWriteOnce(t *testing.T) {
 func TestApplyingAnIdenticalSuggestionRecordsNoVersion(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	srv := newTestServer(t)
 	original := "A Work\n\nThe original body."
@@ -165,6 +165,84 @@ func TestApplyingAnIdenticalSuggestionRecordsNoVersion(t *testing.T) {
 	proposals, err := services.ListWorkProposals(t.Context(), id)
 	if err != nil || len(proposals) != 1 || proposals[0].AppliedAt == nil {
 		t.Errorf("the proposal was not marked applied: %+v, err = %v", proposals, err)
+	}
+}
+
+func TestPrivateLinkUsesTheAuthorOriginNotTheReaderOrigin(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	// A reader origin is configured, as it would be in production. It must not appear in a private
+	// link: /s/{token} is an authoring route and the reader's static site has no such path.
+	t.Setenv("PUBLIC_BASE_URL", "https://reader.example")
+	id := insertPoem(t, "A Work\n\nIts body.")
+
+	form := url.Values{"id": {id}}
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Host = "author.example"
+	rec := httptest.NewRecorder()
+	handlers.ShareLinkHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, truncate(rec.Body.Bytes()))
+	}
+	var data struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &data); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(data.URL, "http://author.example/s/") {
+		t.Errorf("link URL = %q, want the authoring origin", data.URL)
+	}
+	if strings.Contains(data.URL, "reader.example") {
+		t.Errorf("link URL leaked the reader origin: %q", data.URL)
+	}
+
+	// Render terminates TLS: r.TLS is nil and the original scheme arrives in X-Forwarded-Proto.
+	// A client-supplied "http" in front of an honest "https" must not downgrade the capability.
+	req = httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Forwarded-Proto", "http, https")
+	req.Host = "author.example"
+	rec = httptest.NewRecorder()
+	handlers.ShareLinkHandler(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("proxied status = %d, want 200; body: %s", rec.Code, truncate(rec.Body.Bytes()))
+	}
+	var proxied struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &proxied); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(proxied.URL, "https://author.example/s/") {
+		t.Errorf("proxied link = %q, want https on the authoring origin", proxied.URL)
+	}
+}
+
+func TestPrivateLinkRefusesAMalformedHost(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+	id := insertPoem(t, "A Work\n\nIts body.")
+
+	form := url.Values{"id": {id}}
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Host = "evil@example.com"
+	rec := httptest.NewRecorder()
+	handlers.ShareLinkHandler(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400; body: %s", rec.Code, truncate(rec.Body.Bytes()))
+	}
+	links, err := services.ListPrivateLinks(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(links) != 0 {
+		t.Errorf("a refused request minted %d links", len(links))
 	}
 }
 
@@ -208,7 +286,6 @@ func TestTSGuardFailsOnAStrayJavaScriptFile(t *testing.T) {
 func TestSoftDeletedWorkRefusesItsPrivateLink(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
@@ -246,7 +323,6 @@ func TestSoftDeletedWorkRefusesItsPrivateLink(t *testing.T) {
 func TestApplyProposalTwiceIsRejectedAndWritesOnce(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	const original = "A Work\n\nThe original body."
 	const suggestion = "A Work\n\nThe suggested body."
@@ -331,7 +407,6 @@ func TestApplyProposalTwiceIsRejectedAndWritesOnce(t *testing.T) {
 func TestGuestValidationKeepsTheValidatorStatus(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
@@ -355,7 +430,6 @@ func TestGuestValidationKeepsTheValidatorStatus(t *testing.T) {
 func TestGuestCookieIsScopedAndTokenDomainsDoNotCross(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
@@ -407,7 +481,6 @@ func TestGuestCookieIsScopedAndTokenDomainsDoNotCross(t *testing.T) {
 func TestGuestCannotApplyAProposal(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
@@ -427,7 +500,6 @@ func TestGuestCannotApplyAProposal(t *testing.T) {
 func TestGuestCSRFRejectsCrossOrigin(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)

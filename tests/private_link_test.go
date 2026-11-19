@@ -99,10 +99,11 @@ func mintLink(t *testing.T, srvURL, poemID string) (url string, token string) {
 	if err := json.Unmarshal([]byte(body), &data); err != nil {
 		t.Fatalf("decode link response: %v", err)
 	}
-	if !strings.HasPrefix(data.URL, "https://verse.test/s/") {
-		t.Fatalf("link URL = %q, want the configured public origin", data.URL)
+	prefix := srvURL + "/s/"
+	if !strings.HasPrefix(data.URL, prefix) {
+		t.Fatalf("link URL = %q, want the authoring origin %q", data.URL, prefix)
 	}
-	return data.URL, strings.TrimPrefix(data.URL, "https://verse.test/s/")
+	return data.URL, strings.TrimPrefix(data.URL, prefix)
 }
 
 func urlValues(key, value string) url.Values {
@@ -130,7 +131,6 @@ func expireLink(t *testing.T, poemID string) {
 func TestPrivateLinkFlowFromMintToAppliedProposal(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	const original = "A Draft Work\n\nThe author's original body."
 	const suggestion = "A Draft Work\n\nA reader's suggested rewrite."
@@ -273,7 +273,6 @@ func TestPrivateLinkFlowFromMintToAppliedProposal(t *testing.T) {
 func TestPrivateLinkRefusesUnknownRevokedAndExpiredTokens(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
@@ -297,7 +296,6 @@ func TestPrivateLinkRefusesUnknownRevokedAndExpiredTokens(t *testing.T) {
 func TestGuestSessionIsScopedToOneWork(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	first := insertPoem(t, "First Work\n\nFirst body.")
 	second := insertPoem(t, "Second Work\n\nSecond body.")
@@ -352,7 +350,6 @@ func TestGuestSessionIsScopedToOneWork(t *testing.T) {
 func TestGuestCSRFIsRequiredAndSeparateFromAuthorCSRF(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
@@ -397,7 +394,6 @@ func TestGuestCSRFIsRequiredAndSeparateFromAuthorCSRF(t *testing.T) {
 func TestGuestSessionExpiresWithTheLink(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
-	t.Setenv("PUBLIC_BASE_URL", "https://verse.test")
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)

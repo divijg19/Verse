@@ -10,41 +10,36 @@ type Poem struct {
 
 	// DeletedAt is the soft-delete instant, or nil while the work is live.
 	//
-	// Five reads in this repository return a Poem, and only two of them populate this field. The
-	// asymmetry is the trap, so here is all five rather than the three this comment used to name:
+	// A Poem does not say which query produced it, so the two optional instants below must be read
+	// with the query in mind. Every read that returns a Poem is listed here; a field marked "nil" is
+	// genuinely nil for that read, either because the filter guarantees it or because the query does
+	// not select the column at all.
 	//
-	//	populated    GetPoemIncludingDeleted  -- no filter; the recovery path, where the instant is
-	//	                                       the answer being sought
-	//	nil, "live"  ListPoems, SearchPoems, GetPoem, DashboardSummary
-	//	                                       -- all filter deleted_at IS NULL, so nil is the
-	//	                                          correct value and always will be
-	//	nil, "dead"  ListDeletedPoems
-	//	                                       -- filters deleted_at IS NOT NULL. The column is
-	//	                                          selected and scanned here precisely so that this
-	//	                                          last row is a contradiction rather than a silent
-	//	                                          inversion; it previously omitted deleted_at and
-	//	                                          returned deleted works with a nil field.
+	//	read                       deleted_at            published_at
+	//	GetPoem                    nil (filtered)        not selected
+	//	ListPoems, SearchPoems     nil (filtered)        selected
+	//	DashboardSummary.Latest    nil (filtered)        not selected
+	//	GetPoemIncludingDeleted    selected              not selected
+	//	ListDeletedPoems           selected ("dead")     not selected
+	//	ListPublishedPoems         nil (filtered)        selected
+	//	export's read              selected              selected
 	//
-	// The two meanings are only distinguishable by the query, and nothing at the type level says
-	// which one a given Poem carries. Before adding a sixth read, decide which row of that list it
-	// belongs in.
-	//
-	// The sixth read is ListPublishedPoems, and it belongs in no row of that table -- it is the
-	// first read whose column is not a soft-delete. See PublishedAt.
+	// The "selected" in ListDeletedPoems is deliberate: the recycle screen must distinguish a
+	// deleted work from a live one, and an earlier version of that query omitted the column and
+	// returned deleted works with a nil field. Counts are deliberately not written here -- this
+	// table has gone stale twice already by naming numbers instead of reads.
 	DeletedAt *time.Time
 
 	// PublishedAt is the explicit publication instant, or nil while the work is a draft.
 	//
-	// This is the first field on Poem that is not about deletion, and it is the reason the
-	// DeletedAt table above needed extending rather than leaving to become quietly wrong. Every read
-	// that populates DeletedAt above is answering "is this live?", and there is no single answer to
-	// the same question about a poem that is a draft: ListPublishedPoems returns rows with nil
-	// DeletedAt and non-nil PublishedAt, a combination that appears in no row of that table.
+	// The table above is the reason this field needs its own column: selecting a live work does not
+	// tell you whether it is published. ListPoems used to omit published_at, and the Share picker
+	// read the field from its rows, so every published work appeared as a draft and Copy Link was
+	// disabled. The query now selects PublishedPoemColumns.
 	//
 	// A draft is not deleted and is not hidden. The authoring app filters on deleted_at only, so
 	// every draft remains visible to the author exactly as before -- which is why the split needed
-	// no status badge, and why there is no listViewRow in that table. Publication governs the
-	// publisher's view alone.
+	// no status badge. Publication governs the publisher's view and the Share screen's Copy Link.
 	PublishedAt *time.Time
 }
 
@@ -62,8 +57,8 @@ type PoemVersion struct {
 
 // PoemColumns is the column list for a live work, in the order the scan functions expect.
 //
-// Seven queries in this repository read a poem, and five of them wrote the same three columns out by
-// hand. That is not duplication in the harmless sense: the column list and the Scan that follows it
+// Several queries in this repository read a poem, and most of them wrote the same three columns out
+// by hand. That is not duplication in the harmless sense: the column list and the Scan that follows it
 // must agree, and nothing tied them together. Adding a column to the table meant finding the scans
 // by eye, and a scan that gained a column in the SQL but not in the destination would have been a
 // runtime error in production rather than a compile error here.
@@ -93,12 +88,13 @@ const PoemColumnsIncludingDeleted = PoemColumns + ", deleted_at"
 // caller and the others to several. A flag here would invite a scan that did not match the columns.
 const ExportPoemColumns = PoemColumns + ", deleted_at, published_at"
 
-// PublishedPoemColumns is PoemColumns plus published_at, for the publisher's read.
+// PublishedPoemColumns is PoemColumns plus published_at, for reads that need the publication state.
 //
-// Separate from the other two lists rather than a variant flag, because it is the only read that is
-// not about deletion: the publisher needs published_at itself, both to build a sitemap's lastmod and
-// to report what it published and when. A reader that selected the three deletion-era columns would
-// return every published work with no way to distinguish them or to date them.
+// Separate from the other two lists rather than a variant flag, because it is not about deletion:
+// the publisher needs published_at itself, both to build a sitemap's lastmod and to report what it
+// published and when, and the Share picker needs it to enable Copy Link only for published works.
+// A reader that selected the three deletion-era columns would return every published work with no
+// way to distinguish them or to date them.
 const PublishedPoemColumns = PoemColumns + ", published_at"
 
 // PublishedFilter is the publisher's entire view of the library, as one literal.

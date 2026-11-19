@@ -811,9 +811,12 @@ the Share screen; unlike a public link, it grants a limited session rather than 
   in one transaction that retains the displaced text under the same rule `UpdatePoem` uses, so an
   applied suggestion is undoable like any other edit. Nothing merges automatically.
 
-Creating a link requires `PUBLIC_BASE_URL`: the URL the author copies must be absolute on the
-reader's origin. A deployment without that variable can still publish and share publicly, but the
-Private Link action refuses rather than copying a relative path nobody else can open.
+A private link needs no configuration. It is an authoring-service route, so the URL the author copies
+is built from the origin that served the Share request (scheme from TLS or `X-Forwarded-Proto`, host
+from the request). `PUBLIC_BASE_URL` stays the reader's origin and is used only for the public
+address that Copy Link puts on the clipboard; pointing it at the reader would make a private link
+404, which is why the two are deliberately kept apart. A malformed request host is refused rather
+than used to build a link.
 
 Migration `008_private_links.sql` adds `private_links` and `work_proposals`. Both have foreign keys
 to `poems`, but **deleting a work does not remove them**: this application soft-deletes by setting

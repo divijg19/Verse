@@ -11,10 +11,10 @@ import (
 
 // Helpers shared by the public Share endpoint and the private-link endpoints.
 //
-// They live together because the two surfaces make the same two decisions: how to encode a small
-// JSON response without letting it be cached, and where the reader's origin is. Having one spelling
-// of each matters more here than it does elsewhere -- a public address built with a different rule
-// on the two surfaces would hand out two different links to the same work.
+// They live together because both surfaces encode a small JSON response the same way. Their origins
+// are deliberately different: shareAddress is the reader's static site and builds the public
+// address Copy Link copies, while a private link is an authoring-service route built from the origin
+// that served the request (see internal/origin). Conflating the two produces a link that 404s.
 
 // shareJSON writes a small JSON response with the no-store header the share endpoints share.
 func shareJSON(w http.ResponseWriter, value any) {
@@ -30,11 +30,11 @@ func shareAddress() string {
 	return strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/")
 }
 
-// guestLinkURL builds the shareable URL the author copies.
+// guestLinkURL builds the shareable URL the author copies on the authoring service's own origin.
 //
-// The absolute form is required, not a convenience: ShareLinkHandler refuses to mint a link without
-// PUBLIC_BASE_URL, so this is only ever called with a configured origin. There is deliberately no
-// relative fallback -- a path nobody else can open would be worse than a refused request.
-func guestLinkURL(token string) string {
-	return shareAddress() + guestLinkPath + url.PathEscape(token)
+// The base comes from the request, not PUBLIC_BASE_URL: the latter names the reader's static site,
+// which has no /s/{token} route. There is deliberately no relative form -- a path nobody else can
+// open would be worse than a refused request.
+func guestLinkURL(base, token string) string {
+	return strings.TrimRight(base, "/") + guestLinkPath + url.PathEscape(token)
 }
