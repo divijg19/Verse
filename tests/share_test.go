@@ -93,9 +93,41 @@ func TestShareEndpointGivesAPublishedWorkItsAddress(t *testing.T) {
 	if data.Published == "" {
 		t.Error("a published work has no publication date")
 	}
-	// PUBLIC_BASE_URL is unset in the test environment, so the address has no origin. The public
-	// site's own Share page always has an origin, and it is where a reader copies the address.
+	// This test leaves PUBLIC_BASE_URL unset, so the address has no origin. The complementary
+	// assertion, with the variable set, is TestShareEndpointUsesTheReaderOrigin below.
 	_ = data.Address
+}
+
+// TestShareEndpointUsesTheReaderOrigin pins the other half of the origin split.
+//
+// Private links are built from the request's own origin; public addresses are not. A regression that
+// swapped the two would pass every private-link test, so the reader origin is asserted here.
+func TestShareEndpointUsesTheReaderOrigin(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+	t.Setenv("PUBLIC_BASE_URL", "https://reader.example")
+
+	id := insertPoem(t, "A Public Work\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share/work/%s = %d, want 200", id, status)
+	}
+	var data struct {
+		Address string `json:"address"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		t.Fatal(err)
+	}
+	if want := "https://reader.example/w/" + id + "/"; data.Address != want {
+		t.Errorf("public address = %q, want %q", data.Address, want)
+	}
 }
 
 // TestShareEndpointRefusesANonExistentWork covers the miss, so the browser can report it honestly.
@@ -134,6 +166,53 @@ func TestTheShareFormIsAccepted(t *testing.T) {
 	status, _, _ = postForm(t, srv.URL+"/share", url.Values{}, nil)
 	if status != http.StatusMethodNotAllowed {
 		t.Fatalf("POST /share = %d, want 405", status)
+	}
+}
+
+// TestSharePickerMarksPublishedWorks covers the flag that enables Copy Link.
+//
+// The picker used to read PublishedAt from ListPoems, whose column list omits published_at, so every
+// work arrived as a draft and the button was disabled even for works with a public address. This
+// test reads the rendered markup rather than calling the service, because the bug was the wiring
+// between the two.
+func TestSharePickerMarksPublishedWorks(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	published := insertPoem(t, "A Public Work\n\nIts body.")
+	draft := insertPoem(t, "A Draft Work\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), published); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, body, _ := get(t, srv.URL+"/share", nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share = %d, want 200", status)
+	}
+
+	for _, tc := range []struct {
+		id   string
+		want string
+	}{
+		{published, `data-published="true"`},
+		{draft, `data-published="false"`},
+	} {
+		option := ""
+		for _, line := range strings.Split(body, "<option") {
+			if strings.Contains(line, tc.id) {
+				option = line
+				break
+			}
+		}
+		if option == "" {
+			t.Fatalf("no picker option for %s", tc.id)
+		}
+		if !strings.Contains(option, tc.want) {
+			t.Errorf("picker option for %s is missing %s: %s", tc.id, tc.want, truncate([]byte(option)))
+		}
 	}
 }
 

@@ -152,8 +152,11 @@ func listLivePoems(ctx context.Context, needle string, limit, offset int) ([]mod
 	// Composed rather than written twice, so the filter that excludes soft-deleted works is one
 	// literal. It is not parameterised, deliberately: a caller cannot turn it off, and the query
 	// plan is unaffected by whether the predicate text happens to be present.
+	// PublishedPoemColumns, not the older three-column list: publication state is a property of a
+	// live work too, and callers that read PublishedAt from these rows must see the real instant.
+	// Leaving it nil here is what made the Share picker mark every published work as a draft.
 	query := `
-        SELECT ` + models.PoemColumns + `
+        SELECT ` + models.PublishedPoemColumns + `
         FROM poems
         WHERE deleted_at IS NULL`
 	args := []any{}
@@ -178,7 +181,7 @@ func listLivePoems(ctx context.Context, needle string, limit, offset int) ([]mod
 	var out []models.Poem
 	for rows.Next() {
 		var p models.Poem
-		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Content, &p.CreatedAt, &p.PublishedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

@@ -186,6 +186,7 @@ services:
         sync: false
 
       - key: PUBLIC_BASE_URL
-        # The reader's origin, used to build the address that Copy Link puts on the clipboard.
-        # No credential; the public site is public.
+        # The reader's origin, used only for the public address that Copy Link puts on the clipboard.
+        # Private links are authoring-service routes and derive their origin from the request, so
+        # this value must not be used for them. No credential; the public site is public.
         value: https://verse.divijganjoo2003.workers.dev

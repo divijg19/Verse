@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/origin"
 	views "github.com/divijg19/Verse/templ"
 )
 
@@ -226,24 +227,13 @@ func verifyLoginCSRF(r *http.Request) loginRejection {
 
 // requestScheme reports the scheme the client believes it is using.
 //
-// Render terminates TLS and forwards the original scheme in X-Forwarded-Proto, so r.TLS is nil even
-// on a perfectly good HTTPS deployment. The header is used for reporting only; it never gates
-// anything, so a forged value can mislead a log line and nothing else.
+// The rule is defined once in internal/origin because private links use it to build a capability
+// URL, not only to decorate a log line. Render terminates TLS and forwards the original scheme in
+// X-Forwarded-Proto, so r.TLS is nil even on a perfectly good HTTPS deployment. A client can forge
+// that header when no trusted proxy overwrites it, so https wins if any hop claims it -- a forged
+// http must not downgrade a link that was really delivered over TLS.
 func requestScheme(r *http.Request) string {
-	if r.TLS != nil {
-		return "https"
-	}
-
-	proto := r.Header.Get("X-Forwarded-Proto")
-	if proto == "" {
-		return "http"
-	}
-	// X-Forwarded-Proto may be a list, client-first. The leftmost entry is the client's claim; the
-	// first entry is the one every honest hop agrees on.
-	if i := strings.IndexByte(proto, ','); i >= 0 {
-		proto = proto[:i]
-	}
-	return strings.ToLower(strings.TrimSpace(proto))
+	return origin.RequestScheme(r)
 }
 
 // logLoginRejection records why a login was refused, without recording anything usable.

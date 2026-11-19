@@ -3,11 +3,12 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/divijg19/Verse/internal/clock"
+	"github.com/divijg19/Verse/internal/origin"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
 )
@@ -26,8 +27,16 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if os.Getenv("PUBLIC_BASE_URL") == "" {
-		http.Error(w, "PUBLIC_BASE_URL is not configured", http.StatusPreconditionFailed)
+	// The link is an authoring-service route, so it is built from the origin that served this
+	// request. PUBLIC_BASE_URL is the reader's static site and is deliberately not consulted here:
+	// a local checkout has no such setting, and a deployed one would produce a 404 on the reader.
+	base, err := origin.FromRequest(r)
+	if err != nil {
+		// A bad Host is normally a hostile client, but a proxy that rewrites it to an internal name
+		// would fail every mint with the same symptom. %q escapes control characters so a crafted
+		// value cannot forge a second log line, and the message stays diagnosable.
+		log.Printf("refused a private-link request with an invalid host %q", r.Host) // #nosec G706 -- %q escapes control characters before the value reaches the log
+		http.Error(w, "could not build the private link address", http.StatusBadRequest)
 		return
 	}
 
@@ -45,7 +54,7 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 		URL       string `json:"url"`
 		ExpiresAt string `json:"expiresAt"`
 	}{
-		URL:       guestLinkURL(token),
+		URL:       guestLinkURL(base, token),
 		ExpiresAt: expiresAt.Format(time.RFC3339),
 	})
 }

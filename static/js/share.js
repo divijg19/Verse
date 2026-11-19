@@ -302,9 +302,7 @@
         if (action === "private") {
           const response = await postForm("/share/link", { id });
           if (!response?.ok) {
-            report(
-              "Could not create a private link. Check the public address setting.",
-            );
+            report("Could not create a private link.");
             return;
           }
           const data = await response.json();
