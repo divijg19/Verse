@@ -443,9 +443,10 @@ func Run(ctx context.Context, pool *pgxpool.Pool, opts Options) (Report, error) 
 	opts = opts.WithDefaults()
 
 	if opts.Reset {
-		// poem_versions is named because it holds a foreign key into poems: Postgres refuses to
-		// TRUNCATE a table another table references, so truncating poems alone fails.
-		if _, err := pool.Exec(ctx, `TRUNCATE TABLE poem_versions, poems`); err != nil {
+		// All three named tables hold foreign keys into poems: Postgres refuses to TRUNCATE a table
+		// another table references, so truncating poems alone fails. Naming them avoids CASCADE,
+		// which would silently empty a future referencing table.
+		if _, err := pool.Exec(ctx, `TRUNCATE TABLE work_proposals, private_links, poem_versions, poems`); err != nil {
 			return Report{}, fmt.Errorf("empty the library: %w", err)
 		}
 	}

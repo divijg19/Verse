@@ -140,6 +140,12 @@
       status.textContent = message;
     }
   }
+  function csrf() {
+    const field = document.querySelector(
+      '.verse-share-panel input[name="csrf"]',
+    );
+    return field?.value ?? "";
+  }
   async function selectedWork(id) {
     try {
       const response = await fetch(`/share/work/${encodeURIComponent(id)}`, {
@@ -151,6 +157,77 @@
       return await response.json();
     } catch {
       return null;
+    }
+  }
+  async function postForm(path, fields) {
+    const body = new FormData();
+    body.set("csrf", csrf());
+    for (const [key, value] of Object.entries(fields)) {
+      body.set(key, value);
+    }
+    try {
+      return await fetch(path, { method: "POST", body });
+    } catch {
+      return null;
+    }
+  }
+  function formatTime(raw) {
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      return "unknown";
+    }
+    return date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  function renderLinks(links) {
+    const section = document.querySelector("[data-private-links]");
+    const list = document.querySelector("[data-private-link-list]");
+    if (!section || !list) {
+      return;
+    }
+    section.hidden = false;
+    list.replaceChildren();
+    if (links.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "verse-share-links-empty";
+      empty.textContent = "No private links for this work.";
+      list.appendChild(empty);
+      return;
+    }
+    for (const link of links) {
+      const row = document.createElement("div");
+      row.className = "verse-share-link-row";
+      const details = document.createElement("div");
+      const summary = document.createElement("p");
+      const state = link.revoked
+        ? "Revoked"
+        : link.expired
+          ? "Expired"
+          : link.proposalCount > 0
+            ? `${link.proposalCount} suggestion${link.proposalCount === 1 ? "" : "s"} received`
+            : "Active";
+      summary.textContent = state;
+      const times = document.createElement("small");
+      times.textContent = `Created ${formatTime(link.createdAt)} · closes ${formatTime(link.expiresAt)}`;
+      details.append(summary, times);
+      const revoke = document.createElement("button");
+      revoke.type = "button";
+      revoke.className = "verse-share-link-revoke";
+      revoke.textContent = "Revoke";
+      revoke.dataset.revoke = link.id;
+      revoke.disabled = link.revoked || link.expired;
+      row.append(details, revoke);
+      list.appendChild(row);
+    }
+  }
+  async function refreshLinks(id) {
+    const data = await selectedWork(id);
+    if (data) {
+      renderLinks(data.links ?? []);
     }
   }
   function syncLinkButton(select) {
@@ -177,8 +254,41 @@
       return;
     }
     select.dataset.shareWired = "true";
-    select.addEventListener("change", () => syncLinkButton(select));
+    select.addEventListener("change", () => {
+      syncLinkButton(select);
+      if (select.value) {
+        refreshLinks(select.value);
+      }
+    });
     syncLinkButton(select);
+    if (select.value) {
+      refreshLinks(select.value);
+    }
+    if (document.body.dataset.revokeWired !== "true") {
+      document.body.dataset.revokeWired = "true";
+      document.body.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLButtonElement)) {
+          return;
+        }
+        const linkID = target.dataset.revoke;
+        if (!linkID) {
+          return;
+        }
+        const current = picker();
+        const workID = current?.value ?? "";
+        const response = await postForm("/share/link/revoke", {
+          id: workID,
+          link: linkID,
+        });
+        if (response?.ok) {
+          report("Link revoked.");
+          await refreshLinks(workID);
+        } else {
+          report("Could not revoke that link.");
+        }
+      });
+    }
     for (const button of document.querySelectorAll(
       "button[data-share-action]",
     )) {
@@ -187,6 +297,20 @@
         const id = select.value;
         if (!id) {
           report("Choose a work first.");
+          return;
+        }
+        if (action === "private") {
+          const response = await postForm("/share/link", { id });
+          if (!response?.ok) {
+            report(
+              "Could not create a private link. Check the public address setting.",
+            );
+            return;
+          }
+          const data = await response.json();
+          const ok = await copyText(data.url);
+          report(ok ? "Private link copied." : "Could not copy the link.");
+          await refreshLinks(id);
           return;
         }
         const data = await selectedWork(id);

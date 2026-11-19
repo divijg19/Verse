@@ -72,6 +72,28 @@ GRANT SELECT, INSERT ON poem_versions TO verse_runtime;
 -- the worst possible moment to discover a missing grant.
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO verse_runtime;
 
+-- private_links and work_proposals: the private-link feature.
+--
+-- Migration 008 also grants these, conditionally on this role already existing. In the documented
+-- order and in CI, migrations run first and the role does not exist yet, so that condition is false
+-- and these statements are the ones that actually grant access. They are idempotent: re-running a
+-- GRANT adds no new privilege.
+--
+-- No DELETE. Links are revoked with revoked_at and proposals are marked with applied_at; the record
+-- of a capability and a suggestion is part of the work's history even after it has served its purpose.
+--
+-- Conditional on the tables existing for the uncommon deployment that creates roles before the
+-- first migration; an unconditional GRANT would then fail on a missing relation.
+DO $$
+BEGIN
+    IF to_regclass('public.private_links') IS NOT NULL
+       AND to_regclass('public.work_proposals') IS NOT NULL THEN
+        GRANT SELECT, INSERT, UPDATE ON private_links TO verse_runtime;
+        GRANT SELECT, INSERT, UPDATE ON work_proposals TO verse_runtime;
+    END IF;
+END
+$$;
+
 -- login_attempts: the full set, including DELETE.
 --
 -- This is the one table the service deletes from, and it is correct to: ratelimit.go clears the
@@ -182,5 +204,6 @@ GRANT verse_runtime TO verse_app;
 --   SELECT count(*) FROM poems;           -- succeeds
 --   DELETE FROM poems;                    -- ERROR: permission denied for table poems
 --
--- The Least privilege CI job applies this file and then asserts fourteen properties, seven of them
--- denials, so the model is checked on every pull request rather than trusted once.
+-- The Least privilege CI job applies this file and then asserts the grants that matter, including
+-- the denials, so the model is checked on every pull request rather than trusted once. The job's own
+-- assertions are the authority on what is checked; no count is repeated here because it goes stale.

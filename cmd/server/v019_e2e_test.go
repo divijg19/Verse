@@ -71,11 +71,11 @@ func truncateE2EPoems(t *testing.T) {
 	if database.Pool == nil {
 		t.Fatalf("database pool is nil")
 	}
-	// poem_versions holds a foreign key into poems, and Postgres refuses to TRUNCATE a referenced
-	// table. Named explicitly rather than using CASCADE, so a new dependency must be added here
-	// rather than being silently emptied.
+	// All three named tables hold foreign keys into poems, and Postgres refuses to TRUNCATE a
+	// referenced table. Named explicitly rather than using CASCADE, so a new dependency must be
+	// added here rather than being silently emptied.
 	if _, err := database.Pool.Exec(context.Background(),
-		`TRUNCATE TABLE poem_versions, poems`); err != nil {
+		`TRUNCATE TABLE work_proposals, private_links, poem_versions, poems`); err != nil {
 		t.Fatalf("truncate poems: %v", err)
 	}
 }

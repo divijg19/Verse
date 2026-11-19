@@ -404,10 +404,11 @@ jobs:
           psql "postgres://verse:verse@localhost:5432/verse" -v ON_ERROR_STOP=1 -v app_password=ci-throwaway-password -f db/roles.sql
 
       - name: Assert the serving credential's privileges
-        # Fifteen properties, seven of which are the important ones: what the credential must not be
-        # able to do. A check that only confirmed the happy path would pass against a role holding
-        # every privilege in the database, so the denials are asserted too, and a denial that
-        # succeeds fails the job.
+        # Positive and negative properties, with the denials carrying most of the weight: what the
+        # credential must not be able to do. A check that only confirmed the happy path would pass
+        # against a role holding every privilege in the database, so the denials are asserted too,
+        # and a denial that succeeds fails the job. Counts are deliberately not spelled out here --
+        # they have gone stale twice already and a wrong number is worse than none.
         #
         # Inlined rather than kept in a script under ci/ for one reason: a directory holding a
         # single file that only this workflow runs is a directory someone has to discover. The
@@ -467,6 +468,15 @@ jobs:
           # this job permanently red, and a permanently red job is a job whose other fourteen
           # assertions stop being read.
           allowed "SELECT count(published_at) FROM poems"                "read the publication instant"
+          # The migration grants these only when verse_runtime already exists; in this job it does
+          # not, so db/roles.sql is the operative grant. Assert every privilege the private-link
+          # paths actually use -- read, insert and the two marks -- not just a representative one.
+          allowed "SELECT count(*) FROM private_links"                   "read private links"
+          allowed "SELECT count(*) FROM work_proposals"                  "read work proposals"
+          allowed "INSERT INTO private_links (id, poem_id, token_hash, expires_at) SELECT gen_random_uuid(), id, 'x', now() FROM poems WHERE false" "create a private link"
+          allowed "INSERT INTO work_proposals (id, poem_id, link_id, guest_name, content) SELECT gen_random_uuid(), id, gen_random_uuid(), 'x', 'x' FROM poems WHERE false" "record a proposal"
+          allowed "UPDATE private_links SET revoked_at = NULL WHERE false" "revoke a private link"
+          allowed "UPDATE work_proposals SET applied_at = NULL WHERE false" "mark a proposal applied"
           # The one table the service deletes from, and correctly so: ratelimit.go clears a caller's
           # row on a successful login. It holds an HMAC of an address and counters, never work.
           allowed "INSERT INTO login_attempts (subject, failures, first_failure) VALUES ('\\x00'::bytea, 1, now())" "record a login attempt"
@@ -486,6 +496,9 @@ jobs:
           # No UPDATE on poem_versions: a retained revision is immutable by design, and restoring
           # one is an ordinary edit that records the displaced text as a new version in turn.
           denied "UPDATE poem_versions SET content = 'rewritten' WHERE false" "edit a retained revision"
+          # A revoked link and an applied proposal keep their rows; the service marks instants.
+          denied "DELETE FROM private_links"                             "hard-delete a private link"
+          denied "DELETE FROM work_proposals"                            "hard-delete a proposal"
           # Deliberately not granted. The boot log reports which migrations ran; the serving process
           # cannot query the table that records it.
           denied "SELECT count(*) FROM schema_migrations"               "read the migration log"
