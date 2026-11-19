@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"io/fs"
 	"path"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/divijg19/Verse/internal/testsupport"
@@ -263,6 +265,101 @@ func TestRunSupportsMultiStatementMigration(t *testing.T) {
 		if rel == nil {
 			t.Fatalf("%s missing; later statements in the file were not executed", name)
 		}
+	}
+}
+
+// TestRun009CollapsesDuplicateProposals covers the one destructive migration in the sequence. A
+// fresh schema has no duplicate proposals, so the normal suite never executes the dedupe. Seed the
+// shape a v0.5.4 deployment could actually have -- several sends on one link, one of them applied --
+// and assert the applied row survives with its id, so an open History page's apply link stays live.
+func TestRun009CollapsesDuplicateProposals(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	before := fstest.MapFS{}
+	files, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if file.Name() >= "009_" {
+			continue
+		}
+		data, err := fs.ReadFile(migrations.FS, file.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		before[file.Name()] = &fstest.MapFile{Data: data}
+	}
+	if _, err := run(ctx, pool, before); err != nil {
+		t.Fatalf("apply migrations before 009: %v", err)
+	}
+
+	const poemID = "11111111-1111-4111-8111-111111111111"
+	const linkID = "22222222-2222-4222-8222-222222222222"
+	if _, err := pool.Exec(ctx, `INSERT INTO poems (id, content) VALUES ($1, 'a work')`, poemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO private_links (id, poem_id, token_hash, expires_at)
+        VALUES ($1, $2, 'hash', now() + interval '8 hours')`, linkID, poemID); err != nil {
+		t.Fatal(err)
+	}
+	rows := []struct {
+		id, content string
+		applied     bool
+	}{
+		{"33333333-3333-4333-8333-333333333333", "old applied", true},
+		{"44444444-4444-4444-8444-444444444444", "newer unapplied", false},
+		{"55555555-5555-4555-8555-555555555555", "newest unapplied", false},
+	}
+	for _, row := range rows {
+		var applied any
+		if !row.applied {
+			applied = nil
+		} else {
+			applied = time.Now()
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO work_proposals
+            (id, poem_id, link_id, guest_name, content, applied_at)
+            VALUES ($1, $2, $3, 'Ada', $4, $5)`, row.id, poemID, linkID, row.content, applied); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	nine, err := fs.ReadFile(migrations.FS, "009_guest_drafts.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Execute 009's SQL directly, not through run(): the runner refuses a file set that omits the
+	// earlier migrations, and this test is about the dedupe statement, not the bookkeeping guard.
+	if _, err := pool.Exec(ctx, string(nine), pgx.QueryExecModeSimpleProtocol); err != nil {
+		t.Fatalf("apply 009: %v", err)
+	}
+
+	var count int
+	var keptID, content string
+	var updatedAt time.Time
+	err = pool.QueryRow(ctx, `SELECT count(*)::int FROM work_proposals WHERE link_id = $1`, linkID).Scan(&count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("%d proposals survived dedupe, want 1", count)
+	}
+	err = pool.QueryRow(ctx, `SELECT id, content, updated_at FROM work_proposals WHERE link_id = $1`,
+		linkID).Scan(&keptID, &content, &updatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keptID != rows[0].id || content != "old applied" {
+		t.Errorf("dedupe kept %q / %q, want the applied row", keptID, content)
+	}
+	var createdAt time.Time
+	if err := pool.QueryRow(ctx, `SELECT created_at FROM work_proposals WHERE id = $1`, keptID).Scan(&createdAt); err != nil {
+		t.Fatal(err)
+	}
+	if !updatedAt.Equal(createdAt) {
+		t.Errorf("updated_at = %v, want created_at %v", updatedAt, createdAt)
 	}
 }
 

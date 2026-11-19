@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/handlers"
 	"github.com/divijg19/Verse/internal/services"
 )
@@ -150,7 +151,18 @@ func TestApplyingAnIdenticalSuggestionRecordsNoVersion(t *testing.T) {
 
 	srv := newTestServer(t)
 	original := "A Work\n\nThe original body."
-	id, proposalID := proposalFor(t, srv, original, original)
+	// A submit with identical text is now refused, so construct the unchanged proposal directly
+	// through the service. This test is about the apply step's version rule, not the submit gate.
+	id, _ := proposalFor(t, srv, original, original+"\nA line the guest added.")
+	proposal, err := services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposal) != 1 {
+		t.Fatalf("proposals = %+v, err = %v", proposal, err)
+	}
+	if _, err := database.Pool.Exec(t.Context(),
+		`UPDATE work_proposals SET content = $2 WHERE id = $1`, proposal[0].ID, original); err != nil {
+		t.Fatalf("make the proposal identical: %v", err)
+	}
+	proposalID := proposal[0].ID
 
 	if err := services.ApplyWorkProposal(t.Context(), id, proposalID); err != nil {
 		t.Fatalf("apply: %v", err)
@@ -246,6 +258,226 @@ func TestPrivateLinkRefusesAMalformedHost(t *testing.T) {
 	}
 }
 
+func TestGuestDraftPersistsAndIsPerLink(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	const original = "A Work\n\nThe original body."
+	id := insertPoem(t, original)
+	srv := newTestServer(t)
+	_, firstToken := mintLink(t, srv.URL, id)
+	_, secondToken := mintLink(t, srv.URL, id)
+
+	first := guestClient(t, srv)
+	if status, _, _ := guestGet(t, first, srv.URL+"/s/"+firstToken); status != http.StatusSeeOther {
+		t.Fatalf("first entry = %d", status)
+	}
+	status, editor, _ := guestGet(t, first, srv.URL+"/guest/edit")
+	if status != http.StatusOK {
+		t.Fatalf("first editor = %d", status)
+	}
+	csrf := csrfFromBody(t, editor)
+
+	draft := original + "\nA line only the first guest wrote."
+	status, body, _ := guestPost(t, first, srv.URL+"/guest/draft", url.Values{
+		"csrf": {csrf}, "content": {draft}, "name": {"Ada"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("autosave = %d, want 200; body: %s", status, truncate([]byte(body)))
+	}
+	var saved struct {
+		Changed bool   `json:"changed"`
+		Name    string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(body), &saved); err != nil {
+		t.Fatalf("autosave response is not JSON: %v; body: %s", err, truncate([]byte(body)))
+	}
+	if !saved.Changed || saved.Name != "Ada" {
+		t.Errorf("autosave = %+v, want changed with name Ada", saved)
+	}
+
+	// A reload must restore the continuous body, not the work's original text.
+	status, editor, _ = guestGet(t, first, srv.URL+"/guest/edit")
+	if status != http.StatusOK || !strings.Contains(editor, "A line only the first guest wrote.") {
+		t.Errorf("reload did not restore the draft: %s", truncate([]byte(editor)))
+	}
+
+	// The second link to the same work is a separate conversation with its own body.
+	second := guestClient(t, srv)
+	if status, _, _ := guestGet(t, second, srv.URL+"/s/"+secondToken); status != http.StatusSeeOther {
+		t.Fatalf("second entry = %d", status)
+	}
+	status, other, _ := guestGet(t, second, srv.URL+"/guest/edit")
+	if status != http.StatusOK || strings.Contains(other, "A line only the first guest wrote.") {
+		t.Errorf("second link inherited the first link's draft: %s", truncate([]byte(other)))
+	}
+}
+
+func TestGuestCannotSendWithoutChanges(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	const original = "A Work\n\nThe original body."
+	id := insertPoem(t, original)
+	srv := newTestServer(t)
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+	status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+	if status != http.StatusOK {
+		t.Fatalf("editor = %d", status)
+	}
+	status, _, _ = guestPost(t, guest, srv.URL+"/guest/propose", url.Values{
+		"csrf": {csrfFromBody(t, editor)}, "content": {original},
+	})
+	if status != http.StatusConflict {
+		t.Errorf("unchanged submit = %d, want 409", status)
+	}
+	proposals, err := services.ListWorkProposals(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposals) != 0 {
+		t.Errorf("an unchanged submit stored %d proposals", len(proposals))
+	}
+}
+
+func TestPrimarySubmissionUpdatesAndAlternativeBranches(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	const original = "A Work\n\nThe original body."
+	id := insertPoem(t, original)
+	srv := newTestServer(t)
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+
+	send := func(content, branch string) int {
+		status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+		if status != http.StatusOK {
+			t.Fatalf("editor = %d", status)
+		}
+		form := url.Values{"csrf": {csrfFromBody(t, editor)}, "content": {content}, "name": {"Ada"}}
+		if branch != "" {
+			form.Set("branch", branch)
+		}
+		status, body, _ := guestPost(t, guest, srv.URL+"/guest/propose", form)
+		if status != http.StatusOK {
+			t.Errorf("submit = %d; body: %s", status, truncate([]byte(body)))
+		}
+		return status
+	}
+
+	send(original+"\nFirst version.", "")
+	proposals, err := services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposals) != 1 || proposals[0].Branch != services.PrimaryBranch {
+		t.Fatalf("proposals after first send = %+v, err = %v", proposals, err)
+	}
+	firstID := proposals[0].ID
+
+	// A second, changed primary must update the same row in place.
+	send(original+"\nSecond version.", "")
+	proposals, err = services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposals) != 1 {
+		t.Fatalf("proposals after update = %+v, err = %v", proposals, err)
+	}
+	if proposals[0].ID != firstID || !strings.Contains(proposals[0].Content, "Second version.") {
+		t.Errorf("primary was not updated in place: %+v", proposals[0])
+	}
+
+	// An explicit alternative keeps the primary and adds a second branch.
+	send(original+"\nAn alternative version.", "alternative")
+	proposals, err = services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposals) != 2 {
+		t.Fatalf("proposals after alternative = %+v, err = %v", proposals, err)
+	}
+	foundPrimary, foundAlt := false, false
+	for _, proposal := range proposals {
+		if proposal.ID == firstID && strings.Contains(proposal.Content, "Second version.") {
+			foundPrimary = true
+		}
+		if strings.HasPrefix(proposal.Branch, "alt:") && strings.Contains(proposal.Content, "An alternative version.") {
+			foundAlt = true
+		}
+	}
+	if !foundPrimary || !foundAlt {
+		t.Errorf("branches are wrong: %+v", proposals)
+	}
+}
+
+func TestGuestDraftRefusedAfterRevocation(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Work\n\nIts body.")
+	srv := newTestServer(t)
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+	status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+	if status != http.StatusOK {
+		t.Fatalf("editor = %d", status)
+	}
+	links, err := services.ListPrivateLinks(t.Context(), id)
+	if err != nil || len(links) != 1 {
+		t.Fatalf("links = %+v, err = %v", links, err)
+	}
+	status, _, _ = postForm(t, srv.URL+"/share/link/revoke", url.Values{
+		"id": {id}, "link": {links[0].ID},
+	}, nil)
+	if status != http.StatusOK {
+		t.Fatalf("revoke = %d", status)
+	}
+	status, _, _ = guestPost(t, guest, srv.URL+"/guest/draft", url.Values{
+		"csrf": {csrfFromBody(t, editor)}, "content": {"A change after revocation."},
+	})
+	if status != http.StatusNotFound {
+		t.Errorf("autosave after revocation = %d, want 404", status)
+	}
+}
+
+func TestWhitespaceOnlyEditIsNotASubmission(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	const original = "A Work\n\nThe original body."
+	id := insertPoem(t, original)
+	srv := newTestServer(t)
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+	status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+	if status != http.StatusOK {
+		t.Fatalf("editor = %d", status)
+	}
+	csrf := csrfFromBody(t, editor)
+
+	// A trailing newline is exactly the edit an accidental keypress makes. It must not create a
+	// proposal whose content is identical to the work.
+	status, body, _ := guestPost(t, guest, srv.URL+"/guest/propose", url.Values{
+		"csrf": {csrf}, "content": {original + "\n\n   "},
+	})
+	if status != http.StatusConflict {
+		t.Errorf("whitespace-only submit = %d, want 409; body: %s", status, truncate([]byte(body)))
+	}
+	proposals, err := services.ListWorkProposals(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposals) != 0 {
+		t.Errorf("whitespace-only submit stored %d proposals", len(proposals))
+	}
+}
+
 func TestTSGuardFailsOnAStrayJavaScriptFile(t *testing.T) {
 	root := t.TempDir()
 	write := func(path, content string) {
@@ -264,11 +496,12 @@ func TestTSGuardFailsOnAStrayJavaScriptFile(t *testing.T) {
   { source: "web/ts/two.ts", output: "static/js/two.js" },
   { source: "web/ts/three.ts", output: "static/js/three.js" },
   { source: "web/ts/four.ts", output: "internal/publish/assets/public.js" },
+  { source: "web/ts/five.ts", output: "static/js/five.js" },
 ];`
 	write("scripts/build_js.ts", manifest)
 	for _, path := range []string{
-		"web/ts/one.ts", "web/ts/two.ts", "web/ts/three.ts", "web/ts/four.ts",
-		"static/js/one.js", "static/js/two.js", "static/js/three.js",
+		"web/ts/one.ts", "web/ts/two.ts", "web/ts/three.ts", "web/ts/four.ts", "web/ts/five.ts",
+		"static/js/one.js", "static/js/two.js", "static/js/three.js", "static/js/five.js",
 		"internal/publish/assets/public.js",
 	} {
 		write(path, "// fixture")

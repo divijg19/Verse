@@ -144,7 +144,7 @@ function renderLinks(links: PrivateLinkView[]): void {
       : link.expired
         ? "Expired"
         : link.proposalCount > 0
-          ? `${link.proposalCount} suggestion${link.proposalCount === 1 ? "" : "s"} received`
+          ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
           : "Active";
     summary.textContent = state;
     const times = document.createElement("small");

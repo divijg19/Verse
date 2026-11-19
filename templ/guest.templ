@@ -11,8 +11,9 @@ func guestThanks(name string) string {
 }
 
 // GuestEditor is the limited editor a private link opens. It is a standalone page: no authoring
-// shell, no navigation, no HTMX, no script at all. The holder can edit the one work the link names
-// and send the result back as a proposal; nothing else is reachable from here.
+// shell, no navigation and no HTMX. Its one script is first-party and only autosaves the body; the
+// plain form works without it. The holder edits one continuous body for the link and sends the
+// result back as a proposal; nothing else is reachable from here.
 templ GuestEditor(data GuestEditorData) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -22,6 +23,7 @@ templ GuestEditor(data GuestEditorData) {
 			<title>{ data.Title } — Verse</title>
 			<meta name="robots" content="noindex, nofollow"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
+			<script src="/static/js/guest.js" defer></script>
 			<style>
 				:root { color-scheme: dark; }
 				html, body { min-height: 100%; }
@@ -114,7 +116,24 @@ templ GuestEditor(data GuestEditorData) {
 					cursor: pointer;
 					transition: background-color 150ms ease;
 				}
-				.verse-guest-submit:hover { background: rgb(168, 85, 247); }
+				.verse-guest-submit:hover:not(:disabled) { background: rgb(168, 85, 247); }
+				.verse-guest-submit:disabled { cursor: not-allowed; opacity: 0.45; }
+				.verse-guest-alternative {
+					margin-top: 0.5rem;
+					background: transparent;
+					border: 1px solid rgb(63 33 101);
+					color: rgb(192 132 252);
+				}
+				.verse-guest-alternative:hover:not(:disabled) {
+					background: rgba(63, 33, 101, 0.35);
+				}
+				.verse-guest-status {
+					min-height: 1.2rem;
+					margin: 0.85rem 0 0;
+					font-size: 0.7rem;
+					letter-spacing: 0.06em;
+					color: rgb(168 85 247);
+				}
 				.verse-guest-footnote {
 					font-size: 0.72rem;
 					line-height: 1.6;
@@ -136,8 +155,15 @@ templ GuestEditor(data GuestEditorData) {
 						This link closes at { data.ExpiresAt.UTC().Format("Jan 2, 2006 15:04 UTC") } —
 						about { fmt.Sprintf("%d", data.Minutes) } minutes from now.
 					</p>
-					<form method="post" action="/guest/propose">
+					<form
+						method="post"
+						action="/guest/propose"
+						class="verse-guest-form"
+						data-guest-changed={ fmt.Sprintf("%t", data.Changed) }
+					>
 						@CSRFField(ctx)
+						<input type="hidden" name="submission_id" data-guest-submission value=""/>
+						<input type="hidden" name="branch" data-guest-branch value="primary"/>
 						<label class="verse-guest-label" for="guest-name">Your name (optional)</label>
 						<input
 							id="guest-name"
@@ -147,6 +173,7 @@ templ GuestEditor(data GuestEditorData) {
 							maxlength="80"
 							autocomplete="name"
 							placeholder="Anonymous"
+							value={ data.GuestName }
 						/>
 						<label class="verse-guest-label" for="guest-content">Your suggested version</label>
 						<textarea
@@ -156,11 +183,38 @@ templ GuestEditor(data GuestEditorData) {
 							required
 							spellcheck="true"
 						>{ data.Content }</textarea>
-						<button type="submit" class="verse-guest-submit">Send suggestion</button>
+						<p class="verse-guest-status" data-guest-status role="status" aria-live="polite">
+							if data.Changed {
+								Saved · ready to send
+							} else {
+								No changes since your last send
+							}
+						</p>
+						<button
+							type="submit"
+							name="branch"
+							value="primary"
+							data-guest-send="primary"
+							class="verse-guest-submit"
+							if !data.Changed {
+								disabled
+							}
+						>Send suggestion</button>
+						<button
+							type="submit"
+							name="branch"
+							value="alternative"
+							data-guest-send="alternative"
+							class="verse-guest-submit verse-guest-alternative"
+							if !data.Changed {
+								disabled
+							}
+						>Send as alternative</button>
 					</form>
 					<p class="verse-guest-footnote">
 						Your changes are sent to the author as a suggestion. They are not applied to the
-						work automatically. This page is temporary and is not indexed.
+						work automatically. "Send as alternative" keeps the current version and sends
+						this one beside it. This page is temporary and is not indexed.
 					</p>
 				</div>
 			</main>

@@ -3,8 +3,10 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"html"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -101,24 +103,74 @@ func GuestEditorHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The editor shows the link's own continuous body, not the work's current text. The draft is
+	// seeded from the work on first open and then belongs to the guest for the link's window.
+	draft, err := services.GetOrCreateGuestDraft(r.Context(), services.PrivateLinkSession{
+		LinkID: guest.LinkID, PoemID: guest.PoemID,
+	}, poem.Content)
+	if err != nil {
+		if errors.Is(err, services.ErrNoLink) || errors.Is(err, services.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		fail500(w, r, "failed to load the shared draft", err)
+		return
+	}
+
+	counts, err := services.CountProposalsByLink(r.Context(), guest.PoemID)
+	if err != nil {
+		fail500(w, r, "failed to count submissions", err)
+		return
+	}
+
 	remaining := guest.ExpiresAt.Sub(clock.NowUTC())
 	if remaining < 0 {
 		remaining = 0
 	}
 
 	page := templ.GuestEditor(templ.GuestEditorData{
-		Title:     presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
-		Content:   poem.Content,
-		ExpiresAt: guest.ExpiresAt,
-		Minutes:   int(remaining / time.Minute),
+		Title:       presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
+		Content:     draft.Content,
+		GuestName:   draft.GuestName,
+		Changed:     draft.BaseHash != services.ContentHash(draft.Content),
+		BranchCount: counts[guest.LinkID],
+		ExpiresAt:   guest.ExpiresAt,
+		Minutes:     int(remaining / time.Minute),
 	})
 	renderGuest(w, r, page)
 }
 
-// GuestProposalHandler records a guest's suggested rewrite.
+// GuestDraftHandler autosaves the continuous body for this link.
 //
-// It never touches the author's text. On success the guest sees a confirmation; the proposal waits
-// in the work's history until the author chooses to apply it.
+// It answers JSON, not an HTML fragment: the guest script parses status and change state from the
+// response, and an HTML validation page would make response.json() throw. CSRF and link liveness are
+// enforced by the middleware and again by the service.
+func GuestDraftHandler(w http.ResponseWriter, r *http.Request) {
+	guest, ok := GuestSessionFrom(r.Context())
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	draft, changed, err := services.SaveGuestDraft(r.Context(), services.PrivateLinkSession{
+		LinkID: guest.LinkID, PoemID: guest.PoemID,
+	}, r.PostFormValue("content"), r.PostFormValue("name"))
+	if err != nil {
+		writeGuestJSONError(w, err)
+		return
+	}
+	writeGuestJSON(w, struct {
+		SavedAt time.Time `json:"savedAt"`
+		Changed bool      `json:"changed"`
+		Name    string    `json:"name"`
+	}{SavedAt: draft.UpdatedAt, Changed: changed, Name: draft.GuestName})
+}
+
+// GuestProposalHandler submits the current body.
+//
+// A primary submission replaces the link's single primary row; an alternative creates a new branch.
+// Both advance the draft baseline in one transaction, so sending the same text twice is refused.
+// The author's work is never touched here.
 func GuestProposalHandler(w http.ResponseWriter, r *http.Request) {
 	guest, ok := GuestSessionFrom(r.Context())
 	if !ok {
@@ -126,26 +178,64 @@ func GuestProposalHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := validateContent(r.FormValue("content"))
-	if err != nil {
-		writeGuestValidationError(w, err)
-		return
-	}
-
-	name := cleanGuestName(r.FormValue("name"))
-	if err := services.CreateWorkProposal(r.Context(), services.PrivateLinkSession{
+	alternative := r.PostFormValue("branch") == "alternative"
+	_, _, err := services.SubmitGuestDraft(r.Context(), services.PrivateLinkSession{
 		LinkID: guest.LinkID,
 		PoemID: guest.PoemID,
-	}, name, content); err != nil {
-		if errors.Is(err, services.ErrNoLink) {
-			http.NotFound(w, r)
-			return
-		}
-		fail500(w, r, "failed to record a proposal", err)
+	}, r.PostFormValue("content"), r.PostFormValue("name"), alternative, r.PostFormValue("submission_id"))
+	if err != nil {
+		writeGuestServiceError(w, r, err)
 		return
 	}
 
+	name := cleanGuestName(r.PostFormValue("name"))
 	renderGuest(w, r, templ.GuestProposalSent(name))
+}
+
+// writeGuestServiceError maps service errors onto the statuses the guest surface has always used.
+func writeGuestServiceError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrNoLink), errors.Is(err, services.ErrNoDraft), errors.Is(err, services.ErrNotFound):
+		http.NotFound(w, r)
+	case errors.Is(err, services.ErrNoChanges), errors.Is(err, services.ErrTooManyAlternatives), errors.Is(err, services.ErrInvalidSubmission):
+		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, services.ErrEmptyContent):
+		writeGuestValidationError(w, &validationError{message: err.Error(), status: http.StatusBadRequest})
+	case errors.Is(err, services.ErrContentTooLong):
+		writeGuestValidationError(w, &validationError{message: err.Error(), status: http.StatusRequestEntityTooLarge})
+	default:
+		fail500(w, r, "failed to save the guest draft", err)
+	}
+}
+
+func writeGuestJSON(w http.ResponseWriter, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		log.Printf("write the guest response: %v", err)
+	}
+}
+
+// writeGuestJSONError keeps the autosave endpoint's media type consistent on failures. The script
+// checks response.ok before parsing, but a JSON error is easier to diagnose than an HTML page.
+func writeGuestJSONError(w http.ResponseWriter, err error) {
+	status, message := http.StatusInternalServerError, "could not save the draft"
+	switch {
+	case errors.Is(err, services.ErrNoLink), errors.Is(err, services.ErrNoDraft), errors.Is(err, services.ErrNotFound):
+		status, message = http.StatusNotFound, "this link is no longer available"
+	case errors.Is(err, services.ErrContentTooLong):
+		status, message = http.StatusRequestEntityTooLarge, err.Error()
+	case errors.Is(err, services.ErrEmptyContent):
+		status, message = http.StatusBadRequest, err.Error()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(struct {
+		Error string `json:"error"`
+	}{Error: message}); err != nil {
+		log.Printf("write the guest error response: %v", err)
+	}
 }
 
 // renderGuest buffers a standalone guest component before writing it, so a render error cannot emit

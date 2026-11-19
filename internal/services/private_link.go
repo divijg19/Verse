@@ -61,9 +61,11 @@ type WorkProposal struct {
 	ID        string
 	PoemID    string
 	LinkID    string
+	Branch    string
 	GuestName string
 	Content   string
 	CreatedAt time.Time
+	UpdatedAt time.Time
 	AppliedAt *time.Time
 }
 
@@ -243,52 +245,19 @@ func RevokePrivateLink(ctx context.Context, poemID, linkID string) error {
 	return nil
 }
 
-// CreateWorkProposal records a guest's suggested rewrite.
-//
-// It never touches poems or poem_versions. The author's text stays exactly as it was until the
-// author applies the proposal through the ordinary edit path.
-//
-// The existence check joins poems and filters deleted_at for the same reason ResolvePrivateLink
-// does: deleting a work does not remove its link rows, so without the join a withdrawn work would
-// keep accepting suggestions that the author could never see or apply.
-func CreateWorkProposal(ctx context.Context, session PrivateLinkSession, name, content string) error {
-	if err := database.Require(); err != nil {
-		return err
-	}
-
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return fmt.Errorf("generate a proposal id: %w", err)
-	}
-
-	tag, err := database.Pool.Exec(ctx, `
-        INSERT INTO work_proposals (id, poem_id, link_id, guest_name, content)
-        SELECT $1, $2, $3, $4, $5
-        WHERE EXISTS (
-            SELECT 1 FROM private_links l
-            JOIN poems p ON p.id = l.poem_id AND p.deleted_at IS NULL
-            WHERE l.id = $3 AND l.poem_id = $2 AND l.revoked_at IS NULL AND l.expires_at > $6
-        )`, id, session.PoemID, session.LinkID, name, content, clock.NowUTC())
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNoLink
-	}
-	return nil
-}
-
 // ListWorkProposals returns a work's proposals, newest first.
 func ListWorkProposals(ctx context.Context, poemID string) ([]WorkProposal, error) {
 	if err := database.Require(); err != nil {
 		return nil, err
 	}
 
+	// Primary first within a link, then by last update. An updated submission must not stay pinned
+	// at its original created_at position in History.
 	rows, err := database.Pool.Query(ctx, `
-        SELECT id, poem_id, link_id, guest_name, content, created_at, applied_at
+        SELECT id, poem_id, link_id, branch, guest_name, content, created_at, updated_at, applied_at
         FROM work_proposals
         WHERE poem_id = $1
-        ORDER BY created_at DESC, id DESC`, poemID)
+        ORDER BY updated_at DESC, created_at DESC, id DESC`, poemID)
 	if err != nil {
 		return nil, err
 	}
@@ -297,8 +266,9 @@ func ListWorkProposals(ctx context.Context, poemID string) ([]WorkProposal, erro
 	var out []WorkProposal
 	for rows.Next() {
 		var proposal WorkProposal
-		if err := rows.Scan(&proposal.ID, &proposal.PoemID, &proposal.LinkID,
-			&proposal.GuestName, &proposal.Content, &proposal.CreatedAt, &proposal.AppliedAt); err != nil {
+		if err := rows.Scan(&proposal.ID, &proposal.PoemID, &proposal.LinkID, &proposal.Branch,
+			&proposal.GuestName, &proposal.Content, &proposal.CreatedAt, &proposal.UpdatedAt,
+			&proposal.AppliedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, proposal)
@@ -352,10 +322,14 @@ func CountProposalsByLink(ctx context.Context, poemID string) (map[string]int, e
 // history versions. It also left the content changed but the proposal unmarked if the process died
 // between them, so a retry would duplicate the version again.
 //
-// The proposal row is locked first, then the poem, in one transaction. No other path locks in the
-// reverse order, so there is no deadlock cycle. The retained-version rule is the same one UpdatePoem
-// uses: a version is recorded only when the text actually changes. Applying an identical suggestion
-// is a no-op for history, but still marks the proposal as dealt with.
+// The proposal row is locked first, then the poem, in one transaction. The submit path locks the
+// draft before the proposal, so neither path holds the other's lock when it asks for its own. The
+// retained-version rule is the same one UpdatePoem uses: a version is recorded only when the text
+// actually changes. Applying an identical suggestion is a no-op for history, but still marks the
+// proposal as dealt with.
+//
+// Applying one branch unmarks its siblings, so exactly one submission per work is "applied" at a
+// time. Submitting new text on the primary branch also clears its own applied_at in the upsert.
 func ApplyWorkProposal(ctx context.Context, poemID, proposalID string) error {
 	if err := database.Require(); err != nil {
 		return err
@@ -400,6 +374,11 @@ func ApplyWorkProposal(ctx context.Context, poemID, proposalID string) error {
 		}
 	}
 	if _, err := tx.Exec(ctx, `UPDATE poems SET content = $1 WHERE id = $2`, content, poemID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE work_proposals SET applied_at = NULL WHERE poem_id = $1 AND id <> $2 AND applied_at IS NOT NULL`,
+		poemID, proposalID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE work_proposals SET applied_at = $2 WHERE id = $1`, proposalID, clock.NowUTC()); err != nil {

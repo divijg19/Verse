@@ -221,10 +221,21 @@ table work_proposals {
     id          uuid        -- primary key
     poem_id     uuid        -- references poems(id)
     link_id     uuid        -- references private_links(id); which link carried the suggestion
+    branch      text        -- 'primary', or an opaque id for an explicitly parallel submission
     guest_name  text        -- optional attribution, "Anonymous" when left blank
-    content     text        -- the suggested rewrite; never written to poems by the guest
+    content     text        -- the submitted rewrite; never written to poems by the guest
     created_at  timestamptz
+    updated_at  timestamptz -- last submission on this branch
     applied_at  timestamptz -- nullable: NULL until the author applies it to the draft
+}
+
+table guest_drafts {
+    link_id     uuid        -- primary key; references private_links(id), one body per link
+    poem_id     uuid        -- references poems(id)
+    guest_name  text        -- optional attribution, remembered between visits
+    content     text        -- one continuous body, autosaved for the link's eight-hour window
+    base_hash   text        -- sha256 of the body at the last send, for change detection
+    updated_at  timestamptz
 }
 
 table login_attempts {

@@ -75,7 +75,7 @@ func truncateE2EPoems(t *testing.T) {
 	// referenced table. Named explicitly rather than using CASCADE, so a new dependency must be
 	// added here rather than being silently emptied.
 	if _, err := database.Pool.Exec(context.Background(),
-		`TRUNCATE TABLE work_proposals, private_links, poem_versions, poems`); err != nil {
+		`TRUNCATE TABLE guest_drafts, work_proposals, private_links, poem_versions, poems`); err != nil {
 		t.Fatalf("truncate poems: %v", err)
 	}
 }

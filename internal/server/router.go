@@ -376,6 +376,7 @@ func NewRouter() (*chi.Mux, error) {
 			scoped.Use(requireGuest(authCfg))
 			scoped.Use(requireGuestCSRF(authCfg))
 			scoped.Get("/edit", handlers.GuestEditorHandler)
+			scoped.Post("/draft", handlers.GuestDraftHandler)
 			scoped.Post("/propose", handlers.GuestProposalHandler)
 		})
 	})
@@ -471,6 +472,7 @@ func NewRouter() (*chi.Mux, error) {
 var staticAssets = map[string]string{
 	"css/output.css":   "css/output.css",
 	"js/editor.js":     "js/editor.js",
+	"js/guest.js":      "js/guest.js",
 	"js/htmx.min.js":   "js/htmx.min.js",
 	"js/navigation.js": "js/navigation.js",
 	"js/share.js":      "js/share.js",

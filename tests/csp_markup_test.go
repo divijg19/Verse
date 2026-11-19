@@ -25,6 +25,57 @@ import (
 //
 // The assertion below is the one that was missing.
 
+// TestGuestEditorMarkupObeysThePolicy covers the one surface outside the author session. It cannot
+// be added to surfacesToCheck, which fetches pages with the author's client; the guest editor needs
+// a capability exchange first. The assertion is the same: no inline script, no inline handler, and a
+// script element only if it points at a served asset.
+func TestGuestEditorMarkupObeysThePolicy(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+	id := insertPoem(t, "A Work\n\nIts body.")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token)
+	if status != http.StatusSeeOther {
+		t.Fatalf("guest entry = %d, want 303", status)
+	}
+	status, body, headers := guestGet(t, guest, srv.URL+"/guest/edit")
+	if status != http.StatusOK {
+		t.Fatalf("guest editor = %d, want 200", status)
+	}
+	if !strings.Contains(headers.Get("Content-Security-Policy"), "script-src 'self'") {
+		t.Fatalf("guest page has no pinned script-src: %q", headers.Get("Content-Security-Policy"))
+	}
+	// The guest page is allowed exactly one script, provided it has a src. The general block detector
+	// matches any script tag, so assert the narrower property here instead.
+	scripts := inlineScriptBlock.FindAllString(body, -1)
+	if len(scripts) != 1 {
+		t.Errorf("guest page has %d script tags, want 1: %v", len(scripts), scripts)
+	}
+	for _, tag := range scripts {
+		if !srcAttribute.MatchString(tag) {
+			t.Errorf("guest page has a script without src: %s", tag)
+		}
+	}
+	if inlineEventAttribute.MatchString(body) {
+		t.Error("guest page contains an inline event handler")
+	}
+	if !strings.Contains(body, `<script src="/static/js/guest.js" defer>`) {
+		t.Error("guest page does not load its one first-party bundle")
+	}
+	// Both submit buttons must write their branch to a hidden field before the form is sent. A
+	// submit button's own name/value disappears when the script disables it during submit, which
+	// would silently turn every "Send as alternative" into a primary submission.
+	if !strings.Contains(body, `data-guest-branch`) ||
+		!strings.Contains(body, `data-guest-send="primary"`) ||
+		!strings.Contains(body, `data-guest-send="alternative"`) {
+		t.Error("guest form is missing the branch field or one of its submit buttons")
+	}
+}
+
 // surfacesToCheck are the surfaces that carry controls. A control is markup, so a surface without one
 // is not evidence of anything -- but the editor and the dashboard both need checking, because a
 // regression that reintroduces an inline handler on a rarely-visited surface is exactly the kind that

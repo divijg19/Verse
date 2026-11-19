@@ -17,6 +17,33 @@ function envPath(): string {
 }
 
 describe("mergeEnvAt", () => {
+  test("adds the local reader origin for Copy Link", () => {
+    const path = envPath();
+    writeFileSync(
+      path,
+      "VERSE_AUTHORIZATION=kept\nVERSE_AUTH_SECRET=kept-secret\n",
+    );
+
+    mergeEnvAt(path);
+
+    const contents = readFileSync(path, "utf8");
+    expect(contents).toContain("PUBLIC_BASE_URL=http://localhost:4000");
+  });
+
+  test("keeps a reader origin the developer already chose", () => {
+    const path = envPath();
+    writeFileSync(
+      path,
+      "PUBLIC_BASE_URL=https://mine.example\nVERSE_AUTHORIZATION=kept\nVERSE_AUTH_SECRET=kept-secret\n",
+    );
+
+    mergeEnvAt(path);
+
+    const contents = readFileSync(path, "utf8");
+    expect(contents).toContain("PUBLIC_BASE_URL=https://mine.example");
+    expect(contents.split("PUBLIC_BASE_URL=").length - 1).toBe(1);
+  });
+
   test("replaces the database URL where it is", () => {
     const path = envPath();
     writeFileSync(

@@ -34,6 +34,7 @@ import (
 var allowedStaticAssets = []string{
 	"/static/css/output.css",
 	"/static/js/editor.js",
+	"/static/js/guest.js",
 	"/static/js/htmx.min.js",
 	"/static/js/navigation.js",
 	"/static/js/share.js",
