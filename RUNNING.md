@@ -764,9 +764,10 @@ that is not an `http` or `https` address stops the build rather than producing a
 With no links configured the pill is a plain link home, because a button that opens nothing is
 worse than a link.
 
-The share surface offers three actions for each published work: **Copy Text**, **Copy Link** and
-**Card Export**. The same three actions appear on the authoring side's Share screen, backed by one
-shared TypeScript module, so the two surfaces cannot disagree about what a name means.
+The reader's share surface offers three actions for each published work: **Copy Text**, **Copy Link**
+and **Card Export**. The authoring side's Share screen has those three plus **Private Link**, which
+is deliberately not a publication. The first three are backed by one shared TypeScript module, so
+the two surfaces cannot disagree about what a name means.
 
 The page still works with no script. Each title is a real link and each address is plain selectable
 text in a monospace face with `user-select: all`, so a reader can copy it by hand. The script adds the
@@ -778,11 +779,54 @@ second time: the script fetches the work's own page and reads the `.poem` elemen
 Export draws a 1200x630 PNG on a canvas from the same text and saves it locally, with no request to
 any other origin.
 
-On the authoring side, the Share screen has a work picker. The three actions use a small
-authenticated endpoint to read the selected work when an action needs its text. Copy Link is
-disabled for a draft, because a link to an unpublished work would lead nowhere; it says so rather
-than handing out an address that will 404. The endpoint builds that address from `PUBLIC_BASE_URL`,
-which is why the authoring service needs the reader's origin set.
+On the authoring side, the Share screen has a work picker. The actions use a small authenticated
+endpoint to read the selected work when an action needs its text. Copy Link is disabled for a draft,
+because a link to an unpublished work would lead nowhere; it says so rather than handing out an
+address that will 404. The endpoint builds that address from `PUBLIC_BASE_URL`, which is why the
+authoring service needs the reader's origin set.
+
+### Private links and suggested changes
+
+**Private Link is author-side only.** It never reaches the reader's site and is not part of the
+published artifact. It mints a capability URL that lets someone the author chooses edit **one work**
+for a short time and send back a suggested rewrite. It replaces the "Soon" card that used to sit on
+the Share screen; unlike a public link, it grants a limited session rather than publishing text.
+
+- **Eight hours, no renewal.** The link and the session it issues expire together. The guest editor
+  shows the remaining window; the server checks the same instant on every request. A longer window
+  would leave a capability to edit a work alive long after the author forgot it was handed out.
+- **A capability, not an account.** The raw token is 256 bits from `crypto/rand`, shown once when the
+  link is created and stored only as its SHA-256. A read of the table, a backup, or a support session
+  cannot reproduce the URL. Guessing it is infeasible, which is why a hash lookup is enough.
+- **A separate identity.** `GET /s/{token}` exchanges the token for a signed cookie scoped to
+  `/guest/`, with a different name, path, and signing domain from the author session. Neither
+  credential works on the other's routes. Guest pages send `Cache-Control: no-store` and
+  `X-Robots-Tag: noindex, nofollow`; there is no authoring shell, navigation, or script on them.
+- **Suggestions, not edits.** A guest may edit the one work they were given, optionally add a name,
+  and submit. The text is stored in `work_proposals`, never in `poems` or `poem_versions`, so the
+  author's draft is untouched until the author acts. The Share screen lists active links with
+  suggestion counts and a revoke control; revoking ends any session already issued from that link.
+- **A deliberate apply step.** Each work's History screen shows suggestions from private links,
+  newest first, with the guest's name and the full suggested text. "Apply to draft" writes the text
+  in one transaction that retains the displaced text under the same rule `UpdatePoem` uses, so an
+  applied suggestion is undoable like any other edit. Nothing merges automatically.
+
+Creating a link requires `PUBLIC_BASE_URL`: the URL the author copies must be absolute on the
+reader's origin. A deployment without that variable can still publish and share publicly, but the
+Private Link action refuses rather than copying a relative path nobody else can open.
+
+Migration `008_private_links.sql` adds `private_links` and `work_proposals`. Both have foreign keys
+to `poems`, but **deleting a work does not remove them**: this application soft-deletes by setting
+`deleted_at`, so `ON DELETE CASCADE` never fires. Every path that uses a link therefore joins `poems`
+and filters `deleted_at IS NULL`; a withdrawn work's link is refused even though its row survives.
+There is no application path that hard-deletes a work, so the rows remain even after a soft delete.
+
+The serving credential gets only `SELECT`, `INSERT` and `UPDATE` on both tables. Migrations normally
+run before `db/roles.sql`, so the role does not exist when 008 executes and the grant in that
+migration is skipped; the grant in `db/roles.sql` is the one that applies. Both are conditional on
+their prerequisite existing so an unusual role-first deployment does not fail on a missing relation
+or silently lose the grant. Rows are marked with `revoked_at` and `applied_at` rather than deleted,
+because the record of a capability and a suggestion is part of the work's history.
 
 The build refuses to write if validation fails. Validation checks that the required files exist, that
 no authoring route, asset, htmx attribute, script element, or secret name reached the output, and

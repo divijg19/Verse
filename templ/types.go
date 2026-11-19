@@ -68,6 +68,38 @@ type ShareWorkOption struct {
 	Published bool
 }
 
+// ProposalView is a guest's suggested rewrite as it appears in the author's history.
+type ProposalView struct {
+	ID        string
+	PoemID    string
+	GuestName string
+	Content   string
+	CreatedAt time.Time
+	Applied   bool
+}
+
+// GuestEditorData is the one work a private-link holder is allowed to edit.
+//
+// It carries no navigation, no library, and no other work. The expiration is shown so the guest
+// knows the boundary; the server enforces the same instant before every request.
+type GuestEditorData struct {
+	Title     string
+	Content   string
+	ExpiresAt time.Time
+	Minutes   int
+}
+
+// PrivateLinkView is one link on the author's Share screen.
+type PrivateLinkView struct {
+	ID            string    `json:"id"`
+	PoemID        string    `json:"poemID"`
+	CreatedAt     time.Time `json:"createdAt"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	Revoked       bool      `json:"revoked"`
+	Expired       bool      `json:"expired"`
+	ProposalCount int       `json:"proposalCount"`
+}
+
 // PoemVersionView is one superseded revision, as rendered in a poem's history.
 type PoemVersionView struct {
 	ID         string
@@ -79,11 +111,12 @@ type PoemVersionView struct {
 
 // PoemHistory is a poem's history screen: the work itself, and what it used to say.
 type PoemHistory struct {
-	PoemID   string
-	Title    string
-	Current  string
-	Versions []PoemVersionView
-	Restored string
+	PoemID    string
+	Title     string
+	Current   string
+	Versions  []PoemVersionView
+	Proposals []ProposalView
+	Restored  string
 
 	// DeletedAt reports whether the work is currently in the recycle.
 	//

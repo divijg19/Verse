@@ -1,11 +1,8 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
@@ -65,7 +62,7 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	baseURL := strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/")
+	baseURL := shareAddress()
 	address := ""
 	if state.Published {
 		address = baseURL + "/w/" + poem.ID + "/"
@@ -76,28 +73,32 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		published = state.PublishedAt.UTC().Format("2006-01-02")
 	}
 
+	// Private links are an addition to this endpoint, not a precondition for the three actions that
+	// were here first. If the new tables are unavailable -- a deployment whose grants have not been
+	// applied is the realistic case -- the share data still answers with an empty link list rather
+	// than taking Copy Text, Copy Link and Card Export down with it.
+	links, err := privateLinkViews(r.Context(), id)
+	if err != nil {
+		log.Printf("failed to list private links for %s: %v", id, err) // #nosec G706 -- id was parsed as a UUID by requirePathWorkID
+		links = nil
+	}
+
 	body := presenters.BodyWithoutTitle(poem.Content)
 	out := struct {
-		Title       string `json:"title"`
-		Body        string `json:"body"`
-		Address     string `json:"address"`
-		Published   string `json:"published"`
-		IsPublished bool   `json:"isPublished"`
+		Title       string                  `json:"title"`
+		Body        string                  `json:"body"`
+		Address     string                  `json:"address"`
+		Published   string                  `json:"published"`
+		IsPublished bool                    `json:"isPublished"`
+		Links       []templ.PrivateLinkView `json:"links"`
 	}{
 		Title:       presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Body:        body,
 		Address:     address,
 		Published:   published,
 		IsPublished: state.Published,
+		Links:       links,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	if err := json.NewEncoder(w).Encode(out); err != nil {
-		// The status is already committed by the first write, so a failure here can only be
-		// reported in the log. The id is left out because it came from the request path and this
-		// package has no sanitiser for it; the error is enough to find the failure. The author
-		// gets no copied text rather than the wrong text, which is the safe direction.
-		log.Printf("write the share data: %v", err)
-	}
+	shareJSON(w, out)
 }

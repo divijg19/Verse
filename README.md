@@ -208,6 +208,25 @@ table poem_versions {
     seq          bigint      -- identity; the history is ordered by this, because recorded_at can tie
 }
 
+table private_links {
+    id          uuid        -- primary key
+    poem_id     uuid        -- references poems(id); the one work this link can edit
+    token_hash  text        -- sha256 of the raw token; the raw token is shown once and never stored
+    created_at  timestamptz
+    expires_at  timestamptz -- eight hours after creation; no renewal
+    revoked_at  timestamptz -- nullable: NULL means the link still works
+}
+
+table work_proposals {
+    id          uuid        -- primary key
+    poem_id     uuid        -- references poems(id)
+    link_id     uuid        -- references private_links(id); which link carried the suggestion
+    guest_name  text        -- optional attribution, "Anonymous" when left blank
+    content     text        -- the suggested rewrite; never written to poems by the guest
+    created_at  timestamptz
+    applied_at  timestamptz -- nullable: NULL until the author applies it to the draft
+}
+
 table login_attempts {
     subject        bytea                 -- HMAC of the caller address; never the address itself
     failures       integer

@@ -15,6 +15,7 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/handlers"
+	"github.com/divijg19/Verse/internal/services"
 )
 
 // securityHeaders are applied to every response.
@@ -296,6 +297,9 @@ func NewRouter() (*chi.Mux, error) {
 	// (GHSA-3fxj-6jh8-hvhx, GHSA-rjr7-jggh-pgcp, GHSA-9g5q-2w5x-hmxf). Because the request logger
 	// records r.RemoteAddr, enabling it would let any client write an arbitrary address into the
 	// logs. The unrewritten peer address is the honest one.
+	// Redaction must precede the logger: the logger prints RequestURI, and the private-link entry
+	// route carries its capability in that string.
+	r.Use(redactRequestURI)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeadersMiddleware)
@@ -345,6 +349,37 @@ func NewRouter() (*chi.Mux, error) {
 	r.Get("/login", loginPageHandler(authCfg))
 	r.Post("/login", loginSubmitHandler(authCfg))
 
+	// Private links. The entry route is public by necessity: the recipient has no author session.
+	// The raw token is exchanged here for a signed, one-work, eight-hour guest session, and the
+	// browser is redirected to /guest/edit so the token leaves the address bar. The issuer is
+	// injected by this layer because the signing secret belongs here, not in the handlers package.
+	//
+	// Both surfaces carry no-store and noindex: a draft shown through a link is not a publication.
+	privateLinkEntry := guestHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := handlers.WithGuestSessionIssuer(r.Context(), func(w http.ResponseWriter, r *http.Request, session services.PrivateLinkSession) error {
+			guest, err := newGuestSession(session.LinkID, session.PoemID, session.ExpiresAt)
+			if err != nil {
+				return err
+			}
+			return authCfg.issueGuestSession(w, guest)
+		})
+		handlers.PrivateLinkEntryHandler(w, r.WithContext(ctx))
+	}))
+	r.Get("/s/{token}", http.HandlerFunc(privateLinkEntry.ServeHTTP))
+
+	// The guest's own limited surface. It is guarded by the guest cookie, never by the author
+	// session: the two credentials are different cookie names, paths, and signing domains, and
+	// neither grants access to the other's routes.
+	r.Route("/guest", func(guest chi.Router) {
+		guest.Use(guestHeadersMiddleware)
+		guest.Group(func(scoped chi.Router) {
+			scoped.Use(requireGuest(authCfg))
+			scoped.Use(requireGuestCSRF(authCfg))
+			scoped.Get("/edit", handlers.GuestEditorHandler)
+			scoped.Post("/propose", handlers.GuestProposalHandler)
+		})
+	})
+
 	// The authoring application. Everything below requires a valid session.
 	r.Group(func(priv chi.Router) {
 		priv.Use(requireAuth(authCfg))
@@ -362,6 +397,12 @@ func NewRouter() (*chi.Mux, error) {
 		// One work's share data for the picker. It returns the body of a single work, so it stays
 		// inside the authenticated group like every other read of work text.
 		priv.Get("/share/work/{id}", handlers.ShareWorkHandler)
+		// Private links mint and revoke capabilities to edit one work. They are mutations despite
+		// living on the Share screen, so CSRF applies to both.
+		priv.Post("/share/link", handlers.ShareLinkHandler)
+		priv.Post("/share/link/revoke", handlers.ShareLinkRevokeHandler)
+		// Applying a guest's suggestion is an ordinary edit of the author's draft.
+		priv.Post("/poem/proposal/apply", handlers.ShareProposalApplyHandler)
 
 		// Work and editor routes.
 		priv.Get("/poems", handlers.PoemsHandler)

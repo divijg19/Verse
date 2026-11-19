@@ -308,6 +308,8 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 		`>Copy Text</p>`,
 		`>Copy Link</p>`,
 		`>Card Export</p>`,
+		`>Private Link</p>`,
+		`data-private-link-list`,
 		`id="share-work-picker"`,
 		`data-published="true"`,
 		`data-published="false"`,
@@ -317,7 +319,6 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 
 	for _, removed := range []string{
 		`>Quiet Copy</p>`,
-		`>Private Link</p>`,
 		`>Soon</span>`,
 		`>Share Studio</p>`,
 		`>Until Then</p>`,

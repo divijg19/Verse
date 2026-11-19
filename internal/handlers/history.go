@@ -93,11 +93,28 @@ func buildPoemHistory(r *http.Request, poemID, restored string) (templ.PoemHisto
 		})
 	}
 
+	proposals, err := services.ListWorkProposals(r.Context(), poemID)
+	if err != nil {
+		return templ.PoemHistory{}, err
+	}
+	proposalViews := make([]templ.ProposalView, 0, len(proposals))
+	for _, proposal := range proposals {
+		proposalViews = append(proposalViews, templ.ProposalView{
+			ID:        proposal.ID,
+			PoemID:    proposal.PoemID,
+			GuestName: proposal.GuestName,
+			Content:   proposal.Content,
+			CreatedAt: proposal.CreatedAt,
+			Applied:   proposal.AppliedAt != nil,
+		})
+	}
+
 	return templ.PoemHistory{
 		PoemID:    poem.ID,
 		Title:     presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Current:   poem.Content,
 		Versions:  views,
+		Proposals: proposalViews,
 		Restored:  restored,
 		DeletedAt: poem.DeletedAt,
 	}, nil

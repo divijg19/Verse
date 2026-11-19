@@ -41,6 +41,11 @@ var privateRoutes = []struct {
 	// The Share picker's work data. Added in v0.5.0's successor: it returns one work verbatim, so
 	// it stays behind the session like every other read of work text.
 	{http.MethodGet, "/share/work/some-id"},
+	// Private links: minting a capability to edit one work, revoking one, and applying the
+	// suggestion a guest sent back. All three mutate and all three carry the author's CSRF token.
+	{http.MethodPost, "/share/link"},
+	{http.MethodPost, "/share/link/revoke"},
+	{http.MethodPost, "/poem/proposal/apply"},
 	{http.MethodGet, "/poems"},
 	{http.MethodGet, "/poem/some-id"},
 	{http.MethodGet, "/prompt"},
@@ -497,9 +502,10 @@ func TestNewRouterAuthSecretLengthBoundary(t *testing.T) {
 //
 // Kept as an explicit list for the same reason privateRoutes is one: the point is that a human
 // classified each route, and TestPrivateRoutesEnumeratesTheWholeRouter is what holds both lists to
-// the router. The unauthenticated surface is deliberately tiny -- the platform probe, the login page,
-// the login submission, and the static assets -- and every one of them is either necessary for the
-// service to run or leaks nothing.
+// the router. Routes here need no author session, but they are not all anonymous in effect: alongside
+// the probe, login and static assets, the private-link entry and guest routes are listed because their
+// authority comes from a capability token or a guest session rather than from the author's cookie.
+// The enumeration is what keeps that decision explicit.
 var publicRoutes = map[string]bool{
 	http.MethodGet + " /health":       true,
 	http.MethodHead + " /health":      true,
@@ -516,6 +522,13 @@ var publicRoutes = map[string]bool{
 	http.MethodConnect + " /static/*": true,
 	// Found by TestPrivateRoutesEnumeratesTheWholeRouter, which is the argument for having it.
 	"QUERY /static/*": true,
+	// A private link's entry route. There is no session at this point by definition: the token in
+	// the URL is the credential, exchanged here for a signed, one-work, eight-hour guest session.
+	// It exposes one work to the link's holder and nothing else; the /guest/* routes below are
+	// guarded by that session rather than by the author's.
+	http.MethodGet + " /s/some-id":      true,
+	http.MethodGet + " /guest/edit":     true,
+	http.MethodPost + " /guest/propose": true,
 }
 
 // TestPrivateRoutesEnumeratesTheWholeRouter is the guard on both lists.
