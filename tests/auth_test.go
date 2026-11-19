@@ -528,6 +528,7 @@ var publicRoutes = map[string]bool{
 	// guarded by that session rather than by the author's.
 	http.MethodGet + " /s/some-id":      true,
 	http.MethodGet + " /guest/edit":     true,
+	http.MethodPost + " /guest/draft":   true,
 	http.MethodPost + " /guest/propose": true,
 }
 

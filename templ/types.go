@@ -72,10 +72,25 @@ type ShareWorkOption struct {
 type ProposalView struct {
 	ID        string
 	PoemID    string
+	Branch    string
 	GuestName string
 	Content   string
 	CreatedAt time.Time
+	UpdatedAt time.Time
 	Applied   bool
+}
+
+// BranchLabel is the human-facing name for a submission branch. Alternatives carry a unique id, so
+// a short suffix distinguishes them when a guest has sent more than one.
+func (p ProposalView) BranchLabel() string {
+	if p.Branch == "primary" {
+		return "Primary"
+	}
+	suffix := p.Branch
+	if len(suffix) > 7 {
+		suffix = suffix[len(suffix)-6:]
+	}
+	return "Alternative " + suffix
 }
 
 // GuestEditorData is the one work a private-link holder is allowed to edit.
@@ -83,10 +98,13 @@ type ProposalView struct {
 // It carries no navigation, no library, and no other work. The expiration is shown so the guest
 // knows the boundary; the server enforces the same instant before every request.
 type GuestEditorData struct {
-	Title     string
-	Content   string
-	ExpiresAt time.Time
-	Minutes   int
+	Title       string
+	Content     string
+	GuestName   string
+	Changed     bool
+	BranchCount int
+	ExpiresAt   time.Time
+	Minutes     int
 }
 
 // PrivateLinkView is one link on the author's Share screen.

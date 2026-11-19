@@ -115,14 +115,15 @@ templ PoemHistoryContent(ctx context.Context, history PoemHistory) {
 						<div class="flex flex-wrap items-center justify-between gap-3">
 							<div>
 								<p class="verse-history-proposal-badge">
+									{ proposal.BranchLabel() }
 									if proposal.Applied {
-										Applied
+										· Applied
 									} else {
-										Suggested
+										· Suggested
 									}
 								</p>
 								<p class="pt-1 text-sm text-neutral-300">
-									{ proposal.GuestName } · { proposal.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }
+									{ proposal.GuestName } · updated { proposal.UpdatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }
 								</p>
 							</div>
 							@If(!proposal.Applied && history.DeletedAt == nil) {

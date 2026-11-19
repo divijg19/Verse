@@ -1,7 +1,8 @@
 // The TypeScript build.
 //
-// Three bundles come out of this: the editor's Focus Mode, the navigation, and the public site's
-// archive search. Bun is the compiler, because Bun is already a build dependency of this repository
+// Five bundles come out of this: the editor's Focus Mode, the guest editor's autosave, the
+// navigation, the author's Share actions, and the public site's archive search. Bun is the compiler,
+// because Bun is already a build dependency of this repository
 // for the authoring stylesheet, and a second toolchain for a second language would cost more than the
 // type-checking is worth.
 //
@@ -64,6 +65,7 @@ interface Bundle {
  */
 const bundles: Bundle[] = [
   { source: "web/ts/editor.ts", output: "static/js/editor.js" },
+  { source: "web/ts/guest.ts", output: "static/js/guest.js" },
   { source: "web/ts/navigation.ts", output: "static/js/navigation.js" },
   { source: "web/ts/share.ts", output: "static/js/share.js" },
   {

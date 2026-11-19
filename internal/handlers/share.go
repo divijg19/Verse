@@ -62,9 +62,12 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Without PUBLIC_BASE_URL there is no reader origin to build an absolute address on. Returning a
+	// relative /w/... used to make Copy Link hand out a path the clipboard could not resolve; leaving
+	// it empty lets the client say the address is not configured instead.
 	baseURL := shareAddress()
 	address := ""
-	if state.Published {
+	if state.Published && baseURL != "" {
 		address = baseURL + "/w/" + poem.ID + "/"
 	}
 

@@ -170,6 +170,12 @@ export function mergeEnvAt(path: string): void {
     missing.push("VERSE_AUTH_SECRET");
     additions.push(`VERSE_AUTH_SECRET=${randomHex(24)}`);
   }
+  // Copy Link needs the reader's origin. The public dev server always listens on 4000, so this can
+  // be filled in without asking the developer; the publisher still passes -base-url explicitly.
+  if (!keys.has("PUBLIC_BASE_URL")) {
+    missing.push("PUBLIC_BASE_URL");
+    additions.push(`PUBLIC_BASE_URL=http://localhost:${publicPort}`);
+  }
 
   // DATABASE_URL is replaced where it is, not appended.
   //
@@ -789,6 +795,13 @@ async function allMode(): Promise<void> {
 // reach without starting anything.
 if (import.meta.main) {
   const mode = process.argv[2] ?? "all";
+
+  // Every working mode gets the same env merge, not just setup. A .env created before
+  // PUBLIC_BASE_URL existed would otherwise never learn the reader's local origin, and Copy Link
+  // would keep reporting that the address is not configured. Existing values are kept by the merge.
+  if (mode === "author" || mode === "public" || mode === "all") {
+    mergeEnv();
+  }
 
   switch (mode) {
     case "setup":

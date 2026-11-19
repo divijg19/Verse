@@ -102,9 +102,11 @@ func buildPoemHistory(r *http.Request, poemID, restored string) (templ.PoemHisto
 		proposalViews = append(proposalViews, templ.ProposalView{
 			ID:        proposal.ID,
 			PoemID:    proposal.PoemID,
+			Branch:    proposal.Branch,
 			GuestName: proposal.GuestName,
 			Content:   proposal.Content,
 			CreatedAt: proposal.CreatedAt,
+			UpdatedAt: proposal.UpdatedAt,
 			Applied:   proposal.AppliedAt != nil,
 		})
 	}

@@ -124,7 +124,7 @@ func truncatePoems(t *testing.T) {
 	// CASCADE, so a future table that references these has to be added here deliberately instead of
 	// being silently emptied.
 	if _, err := database.Pool.Exec(context.Background(),
-		`TRUNCATE TABLE work_proposals, private_links, poem_versions, poems`); err != nil {
+		`TRUNCATE TABLE guest_drafts, work_proposals, private_links, poem_versions, poems`); err != nil {
 		t.Fatalf("truncate poems failed: %v", err)
 	}
 }

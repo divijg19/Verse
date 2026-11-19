@@ -91,6 +91,11 @@ BEGIN
         GRANT SELECT, INSERT, UPDATE ON private_links TO verse_runtime;
         GRANT SELECT, INSERT, UPDATE ON work_proposals TO verse_runtime;
     END IF;
+    -- 009 adds the continuously edited draft. Its own grant covers the uncommon role-first order;
+    -- this one covers the documented order where the role does not exist when 009 executes.
+    IF to_regclass('public.guest_drafts') IS NOT NULL THEN
+        GRANT SELECT, INSERT, UPDATE ON guest_drafts TO verse_runtime;
+    END IF;
 END
 $$;
 

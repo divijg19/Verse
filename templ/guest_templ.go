@@ -20,8 +20,9 @@ func guestThanks(name string) string {
 }
 
 // GuestEditor is the limited editor a private link opens. It is a standalone page: no authoring
-// shell, no navigation, no HTMX, no script at all. The holder can edit the one work the link names
-// and send the result back as a proposal; nothing else is reachable from here.
+// shell, no navigation and no HTMX. Its one script is first-party and only autosaves the body; the
+// plain form works without it. The holder edits one continuous body for the link and sends the
+// result back as a proposal; nothing else is reachable from here.
 func GuestEditor(data GuestEditorData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -46,20 +47,20 @@ func GuestEditor(data GuestEditorData) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(data.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 22, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 23, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Verse</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\thtml, body { min-height: 100%; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tbackground:\n\t\t\t\t\t\tradial-gradient(circle at top, rgba(168, 85, 247, 0.12) 0%, rgba(10, 10, 10, 0) 38%),\n\t\t\t\t\t\tlinear-gradient(180deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.98) 76%);\n\t\t\t\t\tcolor: rgb(229, 229, 229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tpadding: 1.25rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-shell {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmax-width: 46rem;\n\t\t\t\t\tmargin: 0 auto;\n\t\t\t\t}\n\t\t\t\t.verse-guest-card {\n\t\t\t\t\tborder: 1px solid rgb(38, 38, 38);\n\t\t\t\t\tborder-radius: 1.25rem;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.85) 0%, rgba(10, 10, 10, 0.6) 100%);\n\t\t\t\t\tbox-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);\n\t\t\t\t\tpadding: 1.5rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-eyebrow {\n\t\t\t\t\tfont-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.2em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tcolor: rgb(168, 85, 247);\n\t\t\t\t\tmargin: 0 0 0.5rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-title {\n\t\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", Times, serif;\n\t\t\t\t\tfont-size: 1.7rem;\n\t\t\t\t\tline-height: 1.15;\n\t\t\t\t\tmargin: 0 0 0.35rem;\n\t\t\t\t\tcolor: rgb(245, 245, 245);\n\t\t\t\t}\n\t\t\t\t.verse-guest-timer {\n\t\t\t\t\tfont-size: 0.72rem;\n\t\t\t\t\tletter-spacing: 0.08em;\n\t\t\t\t\tcolor: rgb(163, 163, 163);\n\t\t\t\t\tmargin: 0 0 1.25rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-label {\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\tfont-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.18em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tcolor: rgb(115, 115, 115);\n\t\t\t\t\tmargin: 0 0 0.5rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-name,\n\t\t\t\t.verse-guest-textarea {\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t\tbackground: rgba(10, 10, 10, 0.65);\n\t\t\t\t\tborder: 1px solid rgb(38, 38, 38);\n\t\t\t\t\tborder-radius: 0.6rem;\n\t\t\t\t\tcolor: rgb(245, 245, 245);\n\t\t\t\t\toutline: none;\n\t\t\t\t\tpadding: 0.75rem 0.85rem;\n\t\t\t\t\ttransition: border-color 150ms ease, box-shadow 150ms ease;\n\t\t\t\t}\n\t\t\t\t.verse-guest-name:focus,\n\t\t\t\t.verse-guest-textarea:focus {\n\t\t\t\t\tborder-color: rgb(115, 115, 115);\n\t\t\t\t\tbox-shadow: inset 0 1px 0 rgba(163, 163, 163, 0.16);\n\t\t\t\t}\n\t\t\t\t.verse-guest-name { font-size: 0.95rem; margin-bottom: 1.1rem; }\n\t\t\t\t.verse-guest-textarea {\n\t\t\t\t\tmin-height: 20rem;\n\t\t\t\t\tresize: vertical;\n\t\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", Times, serif;\n\t\t\t\t\tfont-size: 1.05rem;\n\t\t\t\t\tline-height: 1.65;\n\t\t\t\t}\n\t\t\t\t.verse-guest-submit {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmin-height: 2.625rem;\n\t\t\t\t\tmargin-top: 1rem;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tborder-radius: 0.375rem;\n\t\t\t\t\tbackground: rgb(147, 51, 234);\n\t\t\t\t\tcolor: rgb(250, 245, 255);\n\t\t\t\t\tfont-size: 1rem;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\ttransition: background-color 150ms ease;\n\t\t\t\t}\n\t\t\t\t.verse-guest-submit:hover { background: rgb(168, 85, 247); }\n\t\t\t\t.verse-guest-footnote {\n\t\t\t\t\tfont-size: 0.72rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\tcolor: rgb(82, 82, 82);\n\t\t\t\t\tmargin: 1.1rem 0 0;\n\t\t\t\t}\n\t\t\t\t@media (max-width: 639px) {\n\t\t\t\t\t.verse-guest-card { padding: 1rem; border-radius: 0.85rem; }\n\t\t\t\t\t.verse-guest-textarea { min-height: 16rem; }\n\t\t\t\t}\n\t\t\t</style></head><body><main class=\"verse-guest-shell\"><div class=\"verse-guest-card\"><p class=\"verse-guest-eyebrow\">Private link</p><h1 class=\"verse-guest-title\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Verse</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/js/guest.js\" defer></script><style>\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\thtml, body { min-height: 100%; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tbackground:\n\t\t\t\t\t\tradial-gradient(circle at top, rgba(168, 85, 247, 0.12) 0%, rgba(10, 10, 10, 0) 38%),\n\t\t\t\t\t\tlinear-gradient(180deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.98) 76%);\n\t\t\t\t\tcolor: rgb(229, 229, 229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tpadding: 1.25rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-shell {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmax-width: 46rem;\n\t\t\t\t\tmargin: 0 auto;\n\t\t\t\t}\n\t\t\t\t.verse-guest-card {\n\t\t\t\t\tborder: 1px solid rgb(38, 38, 38);\n\t\t\t\t\tborder-radius: 1.25rem;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.85) 0%, rgba(10, 10, 10, 0.6) 100%);\n\t\t\t\t\tbox-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);\n\t\t\t\t\tpadding: 1.5rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-eyebrow {\n\t\t\t\t\tfont-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.2em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tcolor: rgb(168, 85, 247);\n\t\t\t\t\tmargin: 0 0 0.5rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-title {\n\t\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", Times, serif;\n\t\t\t\t\tfont-size: 1.7rem;\n\t\t\t\t\tline-height: 1.15;\n\t\t\t\t\tmargin: 0 0 0.35rem;\n\t\t\t\t\tcolor: rgb(245, 245, 245);\n\t\t\t\t}\n\t\t\t\t.verse-guest-timer {\n\t\t\t\t\tfont-size: 0.72rem;\n\t\t\t\t\tletter-spacing: 0.08em;\n\t\t\t\t\tcolor: rgb(163, 163, 163);\n\t\t\t\t\tmargin: 0 0 1.25rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-label {\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\tfont-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.18em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tcolor: rgb(115, 115, 115);\n\t\t\t\t\tmargin: 0 0 0.5rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-name,\n\t\t\t\t.verse-guest-textarea {\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t\tbackground: rgba(10, 10, 10, 0.65);\n\t\t\t\t\tborder: 1px solid rgb(38, 38, 38);\n\t\t\t\t\tborder-radius: 0.6rem;\n\t\t\t\t\tcolor: rgb(245, 245, 245);\n\t\t\t\t\toutline: none;\n\t\t\t\t\tpadding: 0.75rem 0.85rem;\n\t\t\t\t\ttransition: border-color 150ms ease, box-shadow 150ms ease;\n\t\t\t\t}\n\t\t\t\t.verse-guest-name:focus,\n\t\t\t\t.verse-guest-textarea:focus {\n\t\t\t\t\tborder-color: rgb(115, 115, 115);\n\t\t\t\t\tbox-shadow: inset 0 1px 0 rgba(163, 163, 163, 0.16);\n\t\t\t\t}\n\t\t\t\t.verse-guest-name { font-size: 0.95rem; margin-bottom: 1.1rem; }\n\t\t\t\t.verse-guest-textarea {\n\t\t\t\t\tmin-height: 20rem;\n\t\t\t\t\tresize: vertical;\n\t\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", Times, serif;\n\t\t\t\t\tfont-size: 1.05rem;\n\t\t\t\t\tline-height: 1.65;\n\t\t\t\t}\n\t\t\t\t.verse-guest-submit {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmin-height: 2.625rem;\n\t\t\t\t\tmargin-top: 1rem;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tborder-radius: 0.375rem;\n\t\t\t\t\tbackground: rgb(147, 51, 234);\n\t\t\t\t\tcolor: rgb(250, 245, 255);\n\t\t\t\t\tfont-size: 1rem;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\ttransition: background-color 150ms ease;\n\t\t\t\t}\n\t\t\t\t.verse-guest-submit:hover:not(:disabled) { background: rgb(168, 85, 247); }\n\t\t\t\t.verse-guest-submit:disabled { cursor: not-allowed; opacity: 0.45; }\n\t\t\t\t.verse-guest-alternative {\n\t\t\t\t\tmargin-top: 0.5rem;\n\t\t\t\t\tbackground: transparent;\n\t\t\t\t\tborder: 1px solid rgb(63 33 101);\n\t\t\t\t\tcolor: rgb(192 132 252);\n\t\t\t\t}\n\t\t\t\t.verse-guest-alternative:hover:not(:disabled) {\n\t\t\t\t\tbackground: rgba(63, 33, 101, 0.35);\n\t\t\t\t}\n\t\t\t\t.verse-guest-status {\n\t\t\t\t\tmin-height: 1.2rem;\n\t\t\t\t\tmargin: 0.85rem 0 0;\n\t\t\t\t\tfont-size: 0.7rem;\n\t\t\t\t\tletter-spacing: 0.06em;\n\t\t\t\t\tcolor: rgb(168 85 247);\n\t\t\t\t}\n\t\t\t\t.verse-guest-footnote {\n\t\t\t\t\tfont-size: 0.72rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\tcolor: rgb(82, 82, 82);\n\t\t\t\t\tmargin: 1.1rem 0 0;\n\t\t\t\t}\n\t\t\t\t@media (max-width: 639px) {\n\t\t\t\t\t.verse-guest-card { padding: 1rem; border-radius: 0.85rem; }\n\t\t\t\t\t.verse-guest-textarea { min-height: 16rem; }\n\t\t\t\t}\n\t\t\t</style></head><body><main class=\"verse-guest-shell\"><div class=\"verse-guest-card\"><p class=\"verse-guest-eyebrow\">Private link</p><h1 class=\"verse-guest-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 134, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 153, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -72,7 +73,7 @@ func GuestEditor(data GuestEditorData) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(data.ExpiresAt.UTC().Format("Jan 2, 2006 15:04 UTC"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 136, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 155, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -85,13 +86,26 @@ func GuestEditor(data GuestEditorData) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", data.Minutes))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 137, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 156, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " minutes from now.</p><form method=\"post\" action=\"/guest/propose\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " minutes from now.</p><form method=\"post\" action=\"/guest/propose\" class=\"verse-guest-form\" data-guest-changed=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("%t", data.Changed)).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 162, Col: 58}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -99,20 +113,68 @@ func GuestEditor(data GuestEditorData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<label class=\"verse-guest-label\" for=\"guest-name\">Your name (optional)</label> <input id=\"guest-name\" class=\"verse-guest-name\" type=\"text\" name=\"name\" maxlength=\"80\" autocomplete=\"name\" placeholder=\"Anonymous\"> <label class=\"verse-guest-label\" for=\"guest-content\">Your suggested version</label> <textarea id=\"guest-content\" class=\"verse-guest-textarea\" name=\"content\" required spellcheck=\"true\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<input type=\"hidden\" name=\"submission_id\" data-guest-submission value=\"\"> <input type=\"hidden\" name=\"branch\" data-guest-branch value=\"primary\"> <label class=\"verse-guest-label\" for=\"guest-name\">Your name (optional)</label> <input id=\"guest-name\" class=\"verse-guest-name\" type=\"text\" name=\"name\" maxlength=\"80\" autocomplete=\"name\" placeholder=\"Anonymous\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(data.Content)
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(data.GuestName).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 158, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 176, Col: 29}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</textarea> <button type=\"submit\" class=\"verse-guest-submit\">Send suggestion</button></form><p class=\"verse-guest-footnote\">Your changes are sent to the author as a suggestion. They are not applied to the work automatically. This page is temporary and is not indexed.</p></div></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"> <label class=\"verse-guest-label\" for=\"guest-content\">Your suggested version</label> <textarea id=\"guest-content\" class=\"verse-guest-textarea\" name=\"content\" required spellcheck=\"true\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var8 string
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(data.Content)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 185, Col: 21}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</textarea><p class=\"verse-guest-status\" data-guest-status role=\"status\" aria-live=\"polite\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if data.Changed {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "Saved · ready to send")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "No changes since your last send")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</p><button type=\"submit\" name=\"branch\" value=\"primary\" data-guest-send=\"primary\" class=\"verse-guest-submit\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if !data.Changed {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " disabled")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, ">Send suggestion</button> <button type=\"submit\" name=\"branch\" value=\"alternative\" data-guest-send=\"alternative\" class=\"verse-guest-submit verse-guest-alternative\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if !data.Changed {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " disabled")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, ">Send as alternative</button></form><p class=\"verse-guest-footnote\">Your changes are sent to the author as a suggestion. They are not applied to the work automatically. \"Send as alternative\" keeps the current version and sends this one beside it. This page is temporary and is not indexed.</p></div></main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -137,20 +199,20 @@ func GuestProposalSent(name string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Suggestion sent — Verse</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tmin-height: 100vh;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.98) 76%);\n\t\t\t\t\tcolor: rgb(229, 229, 229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\tpadding: 1.5rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-done {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmax-width: 26rem;\n\t\t\t\t\tborder: 1px solid rgb(38, 38, 38);\n\t\t\t\t\tborder-radius: 1.25rem;\n\t\t\t\t\tbackground: rgba(23, 23, 23, 0.85);\n\t\t\t\t\tpadding: 1.75rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-done h1 {\n\t\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", Times, serif;\n\t\t\t\t\tfont-size: 1.6rem;\n\t\t\t\t\tmargin: 0 0 0.75rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-done p { font-size: 0.9rem; line-height: 1.7; color: rgb(163, 163, 163); }\n\t\t\t\t.verse-guest-done .verse-guest-eyebrow {\n\t\t\t\t\tfont-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.2em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tcolor: rgb(168, 85, 247);\n\t\t\t\t\tmargin: 0 0 0.6rem;\n\t\t\t\t}\n\t\t\t</style></head><body><main class=\"verse-guest-done\"><p class=\"verse-guest-eyebrow\">Suggestion sent</p><h1>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Suggestion sent — Verse</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tmin-height: 100vh;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23, 23, 23, 0.9) 0%, rgba(10, 10, 10, 0.98) 76%);\n\t\t\t\t\tcolor: rgb(229, 229, 229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tjustify-content: center;\n\t\t\t\t\tpadding: 1.5rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-done {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tmax-width: 26rem;\n\t\t\t\t\tborder: 1px solid rgb(38, 38, 38);\n\t\t\t\t\tborder-radius: 1.25rem;\n\t\t\t\t\tbackground: rgba(23, 23, 23, 0.85);\n\t\t\t\t\tpadding: 1.75rem;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t.verse-guest-done h1 {\n\t\t\t\t\tfont-family: Georgia, Cambria, \"Times New Roman\", Times, serif;\n\t\t\t\t\tfont-size: 1.6rem;\n\t\t\t\t\tmargin: 0 0 0.75rem;\n\t\t\t\t}\n\t\t\t\t.verse-guest-done p { font-size: 0.9rem; line-height: 1.7; color: rgb(163, 163, 163); }\n\t\t\t\t.verse-guest-done .verse-guest-eyebrow {\n\t\t\t\t\tfont-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.2em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tcolor: rgb(168, 85, 247);\n\t\t\t\t\tmargin: 0 0 0.6rem;\n\t\t\t\t}\n\t\t\t</style></head><body><main class=\"verse-guest-done\"><p class=\"verse-guest-eyebrow\">Suggestion sent</p><h1>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(guestThanks(name))
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(guestThanks(name))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 221, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/guest.templ`, Line: 275, Col: 27}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</h1><p>Your suggested version is with the author. It is kept separately and will not change the work until they choose to apply it.</p></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</h1><p>Your suggested version is with the author. It is kept separately and will not change the work until they choose to apply it.</p></main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

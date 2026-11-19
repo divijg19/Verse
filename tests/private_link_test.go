@@ -438,8 +438,8 @@ func checkTSBundles(root string) error {
 	}
 
 	outputs := regexp.MustCompile(`source:\s*"([^"]+)"[\s\S]*?output:\s*"([^"]+)"`).FindAllStringSubmatch(string(manifest), -1)
-	if len(outputs) != 4 {
-		return fmt.Errorf("found %d source/output pairs in build_js.ts, want 4", len(outputs))
+	if len(outputs) != 5 {
+		return fmt.Errorf("found %d source/output pairs in build_js.ts, want 5", len(outputs))
 	}
 
 	authored := make(map[string]bool, len(outputs))
