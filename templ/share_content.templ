@@ -1,6 +1,8 @@
 package templ
 
-templ ShareContent(works []ShareWorkOption) {
+import "fmt"
+
+templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 	<div class="space-y-4">
 		<style>
 			.verse-share-panel {
@@ -176,7 +178,10 @@ templ ShareContent(works []ShareWorkOption) {
 				}
 			}
 		</style>
-		<section class="verse-share-panel verse-panel">
+		<section
+			class="verse-share-panel verse-panel"
+			data-public-address-configured={ fmt.Sprintf("%t", publicAddressConfigured) }
+		>
 			@CSRFField(ctx)
 			<p class="verse-eyebrow">Share</p>
 			<div class="verse-share-picker">

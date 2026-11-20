@@ -3,7 +3,8 @@ package templ
 // Share is the author's sharing screen.
 //
 // The works come from the handler because the picker needs them; the bodies do not, because they are
-// fetched only when an action needs one.
-templ Share(works []ShareWorkOption) {
-	@Screen("Share", ShareContent(works))
+// fetched only when an action needs one. The configuration flag lets Copy Link explain up front
+// that the reader origin has not been set, rather than letting the author click and fail.
+templ Share(works []ShareWorkOption, publicAddressConfigured bool) {
+	@Screen("Share", ShareContent(works, publicAddressConfigured))
 }

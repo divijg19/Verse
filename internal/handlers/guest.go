@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html"
 	"log"
 	"net/http"
@@ -103,23 +104,32 @@ func GuestEditorHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The editor shows the link's own continuous body, not the work's current text. The draft is
-	// seeded from the work on first open and then belongs to the guest for the link's window.
-	draft, err := services.GetOrCreateGuestDraft(r.Context(), services.PrivateLinkSession{
-		LinkID: guest.LinkID, PoemID: guest.PoemID,
-	}, poem.Content)
+	session := services.PrivateLinkSession{LinkID: guest.LinkID, PoemID: guest.PoemID}
+
+	// The primary draft is seeded from the work on first open. Alternatives are real branches with
+	// their own continuous body, created by an explicit send; a crafted branch cannot create one.
+	primary, err := services.GetOrCreateGuestDraft(r.Context(), session, services.PrimaryBranch, poem.Content)
 	if err != nil {
-		if errors.Is(err, services.ErrNoLink) || errors.Is(err, services.ErrNotFound) {
-			http.NotFound(w, r)
-			return
-		}
-		fail500(w, r, "failed to load the shared draft", err)
+		writeGuestLoadError(w, r, err)
 		return
 	}
 
-	counts, err := services.CountProposalsByLink(r.Context(), guest.PoemID)
+	branch := r.URL.Query().Get("branch")
+	if branch == "" {
+		branch = services.PrimaryBranch
+	}
+	draft := primary
+	if branch != services.PrimaryBranch {
+		draft, err = services.GetGuestDraft(r.Context(), session, branch)
+		if err != nil {
+			writeGuestLoadError(w, r, err)
+			return
+		}
+	}
+
+	branches, err := services.ListGuestBranches(r.Context(), guest.LinkID)
 	if err != nil {
-		fail500(w, r, "failed to count submissions", err)
+		fail500(w, r, "failed to list the shared branches", err)
 		return
 	}
 
@@ -128,16 +138,44 @@ func GuestEditorHandler(w http.ResponseWriter, r *http.Request) {
 		remaining = 0
 	}
 
+	branchViews := make([]templ.GuestBranchView, 0, len(branches))
+	alternative := 0
+	for _, item := range branches {
+		label := "Main version"
+		if item.Branch != services.PrimaryBranch {
+			alternative++
+			label = fmt.Sprintf("Alternative %d", alternative)
+		}
+		branchViews = append(branchViews, templ.GuestBranchView{
+			Branch:    item.Branch,
+			Label:     label,
+			Selected:  item.Branch == branch,
+			Changed:   item.Changed,
+			Submitted: item.Submitted,
+		})
+	}
+
 	page := templ.GuestEditor(templ.GuestEditorData{
-		Title:       presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
-		Content:     draft.Content,
-		GuestName:   draft.GuestName,
-		Changed:     draft.BaseHash != services.ContentHash(draft.Content),
-		BranchCount: counts[guest.LinkID],
-		ExpiresAt:   guest.ExpiresAt,
-		Minutes:     int(remaining / time.Minute),
+		Title:     presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
+		Content:   draft.Content,
+		GuestName: draft.GuestName,
+		Changed:   draft.BaseHash != services.ContentHash(draft.Content),
+		Branch:    draft.Branch,
+		Branches:  branchViews,
+		ExpiresAt: guest.ExpiresAt,
+		Minutes:   int(remaining / time.Minute),
 	})
 	renderGuest(w, r, page)
+}
+
+func writeGuestLoadError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrNoLink), errors.Is(err, services.ErrNoDraft),
+		errors.Is(err, services.ErrNotFound), errors.Is(err, services.ErrInvalidSubmission):
+		http.NotFound(w, r)
+	default:
+		fail500(w, r, "failed to load the shared draft", err)
+	}
 }
 
 // GuestDraftHandler autosaves the continuous body for this link.
@@ -154,7 +192,7 @@ func GuestDraftHandler(w http.ResponseWriter, r *http.Request) {
 
 	draft, changed, err := services.SaveGuestDraft(r.Context(), services.PrivateLinkSession{
 		LinkID: guest.LinkID, PoemID: guest.PoemID,
-	}, r.PostFormValue("content"), r.PostFormValue("name"))
+	}, branchFromForm(r), r.PostFormValue("content"), r.PostFormValue("name"))
 	if err != nil {
 		writeGuestJSONError(w, err)
 		return
@@ -178,11 +216,11 @@ func GuestProposalHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alternative := r.PostFormValue("branch") == "alternative"
 	_, _, err := services.SubmitGuestDraft(r.Context(), services.PrivateLinkSession{
 		LinkID: guest.LinkID,
 		PoemID: guest.PoemID,
-	}, r.PostFormValue("content"), r.PostFormValue("name"), alternative, r.PostFormValue("submission_id"))
+	}, branchFromForm(r), r.PostFormValue("source_branch"), r.PostFormValue("content"),
+		r.PostFormValue("name"), r.PostFormValue("submission_id"))
 	if err != nil {
 		writeGuestServiceError(w, r, err)
 		return
@@ -190,6 +228,16 @@ func GuestProposalHandler(w http.ResponseWriter, r *http.Request) {
 
 	name := cleanGuestName(r.PostFormValue("name"))
 	renderGuest(w, r, templ.GuestProposalSent(name))
+}
+
+// branchFromForm reads the selected branch from the hidden field the editor's script keeps in sync
+// with the clicked submit button. An empty value is the primary branch for the no-JS form.
+func branchFromForm(r *http.Request) string {
+	branch := r.PostFormValue("branch")
+	if branch == "" {
+		return services.PrimaryBranch
+	}
+	return branch
 }
 
 // writeGuestServiceError maps service errors onto the statuses the guest surface has always used.
@@ -262,11 +310,7 @@ func cleanGuestName(raw string) string {
 	return name
 }
 
-// writeGuestValidationError reports a rejected suggestion with the validator's own status.
-//
-// The author's forms use writeValidationError, which preserves the 400/413 distinction. The guest
-// surface used to discard it and answer 200 with an error page, so a client could not tell a stored
-// proposal from a rejected one. The message stays escaped for the same reason as everywhere else.
+// writeGuestValidationError preserves the validator's 400/413 status and escapes its message.
 func writeGuestValidationError(w http.ResponseWriter, err error) {
 	var ve *validationError
 	if !errors.As(err, &ve) {

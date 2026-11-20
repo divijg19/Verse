@@ -12,8 +12,9 @@ import templruntime "github.com/a-h/templ/runtime"
 // Share is the author's sharing screen.
 //
 // The works come from the handler because the picker needs them; the bodies do not, because they are
-// fetched only when an action needs one.
-func Share(works []ShareWorkOption) templ.Component {
+// fetched only when an action needs one. The configuration flag lets Copy Link explain up front
+// that the reader origin has not been set, rather than letting the author click and fail.
+func Share(works []ShareWorkOption, publicAddressConfigured bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -30,7 +31,7 @@ func Share(works []ShareWorkOption) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = Screen("Share", ShareContent(works)).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Screen("Share", ShareContent(works, publicAddressConfigured)).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

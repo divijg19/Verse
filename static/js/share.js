@@ -237,8 +237,16 @@
     }
     const option = select.selectedOptions[0];
     const published = option?.getAttribute("data-published") === "true";
-    button.disabled = !published;
-    button.title = published ? "" : "Publish this work first";
+    const configured =
+      document
+        .querySelector("[data-public-address-configured]")
+        ?.getAttribute("data-public-address-configured") === "true";
+    button.disabled = !published || !configured;
+    button.title = !published
+      ? "Publish this work first"
+      : !configured
+        ? "Set PUBLIC_BASE_URL to the reader origin"
+        : "";
     const hint = document.querySelector(".verse-share-link-hint");
     if (hint) {
       hint.hidden = published;
@@ -331,7 +339,11 @@ ${data.body}`);
             return;
           }
           if (!data.address) {
-            report("The public address is not configured.");
+            report(
+              data.publicAddressConfigured
+                ? "This work has no public address yet."
+                : "Set PUBLIC_BASE_URL to the reader origin to copy a public link.",
+            );
             return;
           }
           const ok = await copyText(data.address);

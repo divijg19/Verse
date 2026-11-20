@@ -36,7 +36,7 @@ func ShareHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	renderSurface(w, r, "share", templ.Share(options))
+	renderSurface(w, r, "share", templ.Share(options, shareAddress() != ""))
 }
 
 // ShareWorkHandler returns one work's share data as JSON.
@@ -70,6 +70,7 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 	if state.Published && baseURL != "" {
 		address = baseURL + "/w/" + poem.ID + "/"
 	}
+	publicAddressConfigured := baseURL != ""
 
 	published := ""
 	if state.PublishedAt != nil {
@@ -88,19 +89,21 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 
 	body := presenters.BodyWithoutTitle(poem.Content)
 	out := struct {
-		Title       string                  `json:"title"`
-		Body        string                  `json:"body"`
-		Address     string                  `json:"address"`
-		Published   string                  `json:"published"`
-		IsPublished bool                    `json:"isPublished"`
-		Links       []templ.PrivateLinkView `json:"links"`
+		Title                   string                  `json:"title"`
+		Body                    string                  `json:"body"`
+		Address                 string                  `json:"address"`
+		Published               string                  `json:"published"`
+		IsPublished             bool                    `json:"isPublished"`
+		PublicAddressConfigured bool                    `json:"publicAddressConfigured"`
+		Links                   []templ.PrivateLinkView `json:"links"`
 	}{
-		Title:       presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
-		Body:        body,
-		Address:     address,
-		Published:   published,
-		IsPublished: state.Published,
-		Links:       links,
+		Title:                   presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
+		Body:                    body,
+		Address:                 address,
+		Published:               published,
+		IsPublished:             state.Published,
+		PublicAddressConfigured: publicAddressConfigured,
+		Links:                   links,
 	}
 
 	shareJSON(w, out)

@@ -30,6 +30,17 @@ describe("mergeEnvAt", () => {
     expect(contents).toContain("PUBLIC_BASE_URL=http://localhost:4000");
   });
 
+  test("fills a blank reader origin in place", () => {
+    const path = envPath();
+    writeFileSync(path, "PUBLIC_BASE_URL=\nVERSE_AUTHORIZATION=kept\n");
+
+    mergeEnvAt(path);
+
+    const contents = readFileSync(path, "utf8");
+    expect(contents.split("PUBLIC_BASE_URL=").length - 1).toBe(1);
+    expect(contents).toContain("PUBLIC_BASE_URL=http://localhost:4000");
+  });
+
   test("keeps a reader origin the developer already chose", () => {
     const path = envPath();
     writeFileSync(

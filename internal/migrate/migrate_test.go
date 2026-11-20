@@ -363,6 +363,55 @@ func TestRun009CollapsesDuplicateProposals(t *testing.T) {
 	}
 }
 
+// TestMigrationsGiveEachBranchItsOwnDraft pins the v0.5.6 key: one body per link and branch, with a
+// branch vocabulary matching work_proposals. A regression to one-draft-per-link would make two
+// submitted alternatives silently share a body.
+func TestMigrationsGiveEachBranchItsOwnDraft(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	if _, err := run(ctx, pool, migrations.FS); err != nil {
+		t.Fatalf("apply all migrations: %v", err)
+	}
+
+	const poemID = "11111111-1111-4111-8111-111111111111"
+	const linkID = "22222222-2222-4222-8222-222222222222"
+	if _, err := pool.Exec(ctx, `INSERT INTO poems (id, content) VALUES ($1, 'a work')`, poemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO private_links (id, poem_id, token_hash, expires_at)
+        VALUES ($1, $2, 'hash', now() + interval '8 hours')`, linkID, poemID); err != nil {
+		t.Fatal(err)
+	}
+	for _, branch := range []string{
+		"primary",
+		"alt:33333333-3333-4333-8333-333333333333",
+	} {
+		if _, err := pool.Exec(ctx, `INSERT INTO guest_drafts
+            (link_id, poem_id, branch, content, base_hash) VALUES ($1, $2, $3, 'body', 'hash')`,
+			linkID, poemID, branch); err != nil {
+			t.Fatalf("insert branch %s: %v", branch, err)
+		}
+	}
+
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT count(*)::int FROM guest_drafts WHERE link_id = $1`, linkID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("%d drafts survived, want one per branch", count)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO guest_drafts
+        (link_id, poem_id, branch, content, base_hash) VALUES ($1, $2, 'primary', 'other', 'hash')`,
+		linkID, poemID); err == nil {
+		t.Error("the composite key allowed a second primary draft for the same link")
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO guest_drafts
+        (link_id, poem_id, branch, content, base_hash) VALUES ($1, $2, 'alt:not-a-uuid', 'body', 'hash')`,
+		linkID, poemID); err == nil {
+		t.Error("the branch CHECK accepted an alternative id that the service cannot generate")
+	}
+}
+
 // --- 7. A file with no SQL is handled, and the two flavors differ ---
 
 // TestRunSkipsWhitespaceOnlyMigration covers a file that is empty once trimmed.

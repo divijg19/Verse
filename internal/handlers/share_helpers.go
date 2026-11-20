@@ -26,8 +26,20 @@ func shareJSON(w http.ResponseWriter, value any) {
 }
 
 // shareAddress is the reader-facing base, shared by the share data and the link endpoints.
+//
+// A malformed value must not become a link copied with a success message, so the value is parsed
+// here. An empty string means "not configured" and is the only safe fallback: the authoring service
+// cannot know the reader's origin from the request, because the two are different services.
 func shareAddress() string {
-	return strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/")
+	value := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL"))
+	if value == "" {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return ""
+	}
+	return strings.TrimRight(value, "/")
 }
 
 // guestLinkURL builds the shareable URL the author copies on the authoring service's own origin.

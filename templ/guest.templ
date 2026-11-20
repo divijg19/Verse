@@ -1,6 +1,24 @@
 package templ
 
-import "fmt"
+import (
+	"fmt"
+	"net/url"
+)
+
+// guestBranchHref links to a branch's editable draft. The primary branch needs no query parameter.
+func guestBranchHref(branch string) string {
+	if branch == "primary" {
+		return "/guest/edit"
+	}
+	return "/guest/edit?branch=" + url.QueryEscape(branch)
+}
+
+func guestSelectedAttr(selected bool) string {
+	if selected {
+		return "page"
+	}
+	return ""
+}
 
 // guestThanks is a helper so the greeting stays a single templ expression.
 func guestThanks(name string) string {
@@ -39,8 +57,45 @@ templ GuestEditor(data GuestEditorData) {
 				}
 				.verse-guest-shell {
 					width: 100%;
-					max-width: 46rem;
+					max-width: 62rem;
 					margin: 0 auto;
+				}
+				.verse-guest-layout {
+					display: flex;
+					align-items: stretch;
+					gap: 1rem;
+				}
+				.verse-guest-branches {
+					flex: 0 0 11rem;
+					display: flex;
+					flex-direction: column;
+					gap: 0.4rem;
+					min-width: 0;
+				}
+				.verse-guest-main { flex: 1 1 auto; min-width: 0; }
+				.verse-guest-branch {
+					display: block;
+					text-decoration: none;
+					border: 1px solid rgb(38 38 38);
+					border-radius: 0.5rem;
+					background: rgba(10, 10, 10, 0.5);
+					padding: 0.65rem 0.7rem;
+					color: rgb(196 181 253);
+					font-size: 0.78rem;
+					line-height: 1.35;
+					overflow-wrap: anywhere;
+				}
+				.verse-guest-branch:hover { border-color: rgb(82 82 82); }
+				.verse-guest-branch--selected {
+					border-color: rgb(168 85 247);
+					background: rgba(63, 33, 101, 0.4);
+					color: rgb(245 245 245);
+				}
+				.verse-guest-branch small {
+					display: block;
+					margin-top: 0.2rem;
+					font-size: 0.66rem;
+					color: rgb(115 115 115);
 				}
 				.verse-guest-card {
 					border: 1px solid rgb(38, 38, 38);
@@ -104,10 +159,16 @@ templ GuestEditor(data GuestEditorData) {
 					font-size: 1.05rem;
 					line-height: 1.65;
 				}
-				.verse-guest-submit {
-					width: 100%;
-					min-height: 2.625rem;
+				.verse-guest-actions {
+					display: flex;
+					gap: 0.5rem;
 					margin-top: 1rem;
+				}
+				.verse-guest-submit {
+					flex: 1 1 0;
+					min-width: 0;
+					min-height: 2.625rem;
+					padding: 0.5rem;
 					border: none;
 					border-radius: 0.375rem;
 					background: rgb(147, 51, 234);
@@ -119,7 +180,6 @@ templ GuestEditor(data GuestEditorData) {
 				.verse-guest-submit:hover:not(:disabled) { background: rgb(168, 85, 247); }
 				.verse-guest-submit:disabled { cursor: not-allowed; opacity: 0.45; }
 				.verse-guest-alternative {
-					margin-top: 0.5rem;
 					background: transparent;
 					border: 1px solid rgb(63 33 101);
 					color: rgb(192 132 252);
@@ -143,6 +203,15 @@ templ GuestEditor(data GuestEditorData) {
 				@media (max-width: 639px) {
 					.verse-guest-card { padding: 1rem; border-radius: 0.85rem; }
 					.verse-guest-textarea { min-height: 16rem; }
+					.verse-guest-layout { flex-direction: column; }
+					.verse-guest-branches {
+						flex: none;
+						flex-direction: row;
+						overflow-x: auto;
+						padding-bottom: 0.35rem;
+					}
+					.verse-guest-branch { flex: 0 0 auto; max-width: 11rem; }
+					.verse-guest-submit { font-size: 0.85rem; }
 				}
 			</style>
 		</head>
@@ -155,67 +224,95 @@ templ GuestEditor(data GuestEditorData) {
 						This link closes at { data.ExpiresAt.UTC().Format("Jan 2, 2006 15:04 UTC") } —
 						about { fmt.Sprintf("%d", data.Minutes) } minutes from now.
 					</p>
-					<form
-						method="post"
-						action="/guest/propose"
-						class="verse-guest-form"
-						data-guest-changed={ fmt.Sprintf("%t", data.Changed) }
-					>
-						@CSRFField(ctx)
-						<input type="hidden" name="submission_id" data-guest-submission value=""/>
-						<input type="hidden" name="branch" data-guest-branch value="primary"/>
-						<label class="verse-guest-label" for="guest-name">Your name (optional)</label>
-						<input
-							id="guest-name"
-							class="verse-guest-name"
-							type="text"
-							name="name"
-							maxlength="80"
-							autocomplete="name"
-							placeholder="Anonymous"
-							value={ data.GuestName }
-						/>
-						<label class="verse-guest-label" for="guest-content">Your suggested version</label>
-						<textarea
-							id="guest-content"
-							class="verse-guest-textarea"
-							name="content"
-							required
-							spellcheck="true"
-						>{ data.Content }</textarea>
-						<p class="verse-guest-status" data-guest-status role="status" aria-live="polite">
-							if data.Changed {
-								Saved · ready to send
-							} else {
-								No changes since your last send
+					<div class="verse-guest-layout">
+						<nav class="verse-guest-branches" aria-label="Your versions" data-guest-branches>
+							for _, branch := range data.Branches {
+								<a
+									href={ guestBranchHref(branch.Branch) }
+									class={ "verse-guest-branch", templ.KV("verse-guest-branch--selected", branch.Selected) }
+									data-guest-branch-tab={ branch.Branch }
+									aria-current={ guestSelectedAttr(branch.Selected) }
+								>
+									{ branch.Label }
+									<small>
+										if !branch.Submitted {
+											Not sent yet
+										} else if branch.Changed {
+											Edited since send
+										} else {
+											Sent
+										}
+									</small>
+								</a>
 							}
-						</p>
-						<button
-							type="submit"
-							name="branch"
-							value="primary"
-							data-guest-send="primary"
-							class="verse-guest-submit"
-							if !data.Changed {
-								disabled
-							}
-						>Send suggestion</button>
-						<button
-							type="submit"
-							name="branch"
-							value="alternative"
-							data-guest-send="alternative"
-							class="verse-guest-submit verse-guest-alternative"
-							if !data.Changed {
-								disabled
-							}
-						>Send as alternative</button>
-					</form>
-					<p class="verse-guest-footnote">
-						Your changes are sent to the author as a suggestion. They are not applied to the
-						work automatically. "Send as alternative" keeps the current version and sends
-						this one beside it. This page is temporary and is not indexed.
-					</p>
+						</nav>
+						<div class="verse-guest-main">
+							<form
+								method="post"
+								action="/guest/propose"
+								class="verse-guest-form"
+								data-guest-changed={ fmt.Sprintf("%t", data.Changed) }
+							>
+								@CSRFField(ctx)
+								<input type="hidden" name="submission_id" data-guest-submission value=""/>
+								<input type="hidden" name="branch" data-guest-branch value={ data.Branch }/>
+								<input type="hidden" name="source_branch" data-guest-source value={ data.Branch }/>
+								<label class="verse-guest-label" for="guest-name">Your name (optional)</label>
+								<input
+									id="guest-name"
+									class="verse-guest-name"
+									type="text"
+									name="name"
+									maxlength="80"
+									autocomplete="name"
+									placeholder="Anonymous"
+									value={ data.GuestName }
+								/>
+								<label class="verse-guest-label" for="guest-content">Your suggested version</label>
+								<textarea
+									id="guest-content"
+									class="verse-guest-textarea"
+									name="content"
+									required
+									spellcheck="true"
+								>{ data.Content }</textarea>
+								<p class="verse-guest-status" data-guest-status role="status" aria-live="polite">
+									if data.Changed {
+										Saved · ready to send
+									} else {
+										No changes since your last send
+									}
+								</p>
+								<div class="verse-guest-actions">
+									<button
+										type="submit"
+										name="branch"
+										value="primary"
+										data-guest-send="primary"
+										class="verse-guest-submit"
+										if !data.Changed {
+											disabled
+										}
+									>Send main version</button>
+									<button
+										type="submit"
+										name="branch"
+										value="new"
+										data-guest-send="alternative"
+										class="verse-guest-submit verse-guest-alternative"
+										if !data.Changed {
+											disabled
+										}
+									>Send another version</button>
+								</div>
+							</form>
+							<p class="verse-guest-footnote">
+								Each version has its own draft on the left. "Send another version" keeps the
+								current one and opens a new alternative beside it. Nothing is applied to the
+								author's work until they choose to. This page is temporary and is not indexed.
+							</p>
+						</div>
+					</div>
 				</div>
 			</main>
 		</body>
@@ -277,6 +374,7 @@ templ GuestProposalSent(name string) {
 					Your suggested version is with the author. It is kept separately and will not change
 					the work until they choose to apply it.
 				</p>
+				<p><a href="/guest/edit">Back to your versions</a></p>
 			</main>
 		</body>
 	</html>

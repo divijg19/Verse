@@ -115,8 +115,8 @@
     const branchField = form.querySelector("[data-guest-branch]");
     for (const button of [sendButton, alternativeButton]) {
       button?.addEventListener("click", () => {
-        if (branchField && button.dataset.guestSend) {
-          branchField.value = button.dataset.guestSend;
+        if (branchField && button.value) {
+          branchField.value = button.value;
         }
       });
     }

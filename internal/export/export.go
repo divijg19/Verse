@@ -1,15 +1,8 @@
 // Package export produces a complete, lossless copy of the work outside the database.
 //
-// This exists because the author's writing had exactly three ways out of the application -- the
-// editor, the reader, and hand-written SQL -- and no way to take it away intact. A provider incident
-// or a mistaken migration was total loss. Combined with the history added in v0.4.4, the database is
-// now the only copy of the work, which makes being able to extract it a correctness property rather
-// than a convenience.
-//
-// The guarantee this package makes is that an export is lossless: re-reading an export and
-// comparing it to the database yields byte-identical content for every poem and every retained
-// version. The format therefore stores text verbatim and never normalizes it -- no trimming, no
-// newline translation, no truncation. Anything that altered a poem on the way out would make the
+// The database is the only copy of the author's writing, so extraction is a correctness property.
+// An export is byte-identical to the source: text is stored verbatim, with no trimming, newline
+// translation or truncation. Anything that altered a poem on the way out would make the
 // export a lossy summary of the thing it claims to preserve.
 package export
 
@@ -325,18 +318,8 @@ func Build(ctx context.Context, opts Options) (Document, error) {
 	}
 	p := database.Pool
 
-	// The filter is in the query, not in the loop below.
-	//
-	// It used to be in the loop, which meant the query returned every row in the table and the
-	// export decided in Go which of them to keep. For the published export that read every draft's
-	// full text out of the database -- five times more content than it kept, on this library --
-	// and put it in memory, on every publish action and every artifact build, in order to throw it
-	// away.
-	//
-	// Two reasons to push it down. It is less data over the wire and less work in Go. And it is
-	// one spelling of the published predicate rather than two: the Go form below was the same rule
-	// as models.PublishedFilter written a third way, and the test that refuses a second spelling
-	// cannot see a rule written in Go at all.
+	// The published filter lives in the query, not in a Go loop: it keeps drafts' text out of memory
+	// and keeps one spelling of models.PublishedFilter, which source-level tests can see.
 	//
 	// The published filter is models.PublishedFilter rather than a second literal, for the reason
 	// that constant exists: this predicate is the boundary of the author/viewer split.
@@ -370,20 +353,10 @@ func Build(ctx context.Context, opts Options) (Document, error) {
 		return doc, fmt.Errorf("read poems: %w", err)
 	}
 
-	// Versions for every retained poem, in one query.
-	//
-	// This was one query per poem, which for a library of any size meant thousands of round trips
-	// inside a single 30s request timeout. It is now a second scan of poem_versions with no join at
-	// all, grouped into a map below. The comment here used to describe a LEFT JOIN over both tables
-	// that returned the same rows, which described an approach this code does not use and would be a
-	// poor guide to anyone following it: the join is unnecessary when the versions are grouped in
-	// Go anyway, and joining poems to versions would re-read every poem body.
+	// Versions are read in one scan of poem_versions and grouped below. A join would re-read every
+	// poem body for no benefit.
 	if opts.PublishedOnly {
-		// The published export carries no history, so it does not read any.
-		//
-		// The query used to run and its result was discarded, which was a full scan of the whole
-		// revision history on every publish for data the export does not carry. See the
-		// PublishedOnly field's comment for why it carries none.
+		// The published export carries no history; see PublishedOnly for why.
 		for i := range doc.Poems {
 			doc.Poems[i].Versions = []Version{}
 		}

@@ -38,7 +38,7 @@ func TestTrackedMarkdownLinksResolve(t *testing.T) {
 
 	// Only the files a reader is pointed at by name. CHANGELOG-style archives and vendored trees
 	// are not in the repository, so nothing is excluded for that reason.
-	docs := []string{"README.md", "RUNNING.md", "CONTRIBUTING.md"}
+	docs := []string{"README.md", "ARCHITECTURE.md", "RUNNING.md", "CONTRIBUTING.md"}
 
 	totalChecked := 0
 	for _, doc := range docs {

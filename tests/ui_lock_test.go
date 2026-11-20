@@ -14,7 +14,7 @@ import (
 )
 
 func TestSharedScreenLayoutLocksViewport(t *testing.T) {
-	body := renderComponent(t, views.Layout("share", views.Share(nil)))
+	body := renderComponent(t, views.Layout("share", views.Share(nil, true)))
 
 	assertContainsAll(t, body,
 		`<body class="bg-neutral-950 text-neutral-200 h-screen overflow-hidden">`,
@@ -138,7 +138,7 @@ func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
 // still worked because its handler calls the close function directly. The state flag and the
 // control selector must stay separate names.
 func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
-	layout := renderComponent(t, views.Layout("share", views.Share(nil)))
+	layout := renderComponent(t, views.Layout("share", views.Share(nil, true)))
 	if !strings.Contains(layout, `[data-editor-overlay-active="true"] #screen {`) {
 		t.Fatalf("layout does not style the viewport from data-editor-overlay-active: %q", layout)
 	}
@@ -229,6 +229,8 @@ func TestDashboardPlacesOverviewAboveRecentAndKeepsSidebarQuickActions(t *testin
 		`class="verse-dashboard-stat verse-dashboard-overview-stat"`,
 		`gap: clamp(1.85rem, 3vw, 2.35rem);`,
 		`min-width: 8.5rem;`,
+		`gap: 0.4rem;`,
+		`flex: 1 1 0;`,
 		`min-height: 2.625rem;`,
 		`font-size: 1rem;`,
 		`--verse-heatmap-cell: 1.98rem;`,
@@ -299,7 +301,7 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 		{ID: "aaaa", Title: "A Published Work", Published: true},
 		{ID: "bbbb", Title: "A Draft Work", Published: false},
 	}
-	body := renderComponent(t, views.Share(works))
+	body := renderComponent(t, views.Share(works, true))
 
 	assertContainsAll(t, body,
 		`>Share</h1>`,
@@ -335,7 +337,7 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 // would work on a full load and silently fail on navigation. The layout loads the bundle once,
 // and the bundle re-initializes after each swap.
 func TestShareBundleIsLoadedByTheLayout(t *testing.T) {
-	layout := renderComponent(t, views.Layout("share", views.Share(nil)))
+	layout := renderComponent(t, views.Layout("share", views.Share(nil, true)))
 	if !strings.Contains(layout, `<script src="/static/js/share.js"></script>`) {
 		t.Fatal("the layout does not load the Share bundle")
 	}

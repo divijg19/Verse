@@ -391,7 +391,7 @@ func TestPrimarySubmissionUpdatesAndAlternativeBranches(t *testing.T) {
 	}
 
 	// An explicit alternative keeps the primary and adds a second branch.
-	send(original+"\nAn alternative version.", "alternative")
+	send(original+"\nAn alternative version.", "new")
 	proposals, err = services.ListWorkProposals(t.Context(), id)
 	if err != nil || len(proposals) != 2 {
 		t.Fatalf("proposals after alternative = %+v, err = %v", proposals, err)
@@ -407,6 +407,107 @@ func TestPrimarySubmissionUpdatesAndAlternativeBranches(t *testing.T) {
 	}
 	if !foundPrimary || !foundAlt {
 		t.Errorf("branches are wrong: %+v", proposals)
+	}
+}
+
+func TestGuestBranchTabsHaveIndependentDrafts(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	const original = "A Work\n\nThe original body."
+	id := insertPoem(t, original)
+	srv := newTestServer(t)
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+
+	send := func(content, branch string) {
+		status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+		if status != http.StatusOK {
+			t.Fatalf("editor = %d", status)
+		}
+		form := url.Values{"csrf": {csrfFromBody(t, editor)}, "content": {content}, "name": {"Ada"}}
+		if branch != "" {
+			form.Set("branch", branch)
+		}
+		status, body, _ := guestPost(t, guest, srv.URL+"/guest/propose", form)
+		if status != http.StatusOK {
+			t.Fatalf("submit to %q = %d; body: %s", branch, status, truncate([]byte(body)))
+		}
+	}
+
+	send(original+"\nMain version.", "")
+	send(original+"\nAlternative version.", "new")
+	proposals, err := services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposals) != 2 {
+		t.Fatalf("proposals = %+v, err = %v", proposals, err)
+	}
+	altBranch := ""
+	for _, proposal := range proposals {
+		if strings.HasPrefix(proposal.Branch, "alt:") {
+			altBranch = proposal.Branch
+		}
+	}
+	if altBranch == "" {
+		t.Fatal("no alternative branch was created")
+	}
+
+	status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+	if status != http.StatusOK {
+		t.Fatalf("editor = %d", status)
+	}
+	if !strings.Contains(editor, "Main version") || !strings.Contains(editor, "Alternative 1") ||
+		!strings.Contains(editor, "data-guest-branch-tab") {
+		t.Errorf("branch rail is missing tabs: %s", truncate([]byte(editor)))
+	}
+
+	// Switching to the alternative shows its own body, and autosaving it leaves the main draft alone.
+	status, altEditor, _ := guestGet(t, guest, srv.URL+"/guest/edit?branch="+url.QueryEscape(altBranch))
+	if status != http.StatusOK || !strings.Contains(altEditor, "Alternative version.") {
+		t.Fatalf("alternative editor = %d; body: %s", status, truncate([]byte(altEditor)))
+	}
+	if !strings.Contains(altEditor, `data-guest-branch value="`+altBranch+`"`) {
+		t.Errorf("alternative editor did not select its branch: %s", truncate([]byte(altEditor)))
+	}
+	csrf := csrfFromBody(t, altEditor)
+	status, _, _ = guestPost(t, guest, srv.URL+"/guest/draft", url.Values{
+		"csrf": {csrf}, "branch": {altBranch}, "content": {original + "\nEdited alternative."},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("alternative autosave = %d", status)
+	}
+
+	status, mainEditor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+	if status != http.StatusOK || !strings.Contains(mainEditor, "Main version.") ||
+		strings.Contains(mainEditor, "Edited alternative.") {
+		t.Errorf("main draft was changed by the alternative autosave: %s", truncate([]byte(mainEditor)))
+	}
+
+	// A changed alternative updates only its own submission.
+	status, altEditor, _ = guestGet(t, guest, srv.URL+"/guest/edit?branch="+url.QueryEscape(altBranch))
+	if status != http.StatusOK {
+		t.Fatalf("alternative editor = %d", status)
+	}
+	status, _, _ = guestPost(t, guest, srv.URL+"/guest/propose", url.Values{
+		"csrf": {csrfFromBody(t, altEditor)}, "branch": {altBranch},
+		"content": {original + "\nEdited alternative."},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("alternative submit = %d", status)
+	}
+	proposals, err = services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposals) != 2 {
+		t.Fatalf("proposals after alternative update = %+v, err = %v", proposals, err)
+	}
+	for _, proposal := range proposals {
+		if proposal.Branch == altBranch && !strings.Contains(proposal.Content, "Edited alternative.") {
+			t.Errorf("alternative proposal was not updated: %+v", proposal)
+		}
+		if proposal.Branch == services.PrimaryBranch && !strings.Contains(proposal.Content, "Main version.") {
+			t.Errorf("primary proposal was overwritten: %+v", proposal)
+		}
 	}
 }
 

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -33,6 +35,16 @@ func main() {
 	// TestRenderYamlBuildCommandStampsTheVersion now reads render.yaml's buildCommand to check the
 	// two have not drifted apart again.
 	log.Printf("verse starting, version %s", version)
+	// Private links derive their origin from the request, but Copy Link needs the reader's origin
+	// from configuration. A missing or malformed value does not stop the service; saying so at boot
+	// makes a broken Copy Link diagnosable without clicking it first.
+	if base := strings.TrimSpace(os.Getenv("PUBLIC_BASE_URL")); base == "" {
+		log.Printf("PUBLIC_BASE_URL is not set; Copy Link on the Share screen will report that the public address is not configured")
+	} else if parsed, err := url.Parse(base); err != nil ||
+		(parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		// %q escapes control characters, so a crafted value cannot forge a second log line.
+		log.Printf("PUBLIC_BASE_URL %q is not an absolute http(s) URL; Copy Link will be unavailable", base) // #nosec G706 -- %q is the mitigation
+	}
 	if err := run(); err != nil {
 		log.Fatalf("verse: %v", err)
 	}

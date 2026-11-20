@@ -315,21 +315,11 @@ func CountProposalsByLink(ctx context.Context, poemID string) (map[string]int, e
 	return counts, nil
 }
 
-// ApplyWorkProposal writes a suggestion to the work and marks it applied, atomically.
-//
-// This used to be two statements -- UpdatePoem followed by a separate mark -- which let two
-// simultaneous applies both pass the "not yet applied" check, write the draft twice, and insert two
-// history versions. It also left the content changed but the proposal unmarked if the process died
-// between them, so a retry would duplicate the version again.
-//
-// The proposal row is locked first, then the poem, in one transaction. The submit path locks the
-// draft before the proposal, so neither path holds the other's lock when it asks for its own. The
-// retained-version rule is the same one UpdatePoem uses: a version is recorded only when the text
-// actually changes. Applying an identical suggestion is a no-op for history, but still marks the
-// proposal as dealt with.
-//
-// Applying one branch unmarks its siblings, so exactly one submission per work is "applied" at a
-// time. Submitting new text on the primary branch also clears its own applied_at in the upsert.
+// ApplyWorkProposal writes a suggestion and marks it applied in one transaction, so a double click
+// cannot write the draft twice. The proposal is locked before the poem; the submit path locks a
+// draft before a proposal, so the two paths cannot deadlock. A version is retained only when the text
+// changes, as in UpdatePoem. Applying one branch unmarks its siblings, leaving one applied submission
+// per work.
 func ApplyWorkProposal(ctx context.Context, poemID, proposalID string) error {
 	if err := database.Require(); err != nil {
 		return err

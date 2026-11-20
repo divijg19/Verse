@@ -94,17 +94,8 @@ func refuseForbidden(w http.ResponseWriter, cfg *authConfig, reason string) {
 // A secret shorter than this is treated exactly like an absent one, and both are reported by name.
 const minAuthSecretLen = 32
 
-// minPassphraseLen is the shortest VERSE_AUTHORIZATION accepted.
-//
-// This floor did not exist until v0.4.2, which made it the weaker of the pair: the HMAC secret
-// needed 32 characters while the passphrase guarding the entire archive needed only one. That is
-// backwards, and it matters more than usual here because the login route has no rate limiting
-// history to rely on and, until this release, no rate limiting at all -- an unthrottled single
-// shared secret is a guessing target rather than a passphrase.
-//
-// 16 characters is roughly what four ordinary words provide, which keeps it honest without forcing
-// a memorable passphrase to look like machine output. There is no way to measure the entropy of a
-// string, so this is a floor on length and nothing more; "aaaaaaaaaaaaaaaa" passes it.
+// minPassphraseLen is the shortest VERSE_AUTHORIZATION accepted. Sixteen characters is roughly four
+// ordinary words. Length is the only measurable floor here; it says nothing about entropy.
 const minPassphraseLen = 16
 
 // loadAuthConfig reads and validates the authentication environment. It returns an error naming

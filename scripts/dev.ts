@@ -170,12 +170,8 @@ export function mergeEnvAt(path: string): void {
     missing.push("VERSE_AUTH_SECRET");
     additions.push(`VERSE_AUTH_SECRET=${randomHex(24)}`);
   }
-  // Copy Link needs the reader's origin. The public dev server always listens on 4000, so this can
-  // be filled in without asking the developer; the publisher still passes -base-url explicitly.
-  if (!keys.has("PUBLIC_BASE_URL")) {
-    missing.push("PUBLIC_BASE_URL");
-    additions.push(`PUBLIC_BASE_URL=http://localhost:${publicPort}`);
-  }
+  // Copy Link needs the reader's origin. A blank value is not a developer choice: it is the shape
+  // an older .env leaves behind. Replace it in place so a second run does not append another copy.
 
   // DATABASE_URL is replaced where it is, not appended.
   //
@@ -185,6 +181,24 @@ export function mergeEnvAt(path: string): void {
   // the last definition, a rule nothing in the file says.
   let lines = existing.split("\n");
   let replaced = false;
+
+  const publicBase = `PUBLIC_BASE_URL=http://localhost:${publicPort}`;
+  let publicBaseSeen = false;
+  lines = lines.map((line) => {
+    if (!/^\s*(?:export\s+)?PUBLIC_BASE_URL\s*=/.test(line)) {
+      return line;
+    }
+    publicBaseSeen = true;
+    const value = line
+      .slice(line.indexOf("=") + 1)
+      .trim()
+      .replace(/^['"]|['"]$/g, "");
+    return value === "" ? publicBase : line;
+  });
+  if (!publicBaseSeen) {
+    missing.push("PUBLIC_BASE_URL");
+    additions.push(publicBase);
+  }
 
   lines = lines.map((line) => {
     if (!/^\s*(?:export\s+)?DATABASE_URL\s*=/.test(line)) {
