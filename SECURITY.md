@@ -3,6 +3,12 @@
 Verse is a private, single-author application. There is no user table, no registration, and no
 multi-tenancy: whoever holds the passphrase has the whole library.
 
+## Database credentials
+
+The authoring service runs with a serving credential that no longer holds DDL rights. Migrations
+run at boot through `MIGRATION_DATABASE_URL`, a separate owner credential; when that variable is
+absent the service logs the fallback rather than silently granting itself DDL. See RUNNING.md.
+
 ## Public submission links
 
 A Public Link is the only unauthenticated write surface: the URL is a bearer capability for one
@@ -44,9 +50,6 @@ it are all in scope and treated as urgent.
 
 These are documented rather than hidden, and are tracked as issues where they have one.
 
-- **The runtime database credential holds DDL rights.** It exists because the platform cannot run a
-  pre-deploy step on the current compute plan, so migrations run at boot. Issue #59 tracks splitting
-  it.
 - **Migrations run on every boot**, each instance taking an advisory lock. Correct, but redundant per
   instance.
 - **No password recovery.** The passphrase is compared against an environment variable. Losing it

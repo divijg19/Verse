@@ -75,6 +75,13 @@ templ PoemViewContent(ctx context.Context, poem PoemView) {
 				margin: 0;
 			}
 
+			.verse-poem-view-action-buttons {
+				display: flex;
+				align-items: center;
+				gap: 0.75rem;
+				flex: none;
+			}
+
 				.verse-poem-view-article {
 					padding-top: 1.1rem;
 					font-size: 1.08rem;
@@ -91,6 +98,11 @@ templ PoemViewContent(ctx context.Context, poem PoemView) {
 				.verse-poem-view-actions {
 					flex-direction: column;
 					align-items: flex-start;
+				}
+
+				.verse-poem-view-action-buttons {
+					align-self: flex-end;
+					flex-wrap: wrap;
 				}
 			}
 		</style>
@@ -133,38 +145,39 @@ templ PoemViewContent(ctx context.Context, poem PoemView) {
 					<span class="verse-poem-view-publication-when">not on the public site</span>
 				}
 			</p>
-			<form
-				hx-post="/poem/publish"
-				hx-target="#screen"
-				hx-swap="innerHTML"
-				class="verse-poem-view-publication-form"
-			>
-				<input type="hidden" name="id" value={ poem.ID }/>
-				<input type="hidden" name="publish" value={ poem.PublishAction() }/>
-				@CSRFField(ctx)
-				<button
-					type="submit"
-					class={ poem.PublishButtonClass() }
+			<div class="verse-poem-view-action-buttons">
+				<form
+					hx-post="/poem/publish"
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					class="verse-poem-view-publication-form"
 				>
-					{ poem.PublishActionLabel() }
-				</button>
-			</form>
+					<input type="hidden" name="id" value={ poem.ID }/>
+					<input type="hidden" name="publish" value={ poem.PublishAction() }/>
+					@CSRFField(ctx)
+					<button
+						type="submit"
+						class={ poem.PublishButtonClass() }
+					>
+						{ poem.PublishActionLabel() }
+					</button>
+				</form>
+				<form
+					hx-post="/poem/delete"
+					hx-target="#screen"
+					hx-swap="innerHTML"
+					hx-confirm="Delete this poem from your library?"
+				>
+					<input type="hidden" name="id" value={ poem.ID }/>
+					@CSRFField(ctx)
+					<button
+						type="submit"
+						class="verse-button-danger"
+					>
+						Delete
+					</button>
+				</form>
+			</div>
 		</div>
-		<form
-			hx-post="/poem/delete"
-			hx-target="#screen"
-			hx-swap="innerHTML"
-			hx-confirm="Delete this poem from your library?"
-			class="pt-1"
-		>
-			<input type="hidden" name="id" value={ poem.ID }/>
-			@CSRFField(ctx)
-			<button
-				type="submit"
-				class="verse-button-danger"
-			>
-				Delete
-			</button>
-		</form>
 	</div>
 }

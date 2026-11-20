@@ -171,6 +171,28 @@
       return null;
     }
   }
+  var mintedLinks = new Map();
+  function linkButtons(id, copyAttr, revokeAttr, revoked) {
+    const group = document.createElement("div");
+    group.className = "verse-share-link-buttons";
+    const url = mintedLinks.get(id);
+    if (url) {
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "verse-share-link-copy";
+      copy.textContent = "Copy";
+      copy.setAttribute(copyAttr, id);
+      group.appendChild(copy);
+    }
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "verse-share-link-revoke";
+    revoke.textContent = "Revoke";
+    revoke.setAttribute(revokeAttr, id);
+    revoke.disabled = revoked;
+    group.appendChild(revoke);
+    return group;
+  }
   function formatTime(raw) {
     const date = new Date(raw);
     if (Number.isNaN(date.getTime())) {
@@ -184,7 +206,7 @@
     });
   }
   function renderLinks(links) {
-    const section = document.querySelector("[data-private-links]");
+    const section = document.querySelector("[data-links]");
     const list = document.querySelector("[data-private-link-list]");
     if (!section || !list) {
       return;
@@ -205,27 +227,22 @@
       const summary = document.createElement("p");
       const state = link.revoked
         ? "Revoked"
-        : link.expired
-          ? "Expired"
-          : link.proposalCount > 0
-            ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
-            : "Active";
-      summary.textContent = state;
+        : link.proposalCount > 0
+          ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
+          : "Active";
+      summary.textContent = `Private · ${state}`;
       const times = document.createElement("small");
       times.textContent = `Created ${formatTime(link.createdAt)} · closes ${formatTime(link.expiresAt)}`;
       details.append(summary, times);
-      const revoke = document.createElement("button");
-      revoke.type = "button";
-      revoke.className = "verse-share-link-revoke";
-      revoke.textContent = "Revoke";
-      revoke.dataset.revoke = link.id;
-      revoke.disabled = link.revoked || link.expired;
-      row.append(details, revoke);
+      row.append(
+        details,
+        linkButtons(link.id, "data-copy", "data-revoke", link.revoked),
+      );
       list.appendChild(row);
     }
   }
   function renderPublicLinks(links) {
-    const section = document.querySelector("[data-public-links]");
+    const section = document.querySelector("[data-links]");
     const list = document.querySelector("[data-public-link-list]");
     if (!section || !list) return;
     section.hidden = false;
@@ -242,21 +259,24 @@
       row.className = "verse-share-link-row";
       const details = document.createElement("div");
       const summary = document.createElement("p");
-      summary.textContent = link.revoked
+      const state = link.revoked
         ? "Revoked"
         : link.submissionCount > 0
           ? `${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
           : "Active · no submissions yet";
+      summary.textContent = `Public · ${state}`;
       const times = document.createElement("small");
       times.textContent = `Created ${formatTime(link.createdAt)}`;
       details.append(summary, times);
-      const revoke = document.createElement("button");
-      revoke.type = "button";
-      revoke.className = "verse-share-link-revoke";
-      revoke.textContent = "Revoke";
-      revoke.dataset.publicRevoke = link.id;
-      revoke.disabled = link.revoked;
-      row.append(details, revoke);
+      row.append(
+        details,
+        linkButtons(
+          link.id,
+          "data-public-copy",
+          "data-public-revoke",
+          link.revoked,
+        ),
+      );
       list.appendChild(row);
     }
   }
@@ -319,6 +339,20 @@
         if (!(target instanceof HTMLButtonElement)) {
           return;
         }
+        const copyID = target.dataset.copy ?? target.dataset.publicCopy;
+        if (copyID) {
+          const url = mintedLinks.get(copyID);
+          if (url) {
+            copyText(url).then((ok) =>
+              report(
+                ok
+                  ? "Link copied."
+                  : "Could not copy this browser's clipboard.",
+              ),
+            );
+          }
+          return;
+        }
         const linkID = target.dataset.revoke;
         const publicID = target.dataset.publicRevoke;
         if (!linkID && !publicID) {
@@ -331,6 +365,7 @@
           { id: workID, link: publicID ?? linkID ?? "" },
         );
         if (response?.ok) {
+          mintedLinks.delete(publicID ?? linkID ?? "");
           report("Link revoked.");
           await refreshLinks(workID);
         } else {
@@ -355,6 +390,7 @@
             return;
           }
           const data = await response.json();
+          mintedLinks.set(data.id, data.url);
           const ok = await copyText(data.url);
           report(ok ? "Public link copied." : "Could not copy the link.");
           await refreshLinks(id);
@@ -367,6 +403,7 @@
             return;
           }
           const data = await response.json();
+          mintedLinks.set(data.id, data.url);
           const ok = await copyText(data.url);
           report(ok ? "Private link copied." : "Could not copy the link.");
           await refreshLinks(id);

@@ -14,7 +14,7 @@
 #
 # Two repository variables carry the addresses:
 #
-#   PUBLIC_SITE_URL      the site's own origin, which the sitemap and the feed are written against
+#   PUBLIC_BASE_URL      the site's own origin, which the sitemap and the feed are written against
 #   PUBLIC_ARTIFACT_KEY  the key the published set is stored under
 #
 # and four secrets carry the credentials:
@@ -45,7 +45,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+  PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
   PUBLIC_ARTIFACT_KEY: ${{ vars.PUBLIC_ARTIFACT_KEY || 'verse-public.json' }}
 
 jobs:
@@ -116,7 +116,7 @@ jobs:
 
           # The live site carries the digest it was built from, so the two can be compared
           # without this workflow keeping a list of its own.
-          live_digest="$(curl --fail --silent --location "${PUBLIC_SITE_URL}/" 2>/dev/null \
+          live_digest="$(curl --fail --silent --location "${PUBLIC_BASE_URL}/" 2>/dev/null \
             | grep -o 'name="verse-digest" content="[^"]*"' \
             | sed -e 's/.*content="//' -e 's/"$//' || true)"
 
@@ -132,7 +132,7 @@ jobs:
         # database even by accident, and it produces the same bytes the authoring environment would.
         if: steps.report.outputs.deploy == 'true'
         run: |
-          go run ./cmd/publish -from verse-public.json -out dist -base-url "${PUBLIC_SITE_URL}"
+          go run ./cmd/publish -from verse-public.json -out dist -base-url "${PUBLIC_BASE_URL}"
 
       - name: Deploy
         if: steps.report.outputs.deploy == 'true'

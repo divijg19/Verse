@@ -19,7 +19,6 @@ interface PrivateLinkView {
   createdAt: string;
   expiresAt: string;
   revoked: boolean;
-  expired: boolean;
   proposalCount: number;
 }
 
@@ -111,6 +110,41 @@ async function postForm(
   }
 }
 
+// A minted URL is shown once and only its hash is stored server-side, so an existing link row has
+// no URL to copy. This page-session cache is the one place the raw URL survives after the mint;
+// it disappears on reload, which is the same promise the server makes about storage.
+const mintedLinks = new Map<string, string>();
+
+/** Builds Copy and Revoke buttons for one link row, with Revoke always rightmost. */
+function linkButtons(
+  id: string,
+  copyAttr: string,
+  revokeAttr: string,
+  revoked: boolean,
+): HTMLElement {
+  const group = document.createElement("div");
+  group.className = "verse-share-link-buttons";
+
+  const url = mintedLinks.get(id);
+  if (url) {
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "verse-share-link-copy";
+    copy.textContent = "Copy";
+    copy.setAttribute(copyAttr, id);
+    group.appendChild(copy);
+  }
+
+  const revoke = document.createElement("button");
+  revoke.type = "button";
+  revoke.className = "verse-share-link-revoke";
+  revoke.textContent = "Revoke";
+  revoke.setAttribute(revokeAttr, id);
+  revoke.disabled = revoked;
+  group.appendChild(revoke);
+  return group;
+}
+
 /** Formats an expiry as a short, local, readable instant. */
 function formatTime(raw: string): string {
   const date = new Date(raw);
@@ -127,7 +161,7 @@ function formatTime(raw: string): string {
 
 /** Draws the selected work's private links. Elements are built, never parsed from HTML. */
 function renderLinks(links: PrivateLinkView[]): void {
-  const section = document.querySelector<HTMLElement>("[data-private-links]");
+  const section = document.querySelector<HTMLElement>("[data-links]");
   const list = document.querySelector<HTMLElement>("[data-private-link-list]");
   if (!section || !list) {
     return;
@@ -151,30 +185,25 @@ function renderLinks(links: PrivateLinkView[]): void {
     const summary = document.createElement("p");
     const state = link.revoked
       ? "Revoked"
-      : link.expired
-        ? "Expired"
-        : link.proposalCount > 0
-          ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
-          : "Active";
-    summary.textContent = state;
+      : link.proposalCount > 0
+        ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
+        : "Active";
+    summary.textContent = `Private · ${state}`;
     const times = document.createElement("small");
     times.textContent = `Created ${formatTime(link.createdAt)} · closes ${formatTime(link.expiresAt)}`;
     details.append(summary, times);
 
-    const revoke = document.createElement("button");
-    revoke.type = "button";
-    revoke.className = "verse-share-link-revoke";
-    revoke.textContent = "Revoke";
-    revoke.dataset.revoke = link.id;
-    revoke.disabled = link.revoked || link.expired;
-    row.append(details, revoke);
+    row.append(
+      details,
+      linkButtons(link.id, "data-copy", "data-revoke", link.revoked),
+    );
     list.appendChild(row);
   }
 }
 
 /** Draws the author's public submission links. */
 function renderPublicLinks(links: PublicLinkView[]): void {
-  const section = document.querySelector<HTMLElement>("[data-public-links]");
+  const section = document.querySelector<HTMLElement>("[data-links]");
   const list = document.querySelector<HTMLElement>("[data-public-link-list]");
   if (!section || !list) return;
   section.hidden = false;
@@ -191,21 +220,24 @@ function renderPublicLinks(links: PublicLinkView[]): void {
     row.className = "verse-share-link-row";
     const details = document.createElement("div");
     const summary = document.createElement("p");
-    summary.textContent = link.revoked
+    const state = link.revoked
       ? "Revoked"
       : link.submissionCount > 0
         ? `${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
         : "Active · no submissions yet";
+    summary.textContent = `Public · ${state}`;
     const times = document.createElement("small");
     times.textContent = `Created ${formatTime(link.createdAt)}`;
     details.append(summary, times);
-    const revoke = document.createElement("button");
-    revoke.type = "button";
-    revoke.className = "verse-share-link-revoke";
-    revoke.textContent = "Revoke";
-    revoke.dataset.publicRevoke = link.id;
-    revoke.disabled = link.revoked;
-    row.append(details, revoke);
+    row.append(
+      details,
+      linkButtons(
+        link.id,
+        "data-public-copy",
+        "data-public-revoke",
+        link.revoked,
+      ),
+    );
     list.appendChild(row);
   }
 }
@@ -284,6 +316,18 @@ function init(): void {
       if (!(target instanceof HTMLButtonElement)) {
         return;
       }
+      const copyID = target.dataset.copy ?? target.dataset.publicCopy;
+      if (copyID) {
+        const url = mintedLinks.get(copyID);
+        if (url) {
+          void copyText(url).then((ok) =>
+            report(
+              ok ? "Link copied." : "Could not copy this browser's clipboard.",
+            ),
+          );
+        }
+        return;
+      }
       const linkID = target.dataset.revoke;
       const publicID = target.dataset.publicRevoke;
       if (!linkID && !publicID) {
@@ -296,6 +340,7 @@ function init(): void {
         { id: workID, link: publicID ?? linkID ?? "" },
       );
       if (response?.ok) {
+        mintedLinks.delete(publicID ?? linkID ?? "");
         report("Link revoked.");
         await refreshLinks(workID);
       } else {
@@ -322,7 +367,8 @@ function init(): void {
           report("Could not create a public link. Publish the work first.");
           return;
         }
-        const data = (await response.json()) as { url: string };
+        const data = (await response.json()) as { id: string; url: string };
+        mintedLinks.set(data.id, data.url);
         const ok = await copyText(data.url);
         report(ok ? "Public link copied." : "Could not copy the link.");
         await refreshLinks(id);
@@ -335,7 +381,8 @@ function init(): void {
           report("Could not create a private link.");
           return;
         }
-        const data = (await response.json()) as { url: string };
+        const data = (await response.json()) as { id: string; url: string };
+        mintedLinks.set(data.id, data.url);
         const ok = await copyText(data.url);
         report(ok ? "Private link copied." : "Could not copy the link.");
         await refreshLinks(id);

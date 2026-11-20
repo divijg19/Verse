@@ -240,7 +240,7 @@ func TestDashboardPlacesOverviewAboveRecentAndKeepsSidebarQuickActions(t *testin
 		`>Current Streak</p>`,
 		`>4</p>`,
 		`>Recent</p>`,
-		`>Activity</h2>`,
+		`>Activity</p>`,
 		`>Write</button>`,
 		`>Look to Caelum</button>`,
 		`>Library</button>`,
@@ -255,7 +255,7 @@ func TestDashboardPlacesOverviewAboveRecentAndKeepsSidebarQuickActions(t *testin
 
 	overviewIndex := strings.Index(body, `class="verse-dashboard-overview-strip verse-panel-soft"`)
 	recentIndex := strings.Index(body, `>Recent</p>`)
-	activityIndex := strings.Index(body, `>Activity</h2>`)
+	activityIndex := strings.Index(body, `>Activity</p>`)
 	writeIndex := strings.Index(body, `>Write</button>`)
 	if overviewIndex == -1 || recentIndex == -1 || activityIndex == -1 || writeIndex == -1 {
 		t.Fatalf("dashboard missing expected overview/recent/activity/action markers: %q", body)

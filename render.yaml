@@ -138,6 +138,13 @@ services:
       - key: BUN_VERSION
         value: "latest"
 
+      - key: NODE_VERSION
+        # Node is not a build dependency -- Bun drives every JS step -- but Render provisions a
+        # default Node runtime for the service. Declare the major explicitly so the build
+        # environment is defined rather than inherited. Matches .node-version, and set it in the
+        # dashboard too: this Blueprint service was created manually, so its value alone is inert.
+        value: "24"
+
       - key: DATABASE_URL
         # The serving credential. After the split below, a role holding only SELECT, INSERT, UPDATE
         # and DELETE on login_attempts -- see db/roles.sql.

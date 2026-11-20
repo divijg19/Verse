@@ -137,6 +137,13 @@ them.
 
 ---
 
+## Origins
+
+The authoring origin is derived per request by `internal/origin` and can be overridden with the
+configured `VERSE_AUTHOR_BASE_URL` when a proxy hides the external host. The reader origin is
+`PUBLIC_BASE_URL`, used only for the public work address and the sitemap/feed. Both the authoring
+service and publish workflow use the same `PUBLIC_BASE_URL` name.
+
 ## Anonymous write routes
 
 `GET /p/{token}` and `POST /p/{token}/submit` are the only unauthenticated write surface. A public
