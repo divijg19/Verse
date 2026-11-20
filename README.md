@@ -15,8 +15,8 @@ recommendations, and no algorithmic interference.
 - Streak tracking in UTC days and a monthly activity heatmap.
 - `Caelum`, a prompt engine made of ten static, non-imperative prompts — no model, no network.
 - Lossless JSON export of the whole library, plus a Markdown rendering for reading.
-- Optional public sharing: publish a work to a separate static reader's site, or mint a private link
-  that lets one person suggest changes without publishing anything.
+- Optional sharing: publish a work to a separate static reader's site, mint a private link for one
+  person to suggest changes, or mint a public link that records every submission for review.
 - Passphrase-protected access. No accounts, no multi-tenancy, no telemetry.
 
 ## Get started

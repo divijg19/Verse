@@ -91,14 +91,14 @@ verse/
 ├── internal/
 |   ├── server/        routes, security headers, sessions, CSRF, guest sessions
 |   ├── handlers/      HTTP handlers; one file per surface
-|   ├── services/      the application-domain SQL: poems, versions, dashboard, private links
+|   ├── services/      the application-domain SQL: poems, versions, dashboard, private and public links
 |   ├── database/      connection, pool configuration, schema assertion
 |   ├── migrate/       the migration runner: checksums, advisory lock, timeouts
 |   ├── models/        domain types
 |   ├── presenters/    content flattening and truncation for rendering
 |   ├── export/        the export writers, JSON and Markdown
 |   ├── publish/       the public site renderer, validator, and atomic writer
-|   ├── origin/        origin derivation for private-link URLs
+|   ├── origin/        origin derivation for private and public-link URLs
 |   ├── htmx/          the one HTMX-request predicate
 |   ├── clock/         the injectable clock
 |   └── testsupport/   disposable-DSN gate and scratch schemas
@@ -107,6 +107,7 @@ verse/
 |   ├── layout.templ   shell, navigation, and the CSP-relevant script tags
 |   ├── editor.templ   the editor and its Focus Mode
 |   ├── guest.templ    the private-link editor and its submission confirmation
+|   ├── public_submit.templ  the unauthenticated public submission form
 |   ├── heatmap.templ  the month grid
 |   ├── public.templ   the static public site: index, archive, work pages, and 404
 |   └── security.go    the CSRF field the mutating routes require
@@ -135,6 +136,14 @@ bookkeeping, and the boot-time `to_regclass` assertion keep their queries next t
 them.
 
 ---
+
+## Anonymous write routes
+
+`GET /p/{token}` and `POST /p/{token}/submit` are the only unauthenticated write surface. A public
+link is a token for one published work; every submission is appended to `public_submissions` and
+reviewed read-only in History. The route group carries no-store/noindex, its token is redacted from
+logs, both entry and submit are rate-limited per address, and a double-submit CSRF cookie guards the
+form. The reader's static site is unchanged.
 
 ## Database Schema
 
@@ -194,6 +203,30 @@ table guest_drafts {
     content     text        -- one continuous body, autosaved for the link's eight-hour window
     base_hash   text        -- sha256 of the body at the last send, for change detection
     updated_at  timestamptz
+}
+
+table public_links {
+    id          uuid        -- primary key
+    poem_id     uuid        -- references poems(id); one link per published work
+    token_hash  text        -- sha256 of the raw token; shown once, never stored
+    created_at  timestamptz
+    revoked_at  timestamptz -- nullable: NULL means the link still accepts submissions
+}
+
+table public_submissions {
+    id          uuid        -- primary key
+    link_id     uuid        -- references public_links(id)
+    poem_id     uuid        -- references poems(id)
+    guest_name  text        -- optional attribution
+    content     text        -- appended verbatim; never applied to the work automatically
+    created_at  timestamptz
+}
+
+table guest_requests {
+    subject       bytea       -- part of the key; HMAC of the caller address
+    kind          text        -- entry, editor or public; part of the key
+    window_start  timestamptz
+    count         integer
 }
 
 table login_attempts {

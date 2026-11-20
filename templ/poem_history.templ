@@ -147,6 +147,26 @@ templ PoemHistoryContent(ctx context.Context, history PoemHistory) {
 				}
 			</div>
 		}
+		if len(history.PublicSubmissions) > 0 {
+			<p class="pt-2 text-[0.62rem] uppercase tracking-[0.18em] text-purple-400">
+				Public submissions
+			</p>
+			<div class="space-y-3">
+				for _, submission := range history.PublicSubmissions {
+					<div class="verse-panel verse-history-entry verse-history-proposal">
+						<div class="flex flex-wrap items-center justify-between gap-3">
+							<div>
+								<p class="verse-history-proposal-badge">Public · read only</p>
+								<p class="pt-1 text-sm text-neutral-300">
+									{ submission.GuestName } · { submission.CreatedAt.UTC().Format("Jan 2, 2006 15:04 UTC") }
+								</p>
+							</div>
+						</div>
+						<pre class="pt-3 text-neutral-400">{ submission.Content }</pre>
+					</div>
+				}
+			</div>
+		}
 		if len(history.Versions) == 0 {
 			<div class="verse-panel verse-history-card">
 				<p class="text-neutral-400">

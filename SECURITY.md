@@ -3,6 +3,16 @@
 Verse is a private, single-author application. There is no user table, no registration, and no
 multi-tenancy: whoever holds the passphrase has the whole library.
 
+## Public submission links
+
+A Public Link is the only unauthenticated write surface: the URL is a bearer capability for one
+published work. Its submissions are appended, never applied automatically, and reviewed by the
+author. Entry and submission are rate-limited per address; a double-submit CSRF cookie is defence in
+depth, not the access control. A private link is a different capability for one person: the editor
+draft is keyed by the link, so two holders of the same URL would share one body. Mint a separate link
+for each reviewer. Drafts persist after expiry or revocation but become unreachable through the
+guest routes.
+
 ## Reporting a vulnerability
 
 Report privately through GitHub's security advisory form on this repository

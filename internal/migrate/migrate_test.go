@@ -1044,3 +1044,62 @@ func TestTimestampMigrationIsZoneIndependent(t *testing.T) {
 	t.Logf("bare form shifted %v to %v; the USING clause holds it at %v",
 		want.UTC().Format(time.RFC3339), bare.UTC().Format(time.RFC3339), gotCreated.UTC().Format(time.RFC3339))
 }
+
+// TestRun010PreservesExistingDrafts covers the release's only re-keying migration on live data.
+// A fresh schema has no rows to carry across, so the ordinary suite never exercises preservation.
+func TestRun010PreservesExistingDrafts(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	before := fstest.MapFS{}
+	files, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if file.Name() >= "010_" {
+			continue
+		}
+		data, err := fs.ReadFile(migrations.FS, file.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		before[file.Name()] = &fstest.MapFile{Data: data}
+	}
+	if _, err := run(ctx, pool, before); err != nil {
+		t.Fatalf("apply migrations before 010: %v", err)
+	}
+
+	const poemID = "11111111-1111-4111-8111-111111111111"
+	const linkID = "22222222-2222-4222-8222-222222222222"
+	if _, err := pool.Exec(ctx, `INSERT INTO poems (id, content) VALUES ($1, 'a work')`, poemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO private_links (id, poem_id, token_hash, expires_at)
+        VALUES ($1, $2, 'hash', now() + interval '8 hours')`, linkID, poemID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO guest_drafts
+        (link_id, poem_id, content, base_hash) VALUES ($1, $2, 'a saved body', 'hash')`,
+		linkID, poemID); err != nil {
+		t.Fatal(err)
+	}
+
+	ten, err := fs.ReadFile(migrations.FS, "010_guest_draft_branches.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(ten), pgx.QueryExecModeSimpleProtocol); err != nil {
+		t.Fatalf("apply 010: %v", err)
+	}
+
+	var content, branch string
+	if err := pool.QueryRow(ctx,
+		`SELECT content, branch FROM guest_drafts WHERE link_id = $1`, linkID).
+		Scan(&content, &branch); err != nil {
+		t.Fatal(err)
+	}
+	if content != "a saved body" || branch != "primary" {
+		t.Errorf("draft after re-key = %q on %q, want the original body on primary", content, branch)
+	}
+}

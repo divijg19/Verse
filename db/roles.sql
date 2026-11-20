@@ -96,6 +96,12 @@ BEGIN
     IF to_regclass('public.guest_drafts') IS NOT NULL THEN
         GRANT SELECT, INSERT, UPDATE ON guest_drafts TO verse_runtime;
     END IF;
+    -- 011 adds public submission links and the shared request counter.
+    IF to_regclass('public.guest_requests') IS NOT NULL THEN
+        GRANT SELECT, INSERT, UPDATE, DELETE ON guest_requests TO verse_runtime;
+        GRANT SELECT, INSERT, UPDATE ON public_links TO verse_runtime;
+        GRANT SELECT, INSERT ON public_submissions TO verse_runtime;
+    END IF;
 END
 $$;
 

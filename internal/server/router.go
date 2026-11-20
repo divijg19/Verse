@@ -342,13 +342,15 @@ func NewRouter() (*chi.Mux, error) {
 		})
 		handlers.PrivateLinkEntryHandler(w, r.WithContext(ctx))
 	}))
-	r.Get("/s/{token}", http.HandlerFunc(privateLinkEntry.ServeHTTP))
+	r.Get("/s/{token}", http.HandlerFunc(guestRateLimit(authCfg, "entry", guestEntryLimit)(
+		http.HandlerFunc(privateLinkEntry.ServeHTTP)).ServeHTTP))
 
 	// The guest's own limited surface. It is guarded by the guest cookie, never by the author
 	// session: the two credentials are different cookie names, paths, and signing domains, and
 	// neither grants access to the other's routes.
 	r.Route("/guest", func(guest chi.Router) {
 		guest.Use(guestHeadersMiddleware)
+		guest.Use(guestRateLimit(authCfg, "editor", guestEditorLimit))
 		guest.Group(func(scoped chi.Router) {
 			scoped.Use(requireGuest(authCfg))
 			scoped.Use(requireGuestCSRF(authCfg))
@@ -356,6 +358,15 @@ func NewRouter() (*chi.Mux, error) {
 			scoped.Post("/draft", handlers.GuestDraftHandler)
 			scoped.Post("/propose", handlers.GuestProposalHandler)
 		})
+	})
+
+	// Public submission links. Unauthenticated by design: the token in the URL is the capability.
+	// The group is isolated from guest and author routes and carries the same privacy headers.
+	r.Route("/p", func(public chi.Router) {
+		public.Use(guestHeadersMiddleware)
+		public.Use(guestRateLimit(authCfg, "public", guestEntryLimit))
+		public.Get("/{token}", http.HandlerFunc(handlers.PublicSubmitHandler))
+		public.Post("/{token}/submit", http.HandlerFunc(handlers.PublicSubmitPOSTHandler))
 	})
 
 	// The authoring application. Everything below requires a valid session.
@@ -379,6 +390,8 @@ func NewRouter() (*chi.Mux, error) {
 		// living on the Share screen, so CSRF applies to both.
 		priv.Post("/share/link", handlers.ShareLinkHandler)
 		priv.Post("/share/link/revoke", handlers.ShareLinkRevokeHandler)
+		priv.Post("/share/public-link", handlers.SharePublicLinkHandler)
+		priv.Post("/share/public-link/revoke", handlers.SharePublicLinkRevokeHandler)
 		// Applying a guest's suggestion is an ordinary edit of the author's draft.
 		priv.Post("/poem/proposal/apply", handlers.ShareProposalApplyHandler)
 

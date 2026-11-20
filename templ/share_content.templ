@@ -196,34 +196,25 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 					}
 				</select>
 			</div>
+			<p class="verse-share-links-title">Copy</p>
 			<div class="verse-share-modes">
-				<button
-					type="button"
-					data-share-action="text"
-					class="verse-share-mode verse-panel-soft"
-				>
+				<button type="button" data-share-action="text" class="verse-share-mode verse-panel-soft">
 					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Text</p>
 				</button>
-				<button
-					type="button"
-					data-share-action="link"
-					class="verse-share-mode verse-panel-soft"
-				>
-					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Link</p>
-				</button>
-				<button
-					type="button"
-					data-share-action="card"
-					class="verse-share-mode verse-panel-soft"
-				>
+				<button type="button" data-share-action="card" class="verse-share-mode verse-panel-soft">
 					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Card Export</p>
 				</button>
-				<button
-					type="button"
-					data-share-action="private"
-					class="verse-share-mode verse-panel-soft"
-				>
+			</div>
+			<p class="verse-share-links-title">Link</p>
+			<div class="verse-share-modes">
+				<button type="button" data-share-action="link" class="verse-share-mode verse-panel-soft">
+					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Link</p>
+				</button>
+				<button type="button" data-share-action="private" class="verse-share-mode verse-panel-soft">
 					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Private Link</p>
+				</button>
+				<button type="button" data-share-action="public" class="verse-share-mode verse-panel-soft">
+					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Public Link</p>
 				</button>
 			</div>
 			<p class="verse-share-link-hint" hidden>Publish this work first to copy its public link.</p>
@@ -231,9 +222,17 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 				A private link opens a temporary editor for just this work. The reader's changes come
 				back as suggestions in its history, and the link expires in eight hours.
 			</p>
+			<p class="verse-share-private-hint">
+				A public link lets anyone send a suggestion for a published work. Every submission is
+				kept and reviewed in the work's history; it is never applied automatically.
+			</p>
 			<div class="verse-share-links" data-private-links hidden>
 				<p class="verse-share-links-title">Active private links</p>
 				<div data-private-link-list></div>
+			</div>
+			<div class="verse-share-links" data-public-links hidden>
+				<p class="verse-share-links-title">Active public links</p>
+				<div data-public-link-list></div>
 			</div>
 			<p class="verse-share-status" role="status" aria-live="polite"></p>
 			<div class="verse-share-actions">

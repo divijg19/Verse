@@ -481,6 +481,11 @@ jobs:
           allowed "SELECT count(*) FROM guest_drafts"                       "read guest drafts"
           allowed "INSERT INTO guest_drafts (link_id, poem_id, content, base_hash) SELECT id, poem_id, 'x', 'x' FROM private_links WHERE false" "create a guest draft"
           allowed "UPDATE guest_drafts SET content = 'x' WHERE false"       "save a guest draft"
+          # 011: public submission links and the anonymous request counter.
+          allowed "SELECT count(*) FROM public_links"                        "read public links"
+          allowed "INSERT INTO guest_requests (subject, kind, window_start, count) VALUES ('\\x00', 'public', now(), 1)" "count a guest request"
+          allowed "DELETE FROM guest_requests WHERE false"                   "reset a guest request window"
+          allowed "INSERT INTO public_submissions (id, link_id, poem_id, guest_name, content) SELECT gen_random_uuid(), id, poem_id, 'x', 'x' FROM public_links WHERE false" "append a public submission"
           # The one table the service deletes from, and correctly so: ratelimit.go clears a caller's
           # row on a successful login. It holds an HMAC of an address and counters, never work.
           allowed "INSERT INTO login_attempts (subject, failures, first_failure) VALUES ('\\x00'::bytea, 1, now())" "record a login attempt"
@@ -504,6 +509,7 @@ jobs:
           denied "DELETE FROM private_links"                             "hard-delete a private link"
           denied "DELETE FROM work_proposals"                            "hard-delete a proposal"
           denied "DELETE FROM guest_drafts"                              "hard-delete a guest draft"
+          denied "DELETE FROM public_submissions"                         "hard-delete a public submission"
           # Deliberately not granted. The boot log reports which migrations ran; the serving process
           # cannot query the table that records it.
           denied "SELECT count(*) FROM schema_migrations"               "read the migration log"

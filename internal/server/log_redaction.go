@@ -23,8 +23,8 @@ var privateTokenShape = regexp.MustCompile(`[0-9a-f]{64}`)
 func redactRequestURI(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uri := r.RequestURI
-		if strings.HasPrefix(r.URL.Path, "/s/") {
-			uri = "/s/[redacted]"
+		if strings.HasPrefix(r.URL.Path, "/s/") || strings.HasPrefix(r.URL.Path, "/p/") {
+			uri = r.URL.Path[:2] + "/[redacted]"
 		} else {
 			uri = privateTokenShape.ReplaceAllString(uri, "[redacted]")
 		}

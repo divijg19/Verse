@@ -365,7 +365,9 @@ func requireCSRF(cfg *authConfig) func(http.Handler) http.Handler {
 			}
 
 			expected := cfg.csrf(s)
-			submitted := r.FormValue(csrfFieldName)
+			// PostFormValue reads the body only. FormValue would also accept ?csrf=..., putting a
+			// synchroniser token in a URL where proxies and Referer headers can record it.
+			submitted := r.PostFormValue(csrfFieldName)
 			if submitted == "" {
 				submitted = r.Header.Get("X-CSRF-Token")
 			}

@@ -224,10 +224,47 @@
       list.appendChild(row);
     }
   }
+  function renderPublicLinks(links) {
+    const section = document.querySelector("[data-public-links]");
+    const list = document.querySelector("[data-public-link-list]");
+    if (!section || !list) return;
+    section.hidden = false;
+    list.replaceChildren();
+    if (links.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "verse-share-links-empty";
+      empty.textContent = "No public links for this work.";
+      list.appendChild(empty);
+      return;
+    }
+    for (const link of links) {
+      const row = document.createElement("div");
+      row.className = "verse-share-link-row";
+      const details = document.createElement("div");
+      const summary = document.createElement("p");
+      summary.textContent = link.revoked
+        ? "Revoked"
+        : link.submissionCount > 0
+          ? `${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
+          : "Active · no submissions yet";
+      const times = document.createElement("small");
+      times.textContent = `Created ${formatTime(link.createdAt)}`;
+      details.append(summary, times);
+      const revoke = document.createElement("button");
+      revoke.type = "button";
+      revoke.className = "verse-share-link-revoke";
+      revoke.textContent = "Revoke";
+      revoke.dataset.publicRevoke = link.id;
+      revoke.disabled = link.revoked;
+      row.append(details, revoke);
+      list.appendChild(row);
+    }
+  }
   async function refreshLinks(id) {
     const data = await selectedWork(id);
     if (data) {
       renderLinks(data.links ?? []);
+      renderPublicLinks(data.publicLinks ?? []);
     }
   }
   function syncLinkButton(select) {
@@ -241,7 +278,10 @@
       document
         .querySelector("[data-public-address-configured]")
         ?.getAttribute("data-public-address-configured") === "true";
-    button.disabled = !published || !configured;
+    const linkAction = button.getAttribute("data-share-action");
+    const needsPublished = linkAction === "link" || linkAction === "public";
+    button.disabled =
+      (needsPublished && !published) || (linkAction === "link" && !configured);
     button.title = !published
       ? "Publish this work first"
       : !configured
@@ -280,15 +320,16 @@
           return;
         }
         const linkID = target.dataset.revoke;
-        if (!linkID) {
+        const publicID = target.dataset.publicRevoke;
+        if (!linkID && !publicID) {
           return;
         }
         const current = picker();
         const workID = current?.value ?? "";
-        const response = await postForm("/share/link/revoke", {
-          id: workID,
-          link: linkID,
-        });
+        const response = await postForm(
+          publicID ? "/share/public-link/revoke" : "/share/link/revoke",
+          { id: workID, link: publicID ?? linkID ?? "" },
+        );
         if (response?.ok) {
           report("Link revoked.");
           await refreshLinks(workID);
@@ -305,6 +346,18 @@
         const id = select.value;
         if (!id) {
           report("Choose a work first.");
+          return;
+        }
+        if (action === "public") {
+          const response = await postForm("/share/public-link", { id });
+          if (!response?.ok) {
+            report("Could not create a public link. Publish the work first.");
+            return;
+          }
+          const data = await response.json();
+          const ok = await copyText(data.url);
+          report(ok ? "Public link copied." : "Could not copy the link.");
+          await refreshLinks(id);
           return;
         }
         if (action === "private") {
