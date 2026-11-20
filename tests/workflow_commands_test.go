@@ -197,3 +197,18 @@ func TestTheDocumentationCallsTheCommandsWithFlagsTheyDefine(t *testing.T) {
 		checkInvocations(t, name, string(body))
 	}
 }
+
+// TestPublishRefusesAPlaceholderOrigin pins the v0.5.6 guard that stopped a manual publish from
+// silently writing https://verse.example into the reader's no-script Share page. A source-level
+// assertion is enough here: the strings are the contract, and running the command needs a database.
+func TestPublishRefusesAPlaceholderOrigin(t *testing.T) {
+	source := string(mustReadRepo(t, filepath.Join("cmd", "publish", "main.go")))
+	for _, want := range []string{
+		`"allow-placeholder"`,
+		"refusing to build with the placeholder public origin",
+	} {
+		if !strings.Contains(source, want) {
+			t.Errorf("cmd/publish/main.go no longer contains %q", want)
+		}
+	}
+}

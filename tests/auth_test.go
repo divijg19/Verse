@@ -37,6 +37,8 @@ var privateRoutes = []struct {
 	// suggestion a guest sent back. All three mutate and all three carry the author's CSRF token.
 	{http.MethodPost, "/share/link"},
 	{http.MethodPost, "/share/link/revoke"},
+	{http.MethodPost, "/share/public-link"},
+	{http.MethodPost, "/share/public-link/revoke"},
 	{http.MethodPost, "/poem/proposal/apply"},
 	{http.MethodGet, "/poems"},
 	{http.MethodGet, "/poem/some-id"},
@@ -518,10 +520,12 @@ var publicRoutes = map[string]bool{
 	// the URL is the credential, exchanged here for a signed, one-work, eight-hour guest session.
 	// It exposes one work to the link's holder and nothing else; the /guest/* routes below are
 	// guarded by that session rather than by the author's.
-	http.MethodGet + " /s/some-id":      true,
-	http.MethodGet + " /guest/edit":     true,
-	http.MethodPost + " /guest/draft":   true,
-	http.MethodPost + " /guest/propose": true,
+	http.MethodGet + " /s/some-id":         true,
+	http.MethodGet + " /p/some-id":         true,
+	http.MethodPost + " /p/some-id/submit": true,
+	http.MethodGet + " /guest/edit":        true,
+	http.MethodPost + " /guest/draft":      true,
+	http.MethodPost + " /guest/propose":    true,
 }
 
 // TestPrivateRoutesEnumeratesTheWholeRouter is the guard on both lists.

@@ -609,6 +609,21 @@ restore, which records what it replaced.
 
 ---
 
+## Public submission links
+
+A Public Link is an unauthenticated URL for one published work. Anyone holding it can send a text;
+every submission is appended and appears in the work's History as "Public · read only". Nothing is
+applied to the work automatically, and there is no moderation queue in this release: revoke the link
+from the Share screen if submissions become unwanted. The link lives until revoked, including after
+the work is unpublished, but the submit route re-checks `published_at` and `deleted_at` on every
+request so a withdrawn work cannot receive more text.
+
+Anonymous entry, guest editing and public submission are rate-limited per caller address with a
+15-minute counter (60 requests for entry/submit, 600 for the editor). The limiter is fail-open, so a
+database outage does not make these surfaces unavailable. `TRUSTED_CLIENT_IP_HEADER` decides which
+address is trusted; behind a proxy that overwrites it, leave it set to the proxy's real-IP header or
+all callers share one bucket.
+
 ## Tests
 
 The database-backed tests `TRUNCATE TABLE poems`, so they are gated on two things being set

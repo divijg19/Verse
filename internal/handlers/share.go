@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -87,6 +88,12 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		links = nil
 	}
 
+	publicLinks, err := publicLinkViews(r.Context(), id)
+	if err != nil {
+		log.Printf("failed to list public links for %s: %v", id, err) // #nosec G706 -- validated UUID
+		publicLinks = nil
+	}
+
 	body := presenters.BodyWithoutTitle(poem.Content)
 	out := struct {
 		Title                   string                  `json:"title"`
@@ -96,6 +103,7 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		IsPublished             bool                    `json:"isPublished"`
 		PublicAddressConfigured bool                    `json:"publicAddressConfigured"`
 		Links                   []templ.PrivateLinkView `json:"links"`
+		PublicLinks             []templ.PublicLinkView  `json:"publicLinks"`
 	}{
 		Title:                   presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Body:                    body,
@@ -104,7 +112,31 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		IsPublished:             state.Published,
 		PublicAddressConfigured: publicAddressConfigured,
 		Links:                   links,
+		PublicLinks:             publicLinks,
 	}
 
 	shareJSON(w, out)
+}
+
+// publicLinkViews maps public links and their submission counts for the Share screen.
+func publicLinkViews(ctx context.Context, poemID string) ([]templ.PublicLinkView, error) {
+	links, err := services.ListPublicLinks(ctx, poemID)
+	if err != nil {
+		return nil, err
+	}
+	counts, err := services.CountPublicSubmissionsByLink(ctx, poemID)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]templ.PublicLinkView, 0, len(links))
+	for _, link := range links {
+		views = append(views, templ.PublicLinkView{
+			ID:              link.ID,
+			PoemID:          link.PoemID,
+			CreatedAt:       link.CreatedAt,
+			Revoked:         link.RevokedAt != nil,
+			SubmissionCount: counts[link.ID],
+		})
+	}
+	return views, nil
 }

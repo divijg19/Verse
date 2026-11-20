@@ -93,6 +93,23 @@ func (p ProposalView) BranchLabel() string {
 	return "Alternative " + suffix
 }
 
+// PublicLinkView is one public submission link on the author's Share screen.
+type PublicLinkView struct {
+	ID              string    `json:"id"`
+	PoemID          string    `json:"poemID"`
+	CreatedAt       time.Time `json:"createdAt"`
+	Revoked         bool      `json:"revoked"`
+	SubmissionCount int       `json:"submissionCount"`
+}
+
+// PublicSubmissionView is one appended text from a Public Link, shown read-only in History.
+type PublicSubmissionView struct {
+	ID        string
+	GuestName string
+	Content   string
+	CreatedAt time.Time
+}
+
 // GuestBranchView is one tab in the guest editor's left-hand branch rail.
 type GuestBranchView struct {
 	Branch    string
@@ -140,12 +157,13 @@ type PoemVersionView struct {
 
 // PoemHistory is a poem's history screen: the work itself, and what it used to say.
 type PoemHistory struct {
-	PoemID    string
-	Title     string
-	Current   string
-	Versions  []PoemVersionView
-	Proposals []ProposalView
-	Restored  string
+	PoemID            string
+	Title             string
+	Current           string
+	Versions          []PoemVersionView
+	Proposals         []ProposalView
+	PublicSubmissions []PublicSubmissionView
+	Restored          string
 
 	// DeletedAt reports whether the work is currently in the recycle.
 	//
