@@ -120,16 +120,8 @@ type Summary struct {
 	Latest *models.Poem
 }
 
-// DashboardSummary returns the total and the most recent work in one statement.
-//
-// The two used to be separate queries run concurrently, which was two of five connections. They are
-// unrelated aggregates -- a count and a single row -- so a derived table joined to a one-row anchor
-// returns both in one round trip. The anchor is what makes it a left join: with no live work the
-// latest-row subquery yields nothing, and the count is still owed a row to live in.
-//
-// Written this way rather than as two statements on one connection because the extended protocol
-// permits one statement per execution, and reaching for the simple protocol to batch them would hand
-// up multi-statement support to a query that does not need it.
+// DashboardSummary returns the total and the most recent work in one statement. The one-row anchor
+// keeps the count in the result set when there are no live works.
 func DashboardSummary(ctx context.Context) (Summary, error) {
 	var summary Summary
 	if err := database.Require(); err != nil {

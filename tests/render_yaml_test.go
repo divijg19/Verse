@@ -82,7 +82,7 @@ func parseQueryCount(s string) (int, error) {
 // readRenderYAML returns the contents of render.yaml.
 //
 // Resolved relative to this file rather than the working directory, for the reason given in
-// readReadme: the tests run with tests/ as their working directory, and depending on a helper that
+// readDoc: the tests run with tests/ as their working directory, and depending on a helper that
 // chdirs to the repository root would make the result depend on test order.
 func readRenderYAML(t *testing.T) string {
 	t.Helper()

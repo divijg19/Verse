@@ -11,53 +11,23 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ErrNotFound reports that a read or a mutation named no row.
-//
-// Previously UpdatePoem and SoftDeletePoem discarded the affected-row count, so a request naming a
-// nonexistent id returned success. Callers need to distinguish "changed" from "no such thing".
-//
-// It is also what the single-work reads return, which they did not used to: they passed
-// pgx.ErrNoRows straight up, so a caller had to know which read it had called to know what to test
-// for. Every read and every mutation in this package now reports the same condition the same way,
-// and a handler that maps it to a 404 is correct for all of them.
+// ErrNotFound is the single "no such row" condition for every read and mutation in this package,
+// so a handler can map it to 404 without knowing which query was called.
 var ErrNotFound = errors.New("not found")
 
-// replaceContent is the shared body of the two functions that overwrite a work's text.
+// replaceContent writes a work's text and retains the displaced body as a version.
 //
-// UpdatePoem and RestorePoemVersion each did this in about thirty identical lines: begin, defer a
-// rollback, lock the row and read what was there, record the displaced text as a retained version if
-// it differed, write the new text, commit. RestorePoemVersion's extra step -- clearing deleted_at --
-// is now expressed in the update statement it passes, and its deliberate lack of a deleted_at filter
-// in the guard it passes.
-//
-// The two parameters are SQL fragments, and that is the point of the split. library.go's own
-// reasoning for keeping these two functions separate in the first place was that a boolean
-// parameterising UpdatePoem's `deleted_at IS NULL` guard would put one careless caller away from
-// editing a deleted work invisibly. That reasoning is unchanged and still binds: the guard is
-// visible as a literal at each call site, where a flag would have hidden it behind a `true`. Only the
-// twenty-five lines that are genuinely the same were shared, and the comment on RestorePoemVersion
-// records why the two differ.
+// The lock and update fragments are passed as SQL rather than as a boolean: each caller's
+// deleted_at guard stays visible at the call site, where a flag could hide it from careless callers.
 func replaceContent(ctx context.Context, id, content, lockWhere, update string) error {
 	tx, err := database.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Committed explicitly on the success path; the deferred rollback is then a no-op, which is
-	// preferable to deferring a commit whose error would have to be checked after the response has
-	// already been written.
-	//
-	// The closure is load-bearing, not stylistic. `defer discardRollback(tx.Rollback(ctx))` would
-	// evaluate tx.Rollback(ctx) at the defer statement rather than at return, closing the transaction
-	// before the work below had run -- which is exactly what happened the first time this was written
-	// that way, and it presented as "tx is closed" on every update. migrate.go's own rollback uses
-	// the closure form for the same reason.
-	//
-	// Rollback after a successful Commit returns ErrTxClosed, which is not worth reporting.
-	// discardRollback is the same shape migrate.go uses, and for the same reason: errcheck runs with
-	// check-blank, so an error assigned to the blank identifier is still reported. Passing it to a
-	// function that returns nothing is the way to say "deliberately ignored" in a form the linter
-	// accepts, which is better than a suppression that documents the safety but not the mechanism.
+	// Commit explicitly so its error is checked; the deferred rollback is then a no-op. The closure
+	// is load-bearing: deferring tx.Rollback(ctx) directly would run it here, closing the transaction
+	// before the work below. discardRollback makes the ignored post-commit error explicit to errcheck.
 	defer func() { discardRollback(tx.Rollback(ctx)) }()
 
 	// FOR UPDATE in both callers, and load-bearing: a concurrent edit between the read and the write

@@ -93,18 +93,29 @@ func (p ProposalView) BranchLabel() string {
 	return "Alternative " + suffix
 }
 
+// GuestBranchView is one tab in the guest editor's left-hand branch rail.
+type GuestBranchView struct {
+	Branch    string
+	Label     string
+	Selected  bool
+	Changed   bool
+	Submitted bool
+}
+
 // GuestEditorData is the one work a private-link holder is allowed to edit.
 //
 // It carries no navigation, no library, and no other work. The expiration is shown so the guest
-// knows the boundary; the server enforces the same instant before every request.
+// knows the boundary; the server enforces the same instant before every request. Branches are the
+// guest's own submitted versions; nothing else about the author's library is exposed here.
 type GuestEditorData struct {
-	Title       string
-	Content     string
-	GuestName   string
-	Changed     bool
-	BranchCount int
-	ExpiresAt   time.Time
-	Minutes     int
+	Title     string
+	Content   string
+	GuestName string
+	Changed   bool
+	Branch    string
+	Branches  []GuestBranchView
+	ExpiresAt time.Time
+	Minutes   int
 }
 
 // PrivateLinkView is one link on the author's Share screen.

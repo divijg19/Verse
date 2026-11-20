@@ -16,17 +16,9 @@ import (
 
 // privateRoutes is the set of routes that must never be reachable without a session.
 //
-// This list is the regression test for the v0.3.6 finding that all fifteen routes were public,
-// including the two mutating endpoints that could overwrite or destroy any work by UUID. It is
-// written as an explicit enumeration rather than derived from the router, so that adding a route
-// without deciding its exposure is visible in review.
-//
-// It used to call itself complete while listing fourteen of nineteen. The five it omitted were
-// exactly the ones a later release added -- history, version restore, the recycle, the export, and
-// undelete -- and two of them reach deleted work. The list drifting is the failure mode an
-// enumeration cannot catch on its own, so TestPrivateRoutesEnumeratesTheWholeRouter derives the
-// registered set and requires this one to match. The explicit list stays, because the point is that a
-// human decided each entry's exposure; the test is what stops the decision from quietly lapsing.
+// An explicit enumeration makes a new route's exposure a review decision.
+// TestPrivateRoutesEnumeratesTheWholeRouter derives the registered set and requires this list to
+// match, so neither drift nor a default-public registration passes unnoticed.
 var privateRoutes = []struct {
 	method string
 	path   string

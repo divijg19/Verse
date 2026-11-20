@@ -91,7 +91,7 @@ run` does not enforce the formatters section, so the formatting gate is load-bea
 
   - **Spellings are US.** `behavior`, `defense`, `recognize`. The linter enforces it.
   - **Three test suites govern files you would not expect them to.** `render.yaml` is read by
-    `TestRenderYamlDashboardQueryCountMatchesTheMeasurement`; `README.md` is read by the `TestReadme*`
+    `TestRenderYamlDashboardQueryCountMatchesTheMeasurement`; `ARCHITECTURE.md` is read by the `TestArchitecture*`
     suite; and `internal/handlers` is parsed by `TestEveryInternalErrorResponseIsLogged`, which fails
     if any handler writes a 500 anywhere except `fail500`. Editing any of the three is a change with a
     test suite attached, and the failure names the file. That last one is why adding an error response

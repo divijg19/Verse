@@ -148,8 +148,10 @@ if (form && textarea) {
   );
   for (const button of [sendButton, alternativeButton]) {
     button?.addEventListener("click", () => {
-      if (branchField && button.dataset.guestSend) {
-        branchField.value = button.dataset.guestSend;
+      // The button's value is the branch target the server validates ("primary" or "new"); the
+      // data-guest-send attribute is only a stable test hook with the older label.
+      if (branchField && button.value) {
+        branchField.value = button.value;
       }
     });
   }

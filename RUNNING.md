@@ -807,16 +807,18 @@ the Share screen; unlike a public link, it grants a limited session rather than 
 - **One link, one person, one conversation.** A link is a bearer capability, so it must be given to
   one person. The draft is keyed by the link: two holders of the same URL would share one body and
   could read or overwrite each other's unsent text. For another reviewer, mint another link.
-- **A continuous draft.** `guest_drafts` holds one body per link, autosaved and restored on every
-  visit for the eight-hour window. It is never shown to the author. A hash of the body at the last
-  send lives beside it, so "no changes" means _since the guest last sent_, not since the work was
-  opened; author edits elsewhere do not silently change that answer. Draft rows persist after
-  expiry or revocation, like links and proposals, but become unreachable through the guest routes.
-- **Suggestions, not edits.** "Send suggestion" upserts one primary submission per link; "Send as
-  alternative" adds a separate branch for a version the guest wants compared, up to twenty. Both
-  require a real change and advance the draft's baseline in the same transaction. Submitted text is
-  stored in `work_proposals`, never in `poems` or `poem_versions`, so the author's draft is untouched
-  until the author acts. Revoking ends any session already issued from that link.
+- **A continuous draft per branch.** `guest_drafts` holds one body per `(link_id, branch)`, autosaved
+  and restored on every visit for the eight-hour window. A vertical rail down the left of the editor
+  lists the guest's versions, each with its own continuous body; on narrow screens it becomes a
+  horizontal strip. No draft is shown to the author. A hash of the body at the last send lives beside
+  it, so "no changes" means _since that branch was last sent_, not since the work was opened. Draft
+  rows persist after expiry or revocation but become unreachable through the guest routes.
+- **Suggestions, not edits.** "Send main version" upserts one primary submission per link;
+  "Send another version" keeps the current branch and adds a new alternative beside it, seeded from
+  the text currently being edited, up to twenty. Both require a real change and advance that
+  branch's baseline in the same transaction. Submitted text is stored in `work_proposals`, never in
+  `poems` or `poem_versions`, so the author's draft is untouched until the author acts. Revoking ends
+  any session already issued from that link.
 - **A deliberate apply step.** Each work's History screen shows the submitted branches with their
   guest name, last-update time and full text, labelled Primary or Alternative. "Apply to draft"
   writes the text in one transaction that retains the displaced text under the same rule `UpdatePoem`
@@ -837,7 +839,8 @@ and filters `deleted_at IS NULL`; a withdrawn work's link is refused even though
 There is no application path that hard-deletes a work, so the rows remain even after a soft delete.
 
 Migration `009_guest_drafts.sql` adds the per-link draft table and gives `work_proposals` a `branch`
-and `updated_at`. It collapses pre-existing duplicate proposals to one authoritative row per link —
+and `updated_at`. `010_guest_draft_branches.sql` adds `branch` to the drafts as well and changes their
+key to `(link_id, branch)`, so every alternative has its own continuous body. It collapses pre-existing duplicate proposals to one authoritative row per link —
 an applied row in preference to a newer unapplied one — before adding the unique index. That is the
 one destructive migration in the sequence: the migration owner may delete rows that the serving
 credential is never granted DELETE on.
@@ -1172,7 +1175,7 @@ The value is bounded before anything reads it, by `inboundRequestIDMiddleware`. 
 previously named `middleware.RequestID`, which does not exist: there is no `internal/middleware`
 package, and never has been. The empty directory sat untracked in a working tree, which is enough for
 a path check to pass and not enough for the project to contain it — the README's project tree made
-that mistake in the same release, and `TestReadmeProjectTreeNamesOnlyRealPaths` caught it in CI but
+that mistake in the same release, and `TestArchitectureProjectTreeNamesOnlyRealPaths` caught it in CI but
 not locally, for the same reason.
 
 Every refusal is logged with its reason and request ID, on both the login path and the authenticated

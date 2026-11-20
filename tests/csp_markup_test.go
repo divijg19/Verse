@@ -74,6 +74,12 @@ func TestGuestEditorMarkupObeysThePolicy(t *testing.T) {
 		!strings.Contains(body, `data-guest-send="alternative"`) {
 		t.Error("guest form is missing the branch field or one of its submit buttons")
 	}
+	if !strings.Contains(body, `data-guest-branches`) || !strings.Contains(body, `verse-guest-actions`) {
+		t.Error("guest editor is missing the branch rail or the side-by-side button wrapper")
+	}
+	if !strings.Contains(body, "Send main version") || !strings.Contains(body, "Send another version") {
+		t.Error("guest submit buttons do not carry their clearer labels")
+	}
 }
 
 // surfacesToCheck are the surfaces that carry controls. A control is markup, so a surface without one

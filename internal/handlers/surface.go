@@ -18,31 +18,12 @@ func isHXRequest(r *http.Request) bool {
 	return htmx.IsRequest(r)
 }
 
-// fail500 logs a failure and answers 500 with the given message.
-//
-// Every 500 in this package goes through here, and that is the point. The rule this enforces was
-// written down after the poem-view handlers were fixed -- see PoemViewHandler, "a Neon outage
-// presented as an empty library, with nothing in the log to say the database was unreachable" --
-// and it was then honored by the two handlers that had been fixed and by none of the others.
-// Eight paths returned a 500 and said nothing: the library list, the library search fragment, the
-// heatmap fragment, the dashboard, and both export failures. A database outage while the author was
-// looking at the two surfaces they look at most produced a stream of silent 500s.
-//
-// A single choke point is the enforcement. The alternative is a convention, and this release found
-// eight ways to not follow one.
-//
-// The message is the response body, so it must stay generic. The cause goes to the log and nowhere
-// else, which is the same split the render path has always used: internal error text reaching a
-// client is information disclosure, and the client is an authenticated author who already knows
-// something is wrong.
+// fail500 is the only 500 path in this package. The cause goes to the log; the response body stays
+// generic, because internal error text is information disclosure even to an authenticated author.
 func fail500(w http.ResponseWriter, r *http.Request, message string, err error) {
-	// The request id is what correlates this line with the platform's own request log, which is the
-	// only other place the request appears. Absent from a unit test or a direct handler call, hence
-	// the fallback.
-	//
-	// #nosec G706 -- the id is not raw request input here. inboundRequestIDMiddleware bounds it to
-	// maxRequestIDValue and strips control characters before middleware.RequestID stores it, so it
-	// cannot forge a log line. The sanitization is the actual mitigation.
+	// The request id correlates this line with the platform log. #nosec G706: inboundRequestIDMiddleware
+	// bounds it and strips control characters before middleware.RequestID stores it, so it cannot forge
+	// a log line.
 	if id := middleware.GetReqID(r.Context()); id != "" {
 		log.Printf("%s (request %s): %v", message, id, err) // #nosec G706
 	} else {

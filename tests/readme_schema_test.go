@@ -26,7 +26,7 @@ import (
 // directions. A column added by a migration and not documented fails, and a column documented but
 // never created fails -- which is precisely the bug this replaces.
 
-// documentedSchemaBlock matches the fenced block the README's schema section is required to contain.
+// documentedSchemaBlock matches the fenced block ARCHITECTURE.md's schema section is required to contain.
 //
 // A double-quoted string rather than a raw one: the pattern contains triple backticks, which would
 // terminate a raw string literal.
@@ -52,7 +52,7 @@ var typeAliases = map[string]string{
 	"bytea":                       "bytea",
 }
 
-func TestReadmeSchemaMatchesTheDatabase(t *testing.T) {
+func TestDocumentedSchemaMatchesTheDatabase(t *testing.T) {
 	connectTestDB(t)
 
 	documented := documentedSchema(t)
@@ -100,14 +100,14 @@ func TestReadmeSchemaMatchesTheDatabase(t *testing.T) {
 	}
 }
 
-// TestReadmeDeclaresNoPhantomSchema pins the specific claims that were wrong for the life of the
+// TestArchitectureDeclaresNoPhantomSchema pins the specific claims that were wrong for the life of the
 // project, so a well-meaning edit that reintroduces one is caught with a pointed message rather than
 // as a generic mismatch.
 //
 // Scoped to the declared identifiers rather than the whole document. The prose legitimately names
 // these things -- to say they do not exist -- and a substring search over the entire README flags the
 // correction as the bug. What matters is that none of them is *declared*.
-func TestReadmeDeclaresNoPhantomSchema(t *testing.T) {
+func TestArchitectureDeclaresNoPhantomSchema(t *testing.T) {
 	schema := documentedSchema(t)
 	if len(schema) == 0 {
 		t.Fatal("no schema was parsed out of the README; the documented-schema markers are missing " +
@@ -129,8 +129,8 @@ func TestReadmeDeclaresNoPhantomSchema(t *testing.T) {
 
 	// And positively: the README has to say why. A schema section that simply omits users leaves a
 	// reader wondering whether it is an oversight.
-	if !strings.Contains(readReadme(t), "no `users` table") {
-		t.Error("the README does not state that there is no users table; " +
+	if !strings.Contains(readDoc(t, "ARCHITECTURE.md"), "no `users` table") {
+		t.Error("ARCHITECTURE.md does not state that there is no users table; " +
 			"its absence should be deliberate and visible, not a silent omission")
 	}
 }
@@ -139,7 +139,7 @@ func TestReadmeDeclaresNoPhantomSchema(t *testing.T) {
 func documentedSchema(t *testing.T) map[string]map[string]string {
 	t.Helper()
 
-	match := documentedSchemaBlock.FindStringSubmatch(readReadme(t))
+	match := documentedSchemaBlock.FindStringSubmatch(readDoc(t, "ARCHITECTURE.md"))
 	if match == nil {
 		return nil
 	}
@@ -208,19 +208,19 @@ func missingKeys[V any](want, got map[string]V) []string {
 	return out
 }
 
-// readReadme returns the contents of README.md.
+// readDoc returns the contents of a tracked document, resolved relative to this file.
 //
 // Resolved relative to this file rather than the working directory, because the tests run with tests/
 // as their working directory and the helpers that chdir to the repository root are incidental to what
 // they do. Depending on another test's side effect would make this one fail depending on test order.
-func readReadme(t *testing.T) string {
+func readDoc(t *testing.T, name string) string {
 	t.Helper()
 
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("cannot determine this file's path")
 	}
-	path := filepath.Join(filepath.Dir(thisFile), "..", "README.md")
+	path := filepath.Join(filepath.Dir(thisFile), "..", name)
 
 	body, err := os.ReadFile(path)
 	if err != nil {
@@ -229,7 +229,7 @@ func readReadme(t *testing.T) string {
 	return string(body)
 }
 
-// TestReadmeProjectTreeNamesOnlyRealPaths closes the second half of the documentation problem.
+// TestArchitectureProjectTreeNamesOnlyRealPaths closes the second half of the documentation problem.
 //
 // The block above checks the schema against the live database. It cannot check prose, and the prose
 // around it described a stack this repository has never contained: Dart, Jaspr, Next.js, sqlc, Goose
@@ -241,12 +241,12 @@ func readReadme(t *testing.T) string {
 // deliberately one-directional: a real path missing from the tree is incompleteness, not a falsehood,
 // and failing on it would make this a chore to maintain. A *named* path that does not exist is the
 // thing that misleads.
-func TestReadmeProjectTreeNamesOnlyRealPaths(t *testing.T) {
-	readme := readReadme(t)
+func TestArchitectureProjectTreeNamesOnlyRealPaths(t *testing.T) {
+	readme := readDoc(t, "ARCHITECTURE.md")
 
 	start := strings.Index(readme, "verse/\n")
 	if start == -1 {
-		t.Fatal("the README's project structure block no longer contains a verse/ root; " +
+		t.Fatal("ARCHITECTURE.md's project structure block no longer contains a verse/ root; " +
 			"this test cannot tell whether the paths it names are real")
 	}
 	fence := strings.Index(readme[start:], "```")
@@ -326,7 +326,7 @@ func TestReadmeProjectTreeNamesOnlyRealPaths(t *testing.T) {
 	for _, path := range paths {
 		if !exists(path) {
 			absent++
-			t.Errorf("the README's project tree names %q, which does not exist", path)
+			t.Errorf("ARCHITECTURE.md's project tree names %q, which does not exist", path)
 		}
 		leaf := path[strings.LastIndex(path, "/")+1:]
 		if !strings.Contains(tree, leaf) {
@@ -364,15 +364,15 @@ func TestReadmeProjectTreeNamesOnlyRealPaths(t *testing.T) {
 	}
 }
 
-// TestReadmeClaimsNoTechnologyThatIsNotUsed is the other half, and it is the one that catches the
+// TestArchitectureClaimsNoTechnologyThatIsNotUsed is the other half, and it is the one that catches the
 // style of falsehood rather than the accidental kind.
 //
 // A technology named in the stack list must appear in go.mod, package.json, or a workflow. That is a
 // coarse test and deliberately so: it cannot tell whether Next.js is used *well*, and it does not
 // try. It catches the failure this repository actually had, which was a stack list describing a
 // different project while the build files beside it described this one.
-func TestReadmeClaimsNoTechnologyThatIsNotUsed(t *testing.T) {
-	readme := readReadme(t)
+func TestArchitectureClaimsNoTechnologyThatIsNotUsed(t *testing.T) {
+	readme := readDoc(t, "ARCHITECTURE.md")
 
 	// Technologies that appeared in the stack list and have never been in the build. Each is named
 	// explicitly rather than derived, because the derivation is the interesting part and it is
@@ -389,7 +389,7 @@ func TestReadmeClaimsNoTechnologyThatIsNotUsed(t *testing.T) {
 	// say it is not used, which is the opposite of a claim, so only the list is scanned.
 	stackStart := strings.Index(readme, "Primary stack:")
 	if stackStart == -1 {
-		t.Fatal("the README no longer has a \"Primary stack:\" list; this test cannot check its claims")
+		t.Fatal("ARCHITECTURE.md no longer has a \"Primary stack:\" list; this test cannot check its claims")
 	}
 	stackEnd := strings.Index(readme[stackStart:], "---")
 	if stackEnd == -1 {
@@ -399,7 +399,7 @@ func TestReadmeClaimsNoTechnologyThatIsNotUsed(t *testing.T) {
 
 	for _, tech := range absent {
 		if strings.Contains(stack, tech.name) {
-			t.Errorf("the README's stack list names %s, which this project does not use: %s",
+			t.Errorf("ARCHITECTURE.md's stack list names %s, which this project does not use: %s",
 				tech.name, tech.why)
 		}
 	}

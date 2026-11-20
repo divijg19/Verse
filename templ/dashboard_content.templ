@@ -291,11 +291,17 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 				}
 
 			.verse-dashboard-quick-actions {
-				flex-direction: column;
+				flex-direction: row;
+				flex-wrap: nowrap;
+				gap: 0.4rem;
 			}
 
 			.verse-dashboard-quick-action {
-				width: 100%;
+				flex: 1 1 0;
+				min-width: 0;
+				padding: 0.5rem 0.55rem;
+				font-size: 0.85rem;
+				line-height: 1.15;
 			}
 
 			.verse-dashboard-activity-card .verse-heatmap-shell {

@@ -22,6 +22,34 @@ import (
 // commands and their flags; the commands define their flags. A name in one that the other does not
 // have is a break, and it is found by the test suite rather than by the build.
 
+// TestReaderOriginIsConfiguredOnBothSides guards the one setting that must agree across two systems:
+// the authoring service needs PUBLIC_BASE_URL to build Copy Link addresses, and the publish workflow
+// needs -base-url to build the same addresses into the reader's pages. A missing declaration on
+// either side silently produces a broken link, and no unit test of a single binary can see it.
+func TestReaderOriginIsConfiguredOnBothSides(t *testing.T) {
+	render := string(mustReadRepo(t, "render.yaml"))
+	if !regexp.MustCompile(`(?m)^\s*- key: PUBLIC_BASE_URL\s*$`).MatchString(render) {
+		t.Error("render.yaml does not declare PUBLIC_BASE_URL for the authoring service")
+	}
+
+	workflow := string(mustReadRepo(t, filepath.Join(".github", "workflows", "publish.yml")))
+	if !strings.Contains(workflow, "-base-url") {
+		t.Error("the publish workflow does not pass -base-url to cmd/publish")
+	}
+	if !strings.Contains(workflow, "PUBLIC_SITE_URL") {
+		t.Error("the publish workflow does not name PUBLIC_SITE_URL")
+	}
+}
+
+func mustReadRepo(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot(t), name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
 // commandInvocation finds a `go run ./cmd/<name>` in a line of shell.
 var commandInvocation = regexp.MustCompile(`go run \./cmd/([a-z0-9-]+)`)
 

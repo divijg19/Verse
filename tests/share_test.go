@@ -79,9 +79,10 @@ func TestShareEndpointGivesAPublishedWorkItsAddress(t *testing.T) {
 	}
 
 	var data struct {
-		Address     string `json:"address"`
-		Published   string `json:"published"`
-		IsPublished bool   `json:"isPublished"`
+		Address                 string `json:"address"`
+		Published               string `json:"published"`
+		IsPublished             bool   `json:"isPublished"`
+		PublicAddressConfigured bool   `json:"publicAddressConfigured"`
 	}
 	if err := json.Unmarshal([]byte(body), &data); err != nil {
 		t.Fatalf("decode the share data: %v", err)
@@ -93,9 +94,43 @@ func TestShareEndpointGivesAPublishedWorkItsAddress(t *testing.T) {
 	if data.Published == "" {
 		t.Error("a published work has no publication date")
 	}
-	// This test leaves PUBLIC_BASE_URL unset, so the address has no origin. The complementary
-	// assertion, with the variable set, is TestShareEndpointUsesTheReaderOrigin below.
-	_ = data.Address
+	// With no reader origin configured the address must be empty, not a relative /w/... path. This
+	// assertion used to be missing, which let the original Copy Link regression pass unnoticed.
+	if data.Address != "" {
+		t.Errorf("address = %q with no reader origin, want empty", data.Address)
+	}
+	if data.PublicAddressConfigured {
+		t.Error("an unset PUBLIC_BASE_URL reports the public address as configured")
+	}
+}
+
+func TestShareEndpointRejectsAMalformedReaderOrigin(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+	t.Setenv("PUBLIC_BASE_URL", "localhost:4000")
+
+	id := insertPoem(t, "A Public Work\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share/work/%s = %d, want 200", id, status)
+	}
+	var data struct {
+		Address                 string `json:"address"`
+		PublicAddressConfigured bool   `json:"publicAddressConfigured"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		t.Fatal(err)
+	}
+	if data.Address != "" || data.PublicAddressConfigured {
+		t.Errorf("a malformed origin produced address %q, configured=%t", data.Address, data.PublicAddressConfigured)
+	}
 }
 
 // TestShareEndpointUsesTheReaderOrigin pins the other half of the origin split.

@@ -44,6 +44,8 @@ func run() error {
 	list := flag.Bool("list", false, "list the published works and write nothing")
 	baseURL := flag.String("base-url", envOr("PUBLIC_BASE_URL", publish.DefaultBaseURL),
 		"absolute public origin used by sitemap.xml and feed.xml")
+	allowPlaceholder := flag.Bool("allow-placeholder", false,
+		"allow a build with the reserved placeholder origin; intended for local previews only")
 	title := flag.String("title", publish.DefaultTitle, "public site title")
 	description := flag.String("description", publish.DefaultDescription, "public site description")
 	tagline := flag.String("tagline", envOr("PUBLIC_TAGLINE", ""), "the front screen's line")
@@ -81,6 +83,11 @@ func run() error {
 	}
 
 	if *baseURL == publish.DefaultBaseURL {
+		// The address is also the no-script fallback on the reader's Share page, so a placeholder
+		// would be copied as a real link with a success message. A real build must name its origin.
+		if !*allowPlaceholder {
+			return fmt.Errorf("refusing to build with the placeholder public origin %s; set -base-url or PUBLIC_BASE_URL, or pass -allow-placeholder for a local preview", publish.DefaultBaseURL)
+		}
 		fmt.Fprintf(os.Stderr,
 			"warning: using the placeholder public origin %s; set -base-url or PUBLIC_BASE_URL before deploying\n",
 			publish.DefaultBaseURL)
