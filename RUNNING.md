@@ -609,6 +609,24 @@ restore, which records what it replaced.
 
 ---
 
+## The two origins, and one variable for the reader
+
+Verse has two origins that are easy to confuse:
+
+| Origin        | Used for                                                                               | Set where                                                                                                                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Authoring** | `/share`, `/s/{token}` private links, `/p/{token}` public submission links             | Derived from each request by `internal/origin`: TLS or `X-Forwarded-Proto` plus a validated host. Optional `VERSE_AUTHOR_BASE_URL` overrides it when a proxy hides the external host.                                                   |
+| **Reader**    | `/w/{id}/`, `sitemap.xml`, `feed.xml`, and the address Copy Link puts on the clipboard | `PUBLIC_BASE_URL` — in the Render dashboard for this manually created service, and as the `PUBLIC_BASE_URL` repository variable in `publish.yml`. The Blueprint declaration in `render.yaml` applies only to Blueprint-linked services. |
+
+There is deliberately **one name** for the reader origin: `PUBLIC_BASE_URL`. The publish workflow
+used to read `PUBLIC_SITE_URL` for the same value, which meant an operator had to keep two settings
+in sync. Rename the GitHub repository variable from `PUBLIC_SITE_URL` to `PUBLIC_BASE_URL` if it is
+still present. CI fails if the old name reappears in tracked configuration.
+
+Unset or malformed: the authoring service starts, logs a boot warning, and disables Copy Link with
+an explanatory title. The publish build refuses the reserved placeholder origin unless
+`-allow-placeholder` is passed for a local preview.
+
 ## Public submission links
 
 A Public Link is an unauthenticated URL for one published work. Anyone holding it can send a text;
@@ -955,7 +973,7 @@ On the **repository** (GitHub Actions):
 
 | Variable              | What it is                                            |
 | --------------------- | ----------------------------------------------------- |
-| `PUBLIC_SITE_URL`     | the site's own origin, which the sitemap and feed use |
+| `PUBLIC_BASE_URL`     | the site's own origin, which the sitemap and feed use |
 | `PUBLIC_ARTIFACT_KEY` | the key the published set is stored under             |
 
 The two Cloudflare tokens are separate because the two sides are separate: the one that writes can
@@ -1111,9 +1129,15 @@ which was the state that produced `1.3.4`.
 `.bun-version`. If one is set to an older version, remove it or change it to `latest`, or the file
 will be ignored and the service will keep using the dashboard value.
 
-There is no Node pin any more. Node was needed only by Cloudflare Workers Builds, which are switched
-off; the deploy runs in GitHub Actions and `bun` carries its own runtime. `.node-version` has been
-deleted.
+Node is not a build dependency: the deploy runs in GitHub Actions, `bun` drives every JS step, and
+Cloudflare Workers Builds are switched off. Render nevertheless provisions a Node runtime for the
+service. That runtime is now declared explicitly as the floating major `24` in `.node-version` and
+as `NODE_VERSION` in `render.yaml`; CI asserts the two agree. "Floating" means any Node 24 release
+is acceptable, matching the `latest` policy used for Bun.
+
+**Operator note:** `NODE_VERSION` in the Render dashboard takes precedence over `.node-version` for
+a manually created service. Keep both at `24`, or remove the dashboard value and let the repository
+file apply.
 
 The trade-off of `latest` is deliberate: a build is not reproducible across time, because all paths
 resolve `latest` when they run. A literal pin remains accepted by the gate, but every path must name

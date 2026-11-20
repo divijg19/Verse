@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/divijg19/Verse/internal/clock"
 	"github.com/divijg19/Verse/internal/origin"
@@ -40,7 +39,7 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, expiresAt, err := services.CreatePrivateLink(r.Context(), id)
+	token, linkID, expiresAt, err := services.CreatePrivateLink(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, services.ErrNotFound) {
 			http.Error(w, "no such work", http.StatusNotFound)
@@ -51,11 +50,13 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shareJSON(w, struct {
+		ID        string `json:"id"`
 		URL       string `json:"url"`
 		ExpiresAt string `json:"expiresAt"`
 	}{
+		ID:        linkID,
 		URL:       guestLinkURL(base, token),
-		ExpiresAt: expiresAt.Format(time.RFC3339),
+		ExpiresAt: expiresAt,
 	})
 }
 
@@ -139,15 +140,18 @@ func privateLinkViews(ctx context.Context, poemID string) ([]templ.PrivateLinkVi
 	now := clock.NowUTC()
 	views := make([]templ.PrivateLinkView, 0, len(links))
 	for _, link := range links {
+		// Expired links drop out of the list without ceremony. The row stays for history, but the
+		// capability is unreachable and there is nothing left for the author to act on.
+		if !now.Before(link.ExpiresAt) {
+			continue
+		}
 		revoked := link.RevokedAt != nil
-		expired := now.After(link.ExpiresAt)
 		views = append(views, templ.PrivateLinkView{
 			ID:            link.ID,
 			PoemID:        link.PoemID,
 			CreatedAt:     link.CreatedAt,
 			ExpiresAt:     link.ExpiresAt,
 			Revoked:       revoked,
-			Expired:       expired,
 			ProposalCount: counts[link.ID],
 		})
 	}

@@ -31,7 +31,7 @@ func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not build the public submission link", http.StatusBadRequest)
 		return
 	}
-	token, err := services.CreatePublicLink(r.Context(), id)
+	token, linkID, err := services.CreatePublicLink(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, services.ErrWorkNotPublic) {
 			http.Error(w, "only a published work can receive public submissions", http.StatusConflict)
@@ -41,8 +41,9 @@ func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	shareJSON(w, struct {
+		ID  string `json:"id"`
 		URL string `json:"url"`
-	}{URL: strings.TrimRight(base, "/") + "/p/" + token})
+	}{ID: linkID, URL: strings.TrimRight(base, "/") + "/p/" + token})
 }
 
 // SharePublicLinkRevokeHandler withdraws a public submission link.

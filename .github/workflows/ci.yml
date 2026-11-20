@@ -688,6 +688,34 @@ jobs:
 
           echo "all build paths agree on Bun $docker_bun (CI: ${#ci_buns[@]} pins, render.yaml: 1 pin, .bun-version: 1 pin)"
 
+      - name: Verify the Node major and the reader-origin variable agree
+        run: |
+          # Node is not a build dependency, but Render provisions a default runtime for the
+          # service. Two declarations exist: render.yaml's NODE_VERSION and .node-version, which
+          # Render reads from the repository. They must name the same floating major.
+          render_node=$(grep -A7 'key: NODE_VERSION' render.yaml | grep -oE 'value: "[^"]+"' | head -1 | cut -d'"' -f2)
+          if [ -z "$render_node" ]; then
+            echo "::error::render.yaml does not set NODE_VERSION"
+            exit 1
+          fi
+          file_node=$(sed -n '1p' .node-version | tr -d '[:space:]')
+          if [ -z "$file_node" ]; then
+            echo "::error::.node-version is missing or empty"
+            exit 1
+          fi
+          if [ "$render_node" != "$file_node" ]; then
+            echo "::error::the Node major disagrees: render.yaml=$render_node .node-version=$file_node"
+            exit 1
+          fi
+
+          # One name for the reader origin everywhere. The publish workflow used to call the same
+          # site PUBLIC_SITE_URL while the authoring service called it PUBLIC_BASE_URL; an operator
+          # had to keep two GitHub/render settings in sync with no test saying so.
+          if grep -rq --exclude='workflow_commands_test.go' 'PUBLIC_SITE_URL' .github/workflows/publish.yml render.yaml cmd internal web scripts templ tests 2>/dev/null; then
+            echo "::error::PUBLIC_SITE_URL still appears; the reader origin has one name, PUBLIC_BASE_URL"
+            exit 1
+          fi
+          echo "Node $file_node declared in both places; reader origin is PUBLIC_BASE_URL everywhere"
       - name: Build container image
         # The Dockerfile is a second, independently reproducible build path. It is only worth
         # keeping if it is actually built.

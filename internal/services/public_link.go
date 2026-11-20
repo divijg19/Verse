@@ -43,17 +43,18 @@ type PublicSubmission struct {
 }
 
 // CreatePublicLink mints a link for one published work and returns the raw token once.
-func CreatePublicLink(ctx context.Context, poemID string) (token string, err error) {
+func CreatePublicLink(ctx context.Context, poemID string) (token, id string, err error) {
 	if err := database.Require(); err != nil {
-		return "", err
+		return "", "", err
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return "", fmt.Errorf("generate a public link token: %w", err)
+		return "", "", fmt.Errorf("generate a public link token: %w", err)
 	}
 	token = hex.EncodeToString(raw)
 	sum := sha256.Sum256([]byte(token))
-	id := uuid.NewString()
+	linkID := uuid.NewString()
+	id = linkID
 
 	var created time.Time
 	err = database.Pool.QueryRow(ctx, fmt.Sprintf(`
@@ -65,15 +66,15 @@ func CreatePublicLink(ctx context.Context, poemID string) (token string, err err
             id = EXCLUDED.id, token_hash = EXCLUDED.token_hash,
             created_at = EXCLUDED.created_at, revoked_at = NULL
         RETURNING created_at`, models.PublishedFilter),
-		id, hex.EncodeToString(sum[:]), poemID).Scan(&created)
+		linkID, hex.EncodeToString(sum[:]), poemID).Scan(&created)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrWorkNotPublic
+		return "", "", ErrWorkNotPublic
 	}
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	_ = created
-	return token, nil
+	return token, id, nil
 }
 
 // ResolvePublicLink validates a token and returns its work.

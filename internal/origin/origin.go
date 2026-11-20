@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -58,7 +59,25 @@ func RequestScheme(r *http.Request) string {
 // Internationalised and percent-encoded hostnames are deliberately rejected: the authoring service
 // has an ASCII hostname in every supported deployment, and passing such a value through would
 // produce a URL that browsers may resolve differently from the host the request actually used.
+// ValidatedOverride parses an explicitly configured authoring origin and returns its canonical
+// scheme://host form. A path, query, fragment or userinfo would be swallowed or mis-served when a
+// link path is appended, so all of them are refused rather than silently mangled.
+func ValidatedOverride(value string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" ||
+		parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", ErrInvalid
+	}
+	return parsed.Scheme + "://" + parsed.Host, nil
+}
+
 func FromRequest(r *http.Request) (string, error) {
+	// An explicit authoring origin wins where a proxy rewrites or hides the external host. It is
+	// configuration, not a request header, so a caller cannot point a capability at themselves.
+	if override := strings.TrimSpace(os.Getenv("VERSE_AUTHOR_BASE_URL")); override != "" {
+		return ValidatedOverride(override)
+	}
+
 	scheme := RequestScheme(r)
 	if scheme != "http" && scheme != "https" {
 		return "", ErrInvalid

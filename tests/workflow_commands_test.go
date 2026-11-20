@@ -22,10 +22,9 @@ import (
 // commands and their flags; the commands define their flags. A name in one that the other does not
 // have is a break, and it is found by the test suite rather than by the build.
 
-// TestReaderOriginIsConfiguredOnBothSides guards the one setting that must agree across two systems:
-// the authoring service needs PUBLIC_BASE_URL to build Copy Link addresses, and the publish workflow
-// needs -base-url to build the same addresses into the reader's pages. A missing declaration on
-// either side silently produces a broken link, and no unit test of a single binary can see it.
+// TestReaderOriginHasOneName guards the converged reader-origin variable. The authoring service and
+// the publish workflow must both read PUBLIC_BASE_URL; two names for one origin once forced an
+// operator to keep separate settings in sync, with no test noticing when one drifted.
 func TestReaderOriginIsConfiguredOnBothSides(t *testing.T) {
 	render := string(mustReadRepo(t, "render.yaml"))
 	if !regexp.MustCompile(`(?m)^\s*- key: PUBLIC_BASE_URL\s*$`).MatchString(render) {
@@ -36,8 +35,14 @@ func TestReaderOriginIsConfiguredOnBothSides(t *testing.T) {
 	if !strings.Contains(workflow, "-base-url") {
 		t.Error("the publish workflow does not pass -base-url to cmd/publish")
 	}
-	if !strings.Contains(workflow, "PUBLIC_SITE_URL") {
-		t.Error("the publish workflow does not name PUBLIC_SITE_URL")
+	if !strings.Contains(workflow, "vars.PUBLIC_BASE_URL") {
+		t.Error("the publish workflow does not read vars.PUBLIC_BASE_URL")
+	}
+	if strings.Contains(workflow, "PUBLIC_SITE_URL") {
+		t.Error("the publish workflow still names the old PUBLIC_SITE_URL")
+	}
+	if !strings.Contains(string(mustReadRepo(t, ".node-version")), "24") {
+		t.Error(".node-version no longer declares the Node 24 major")
 	}
 }
 

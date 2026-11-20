@@ -14,6 +14,7 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/migrate"
+	"github.com/divijg19/Verse/internal/origin"
 )
 
 // version is the commit this binary was built from, supplied by the build.
@@ -44,6 +45,11 @@ func main() {
 		(parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
 		// %q escapes control characters, so a crafted value cannot forge a second log line.
 		log.Printf("PUBLIC_BASE_URL %q is not an absolute http(s) URL; Copy Link will be unavailable", base) // #nosec G706 -- %q is the mitigation
+	}
+	if override := strings.TrimSpace(os.Getenv("VERSE_AUTHOR_BASE_URL")); override != "" {
+		if _, err := origin.ValidatedOverride(override); err != nil {
+			log.Printf("VERSE_AUTHOR_BASE_URL %q is not a bare http(s) origin; private links will fail until it is fixed", override) // #nosec G706 -- %q escapes control characters
+		}
 	}
 	if err := run(); err != nil {
 		log.Fatalf("verse: %v", err)

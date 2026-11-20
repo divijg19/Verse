@@ -74,14 +74,14 @@ type WorkProposal struct {
 // The raw token is returned to the caller and never stored. Only its SHA-256 is written, so a backup
 // or a read of the table cannot be used to open the link. 256 bits from crypto/rand make guessing it
 // infeasible, which is what lets the lookup be a hash comparison over an indexed column.
-func CreatePrivateLink(ctx context.Context, poemID string) (token string, expiresAt time.Time, err error) {
+func CreatePrivateLink(ctx context.Context, poemID string) (token, id, expiresAt string, err error) {
 	if err := database.Require(); err != nil {
-		return "", time.Time{}, err
+		return "", "", "", err
 	}
 
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
-		return "", time.Time{}, fmt.Errorf("generate a private link token: %w", err)
+		return "", "", "", fmt.Errorf("generate a private link token: %w", err)
 	}
 
 	token = hex.EncodeToString(raw)
@@ -89,28 +89,29 @@ func CreatePrivateLink(ctx context.Context, poemID string) (token string, expire
 	hash := hex.EncodeToString(sum[:])
 
 	now := clock.NowUTC()
-	expiresAt = now.Add(PrivateLinkTTL)
-	id, err := uuid.NewRandom()
+	expiry := now.Add(PrivateLinkTTL)
+	linkID, err := uuid.NewRandom()
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("generate a private link id: %w", err)
+		return "", "", "", fmt.Errorf("generate a private link id: %w", err)
 	}
+	id = linkID.String()
 
 	tag, err := database.Pool.Exec(ctx, `
         INSERT INTO private_links (id, poem_id, token_hash, created_at, expires_at)
         SELECT $1, $2, $3, $4, $5
         WHERE EXISTS (SELECT 1 FROM poems WHERE id = $2 AND deleted_at IS NULL)`,
-		id, poemID, hash, now, expiresAt)
+		linkID, poemID, hash, now, expiry)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", "", "", err
 	}
 	if tag.RowsAffected() == 0 {
-		return "", time.Time{}, ErrNotFound
+		return "", "", "", ErrNotFound
 	}
 
 	// The stored instant is returned rather than recomputed by the caller. Two independent clocks
 	// would let the JSON the author sees disagree with the row the server enforces, and the editor's
 	// countdown should count down to the instant that is actually stored.
-	return token, expiresAt, nil
+	return token, id, expiry.Format(time.RFC3339), nil
 }
 
 // ResolvePrivateLink validates a token and returns the session it grants.
@@ -188,8 +189,8 @@ func PrivateLinkActive(ctx context.Context, linkID string) (poemID string, expir
 
 // ListPrivateLinks returns a work's links, newest first, including expired and revoked ones.
 //
-// The Share screen lists them so the author can see what has been handed out and revoke any link
-// before it expires. Hiding expired links would hide the fact that a capability existed.
+// The Share screen filters expired rows out before rendering: the row remains for history, but a
+// capability that can no longer be used has nothing left for the author to act on.
 func ListPrivateLinks(ctx context.Context, poemID string) ([]PrivateLink, error) {
 	if err := database.Require(); err != nil {
 		return nil, err

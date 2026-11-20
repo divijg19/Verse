@@ -142,7 +142,6 @@ type PrivateLinkView struct {
 	CreatedAt     time.Time `json:"createdAt"`
 	ExpiresAt     time.Time `json:"expiresAt"`
 	Revoked       bool      `json:"revoked"`
-	Expired       bool      `json:"expired"`
 	ProposalCount int       `json:"proposalCount"`
 }
 

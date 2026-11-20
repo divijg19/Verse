@@ -115,22 +115,18 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 		}
 
 		.verse-dashboard-activity-card .verse-heatmap-nav h2 {
+			margin: 0;
+			padding-bottom: 1rem;
+			font-family: Georgia, Cambria, "Times New Roman", Times, serif;
 			font-size: 1.7rem;
+			line-height: 1.1;
+			color: rgb(245 245 245);
 		}
 
 		.verse-dashboard-activity-card .verse-heatmap-nav a {
 			width: 2.2rem;
 			height: 2.2rem;
 		}
-
-		.verse-dashboard-activity-card h2 {
-			margin: 0;
-			padding-bottom: 1rem;
-		font-family: Georgia, Cambria, "Times New Roman", Times, serif;
-		font-size: 1.25rem;
-		line-height: 1.1;
-		color: rgb(245 245 245);
-	}
 
 		.verse-last-poem {
 			position: relative;
@@ -399,7 +395,7 @@ templ DashboardContent(total int, currentStreak int, lastPoem *LastPoemSummary, 
 				</div>
 			</div>
 			<div class="verse-dashboard-activity-card verse-panel">
-				<h2>Activity</h2>
+				<p class="verse-eyebrow">Activity</p>
 				<div class="verse-dashboard-activity-body">
 					@Heatmap(month, days)
 				</div>

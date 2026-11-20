@@ -2,6 +2,7 @@ package origin
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -59,5 +60,22 @@ func TestFromRequest(t *testing.T) {
 				t.Errorf("FromRequest = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFromRequestHonoursAValidatedOverride(t *testing.T) {
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "http://internal/share", nil)
+	req.Host = "internal"
+
+	t.Setenv("VERSE_AUTHOR_BASE_URL", "https://author.example/")
+	got, err := FromRequest(req)
+	if err != nil || got != "https://author.example" {
+		t.Errorf("override = %q, %v", got, err)
+	}
+
+	for _, bad := range []string{"author.example", "https://author.example/foo", "https://author.example/?x=1", "https://user@author.example"} {
+		if _, err := ValidatedOverride(bad); !errors.Is(err, ErrInvalid) {
+			t.Errorf("override %q = %v, want ErrInvalid", bad, err)
+		}
 	}
 }

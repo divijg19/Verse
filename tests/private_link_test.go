@@ -480,3 +480,56 @@ func checkTSBundles(root string) error {
 	}
 	return nil
 }
+
+func TestSharePickerOmitsExpiredPrivateLinks(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Work\n\nIts body.")
+	srv := newTestServer(t)
+	defer srv.Close()
+	linkURL, token := mintLink(t, srv.URL, id)
+	linkID := strings.TrimPrefix(linkURL, srv.URL+"/s/")
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+	expireLink(t, id)
+
+	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("share data = %d", status)
+	}
+	var data struct {
+		Links []struct {
+			ID string `json:"id"`
+		} `json:"links"`
+	}
+	if err := json.Unmarshal([]byte(body), &data); err != nil {
+		t.Fatal(err)
+	}
+	for _, link := range data.Links {
+		if link.ID == linkID {
+			t.Errorf("expired link %s still reported to the Share picker", linkID)
+		}
+	}
+}
+
+func TestPoemViewPlacesPublishBeforeDelete(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Work\n\nIts body.")
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	status, body, _ := get(t, srv.URL+"/poem/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("poem view = %d", status)
+	}
+	publish := strings.Index(body, `hx-post="/poem/publish"`)
+	deleteAt := strings.Index(body, `hx-post="/poem/delete"`)
+	if publish < 0 || deleteAt < 0 || publish > deleteAt {
+		t.Errorf("publish/delete order wrong: publish=%d delete=%d", publish, deleteAt)
+	}
+}
