@@ -2,9 +2,7 @@ package services
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -13,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/linktoken"
 	"github.com/divijg19/Verse/internal/models"
 )
 
@@ -30,6 +29,10 @@ type PublicLink struct {
 	PoemID    string
 	CreatedAt time.Time
 	RevokedAt *time.Time
+
+	// TokenSeed is NULL for links minted before v0.5.9 and cannot be scanned into a plain string.
+	TokenSeed sql.NullString
+	TokenHash string
 }
 
 // PublicSubmission is one appended text sent through a public link.
@@ -43,37 +46,40 @@ type PublicSubmission struct {
 }
 
 // CreatePublicLink mints a link for one published work and returns the raw token once.
-func CreatePublicLink(ctx context.Context, poemID string) (token, id string, err error) {
+//
+// There is one row per work. Re-minting rotates the token in place but deliberately keeps the row id:
+// public_submissions.link_id references it with no ON UPDATE CASCADE (migration 011), so rewriting
+// the primary key once a submission exists raises a foreign-key violation. RETURNING id yields the
+// surviving id on conflict, which is the one the browser needs for Revoke.
+func CreatePublicLink(ctx context.Context, key linktoken.Key, poemID string) (token, id string, err error) {
 	if err := database.Require(); err != nil {
 		return "", "", err
 	}
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", "", fmt.Errorf("generate a public link token: %w", err)
+	seed, token, err := linktoken.Mint(key, linktoken.Public)
+	if err != nil {
+		return "", "", err
 	}
-	token = hex.EncodeToString(raw)
-	sum := sha256.Sum256([]byte(token))
+	hash := linktoken.HashToken(token)
 	linkID := uuid.NewString()
-	id = linkID
 
-	var created time.Time
 	err = database.Pool.QueryRow(ctx, fmt.Sprintf(`
-        INSERT INTO public_links (id, poem_id, token_hash, created_at)
-        SELECT $1, p.id, $2, now()
+        INSERT INTO public_links (id, poem_id, token_hash, token_seed, created_at)
+        SELECT $1, p.id, $2, $3, now()
         FROM poems p
-        WHERE p.id = $3 AND %s
+        WHERE p.id = $4 AND %s
         ON CONFLICT (poem_id) DO UPDATE SET
-            id = EXCLUDED.id, token_hash = EXCLUDED.token_hash,
-            created_at = EXCLUDED.created_at, revoked_at = NULL
-        RETURNING created_at`, models.PublishedFilter),
-		linkID, hex.EncodeToString(sum[:]), poemID).Scan(&created)
+            token_hash = EXCLUDED.token_hash,
+            token_seed = EXCLUDED.token_seed,
+            created_at = EXCLUDED.created_at,
+            revoked_at = NULL
+        RETURNING id`, models.PublishedFilter),
+		linkID, hash, seed, poemID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", ErrWorkNotPublic
 	}
 	if err != nil {
 		return "", "", err
 	}
-	_ = created
 	return token, id, nil
 }
 
@@ -83,13 +89,12 @@ func ResolvePublicLink(ctx context.Context, token string) (PublicLink, error) {
 	if token == "" {
 		return link, ErrNoPublicLink
 	}
-	sum := sha256.Sum256([]byte(token))
 	err := database.Pool.QueryRow(ctx, fmt.Sprintf(`
         SELECT l.id, l.poem_id, l.created_at, l.revoked_at
         FROM public_links l
         JOIN poems p ON p.id = l.poem_id
         WHERE l.token_hash = $1 AND l.revoked_at IS NULL AND %s`, models.PublishedFilter),
-		hex.EncodeToString(sum[:])).Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.RevokedAt)
+		linktoken.HashToken(token)).Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.RevokedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return link, ErrNoPublicLink
 	}
@@ -177,7 +182,7 @@ func CountPublicSubmissionsByLink(ctx context.Context, poemID string) (map[strin
 // ListPublicLinks returns the author's public links for one work.
 func ListPublicLinks(ctx context.Context, poemID string) ([]PublicLink, error) {
 	rows, err := database.Pool.Query(ctx, `
-        SELECT id, poem_id, created_at, revoked_at FROM public_links
+        SELECT id, poem_id, created_at, revoked_at, token_seed, token_hash FROM public_links
         WHERE poem_id = $1 ORDER BY created_at DESC`, poemID)
 	if err != nil {
 		return nil, err
@@ -186,7 +191,7 @@ func ListPublicLinks(ctx context.Context, poemID string) ([]PublicLink, error) {
 	var out []PublicLink
 	for rows.Next() {
 		var link PublicLink
-		if err := rows.Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.RevokedAt); err != nil {
+		if err := rows.Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.RevokedAt, &link.TokenSeed, &link.TokenHash); err != nil {
 			return nil, err
 		}
 		out = append(out, link)

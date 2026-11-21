@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/divijg19/Verse/internal/linktoken"
+	"github.com/divijg19/Verse/internal/origin"
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
@@ -78,17 +80,26 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		published = state.PublishedAt.UTC().Format("2006-01-02")
 	}
 
+	// The authoring origin builds both submission links. It is request-derived (or set by
+	// VERSE_AUTHOR_BASE_URL), never PUBLIC_BASE_URL, which names the reader and has no /s or /p route.
+	// A bad host means no Copy buttons, not a failed share payload.
+	authorBase, originErr := origin.FromRequest(r)
+	if originErr != nil {
+		authorBase = ""
+	}
+	linkKey, _ := linktoken.KeyFrom(r.Context())
+
 	// Private links are an addition to this endpoint, not a precondition for the three actions that
 	// were here first. If the new tables are unavailable -- a deployment whose grants have not been
 	// applied is the realistic case -- the share data still answers with an empty link list rather
 	// than taking Copy Text, Copy Link and Card Export down with it.
-	links, err := privateLinkViews(r.Context(), id)
+	links, err := privateLinkViews(r.Context(), linkKey, authorBase, id)
 	if err != nil {
 		log.Printf("failed to list private links for %s: %v", id, err) // #nosec G706 -- id was parsed as a UUID by requirePathWorkID
 		links = nil
 	}
 
-	publicLinks, err := publicLinkViews(r.Context(), id)
+	publicLinks, err := publicLinkViews(r.Context(), linkKey, authorBase, id, state.Published)
 	if err != nil {
 		log.Printf("failed to list public links for %s: %v", id, err) // #nosec G706 -- validated UUID
 		publicLinks = nil
@@ -119,7 +130,11 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // publicLinkViews maps public links and their submission counts for the Share screen.
-func publicLinkViews(ctx context.Context, poemID string) ([]templ.PublicLinkView, error) {
+//
+// A URL is emitted only for a live link on a still-published work whose seed derives a token matching
+// the stored hash. Revoked links, legacy rows and links on unpublished works fail closed with an
+// empty URL.
+func publicLinkViews(ctx context.Context, key linktoken.Key, base, poemID string, published bool) ([]templ.PublicLinkView, error) {
 	links, err := services.ListPublicLinks(ctx, poemID)
 	if err != nil {
 		return nil, err
@@ -130,12 +145,20 @@ func publicLinkViews(ctx context.Context, poemID string) ([]templ.PublicLinkView
 	}
 	views := make([]templ.PublicLinkView, 0, len(links))
 	for _, link := range links {
+		revoked := link.RevokedAt != nil
+		url := ""
+		if !revoked && published && base != "" && link.TokenSeed.Valid {
+			if token, err := linktoken.Recover(key, linktoken.Public, link.TokenSeed.String, link.TokenHash); err == nil {
+				url = publicLinkURL(base, token)
+			}
+		}
 		views = append(views, templ.PublicLinkView{
 			ID:              link.ID,
 			PoemID:          link.PoemID,
 			CreatedAt:       link.CreatedAt,
-			Revoked:         link.RevokedAt != nil,
+			Revoked:         revoked,
 			SubmissionCount: counts[link.ID],
+			URL:             url,
 		})
 	}
 	return views, nil

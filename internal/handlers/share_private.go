@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/divijg19/Verse/internal/clock"
+	"github.com/divijg19/Verse/internal/linktoken"
 	"github.com/divijg19/Verse/internal/origin"
 	"github.com/divijg19/Verse/internal/services"
 	"github.com/divijg19/Verse/templ"
@@ -15,14 +16,20 @@ import (
 // Author-side endpoints for private links. All of these sit inside the authenticated group and must
 // pass CSRF: minting a capability to edit a work is as sensitive as publishing it.
 
-// ShareLinkHandler mints a private link for one work and returns its URL once.
+// ShareLinkHandler mints a private link for one work and returns its URL.
 //
-// The raw token is shown exactly here and never again. The database keeps only its hash, so listing
-// links later cannot reproduce the URL -- by design. A screenshot or a password manager is how the
-// author keeps it; a later visit to this page will offer only revocation.
+// The raw token is shown here and can be copied again from Share while the link is active: the row
+// keeps a random seed and the token is derived from it under a server-held key. Only the hash and
+// the non-secret seed are stored, so a database read alone cannot reproduce a usable capability.
 func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireFormWorkID(w, r)
 	if !ok {
+		return
+	}
+
+	key, ok := linktoken.KeyFrom(r.Context())
+	if !ok {
+		fail500(w, r, "link token key is not configured", errors.New("missing link token key"))
 		return
 	}
 
@@ -39,7 +46,7 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, linkID, expiresAt, err := services.CreatePrivateLink(r.Context(), id)
+	token, linkID, expiresAt, err := services.CreatePrivateLink(r.Context(), key, id)
 	if err != nil {
 		if errors.Is(err, services.ErrNotFound) {
 			http.Error(w, "no such work", http.StatusNotFound)
@@ -126,7 +133,11 @@ func ShareProposalApplyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // privateLinkViews maps service rows to the Share screen's view model.
-func privateLinkViews(ctx context.Context, poemID string) ([]templ.PrivateLinkView, error) {
+//
+// A URL is recovered only for an active, non-revoked row whose seed derives a token matching the
+// stored hash. Legacy rows have no seed and a rotated key no longer matches: both fail closed with
+// an empty URL rather than emitting a link that would 404.
+func privateLinkViews(ctx context.Context, key linktoken.Key, base, poemID string) ([]templ.PrivateLinkView, error) {
 	links, err := services.ListPrivateLinks(ctx, poemID)
 	if err != nil {
 		return nil, err
@@ -146,6 +157,12 @@ func privateLinkViews(ctx context.Context, poemID string) ([]templ.PrivateLinkVi
 			continue
 		}
 		revoked := link.RevokedAt != nil
+		url := ""
+		if !revoked && base != "" && link.TokenSeed.Valid {
+			if token, err := linktoken.Recover(key, linktoken.Private, link.TokenSeed.String, link.TokenHash); err == nil {
+				url = guestLinkURL(base, token)
+			}
+		}
 		views = append(views, templ.PrivateLinkView{
 			ID:            link.ID,
 			PoemID:        link.PoemID,
@@ -153,6 +170,7 @@ func privateLinkViews(ctx context.Context, poemID string) ([]templ.PrivateLinkVi
 			ExpiresAt:     link.ExpiresAt,
 			Revoked:       revoked,
 			ProposalCount: counts[link.ID],
+			URL:           url,
 		})
 	}
 	return views, nil

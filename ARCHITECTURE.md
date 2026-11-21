@@ -184,7 +184,8 @@ table poem_versions {
 table private_links {
     id          uuid        -- primary key
     poem_id     uuid        -- references poems(id); the one work this link can edit
-    token_hash  text        -- sha256 of the raw token; the raw token is shown once and never stored
+    token_hash  text        -- sha256 of the raw token, also the lookup key and recovery check
+    token_seed  text        -- nullable random seed; NULL means a pre-v0.5.9 link that cannot be copied
     created_at  timestamptz
     expires_at  timestamptz -- eight hours after creation; no renewal
     revoked_at  timestamptz -- nullable: NULL means the link still works
@@ -215,7 +216,8 @@ table guest_drafts {
 table public_links {
     id          uuid        -- primary key
     poem_id     uuid        -- references poems(id); one link per published work
-    token_hash  text        -- sha256 of the raw token; shown once, never stored
+    token_hash  text        -- sha256 of the raw token, also the lookup key and recovery check
+    token_seed  text        -- nullable random seed; NULL means a pre-v0.5.9 link that cannot be copied
     created_at  timestamptz
     revoked_at  timestamptz -- nullable: NULL means the link still accepts submissions
 }

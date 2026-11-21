@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	page "github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/divijg19/Verse/internal/linktoken"
 	"github.com/divijg19/Verse/internal/origin"
 	"github.com/divijg19/Verse/internal/presenters"
 	"github.com/divijg19/Verse/internal/services"
@@ -31,7 +31,12 @@ func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not build the public submission link", http.StatusBadRequest)
 		return
 	}
-	token, linkID, err := services.CreatePublicLink(r.Context(), id)
+	key, ok := linktoken.KeyFrom(r.Context())
+	if !ok {
+		fail500(w, r, "link token key is not configured", errors.New("missing link token key"))
+		return
+	}
+	token, linkID, err := services.CreatePublicLink(r.Context(), key, id)
 	if err != nil {
 		if errors.Is(err, services.ErrWorkNotPublic) {
 			http.Error(w, "only a published work can receive public submissions", http.StatusConflict)
@@ -43,7 +48,7 @@ func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 	shareJSON(w, struct {
 		ID  string `json:"id"`
 		URL string `json:"url"`
-	}{ID: linkID, URL: strings.TrimRight(base, "/") + "/p/" + token})
+	}{ID: linkID, URL: publicLinkURL(base, token)})
 }
 
 // SharePublicLinkRevokeHandler withdraws a public submission link.

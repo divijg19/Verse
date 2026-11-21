@@ -168,6 +168,22 @@ deliberate. There is no flag, environment variable, or header that disables auth
 If you have forgotten the passphrase, set `VERSE_AUTHORIZATION` to a new value and redeploy. If you
 have forgotten `VERSE_AUTH_SECRET`, set a new one; all sessions end, and you sign in again.
 
+#### Rotating `VERSE_AUTH_SECRET` when links exist (v0.5.9+)
+
+The link-token key is derived from the current secret and no old key is retained, so rotation has two
+distinct effects:
+
+1. **Already-distributed URLs keep working.** A presented token is checked by hashing it and
+   comparing with the stored `token_hash`; that check does not use the derived key.
+2. **Copy disappears until a link is recreated.** Recovery derives a token and accepts it only when
+   its hash matches the row. Under a new secret every link seeded under the old one fails that check.
+   Share omits the Copy button and reports that the link must be recreated; it never emits a token
+   that would 404. Mint the link again from Share to write a fresh seed and hash under the new key.
+   Recreating a public link replaces that work's token in place, so hand out the new URL.
+
+Do not add a `VERSE_AUTH_SECRET_PREVIOUS` variable. The previous secret can forge sessions; keeping it
+in the environment would preserve exactly the credential rotation is meant to retire.
+
 ### Optional
 
 | Variable                         | Default                                                                                                                                                                                                                                                                               | Purpose                                                                                                                                                                                                                                 |
@@ -829,9 +845,12 @@ the Share screen; unlike a public link, it grants a limited session rather than 
 - **Eight hours, no renewal.** The link and the session it issues expire together. The guest editor
   shows the remaining window; the server checks the same instant on every request. A longer window
   would leave a capability to edit a work alive long after the author forgot it was handed out.
-- **A capability, not an account.** The raw token is 256 bits from `crypto/rand`, shown once when the
-  link is created and stored only as its SHA-256. A read of the table, a backup, or a support session
-  cannot reproduce the URL. Guessing it is infeasible, which is why a hash lookup is enough.
+- **A capability, not an account.** The raw token is 256 bits, derived from a random seed and a
+  server-held key. Only its SHA-256 and the non-secret seed are stored; a database read or backup
+  alone cannot reproduce the URL, because the key lives only in the application's environment. The
+  author can copy an active link again from Share, even after a reload. Guessing is infeasible, which
+  is why a hash lookup is enough. Links created before v0.5.9 have no seed and cannot be recovered;
+  they show no Copy button.
 - **A separate identity.** `GET /s/{token}` exchanges the token for a signed cookie scoped to
   `/guest/`, with a different name, path, and signing domain from the author session. Neither
   credential works on the other's routes. Guest pages send `Cache-Control: no-store` and

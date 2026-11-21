@@ -19,6 +19,21 @@ draft is keyed by the link, so two holders of the same URL would share one body.
 for each reviewer. Drafts persist after expiry or revocation but become unreachable through the
 guest routes.
 
+### Link token recovery (v0.5.9+)
+
+To make Copy work on an active link after a reload, each row keeps a random, non-secret seed; the
+token is recomputed from it under a key derived from `VERSE_AUTH_SECRET`. Only the seed and the
+token's SHA-256 are stored, so **a database read or backup alone still yields no usable URL**.
+The accepted trade-off is narrower than plaintext: an attacker who obtains both the database and
+the application secret can recover active links. Plaintext tokens are never stored.
+
+`token_hash` remains the lookup key and doubles as the integrity check — a derived token is only
+shown when its hash matches the stored value. Rotating `VERSE_AUTH_SECRET` therefore leaves existing
+URLs working for their holders but removes the author's ability to re-copy them; Share reports that
+the link must be recreated rather than handing out a token that would not resolve. Links created
+before v0.5.9 have no seed and likewise have no Copy button. No old key is retained, so rotation does
+not extend the lifetime of a session-forging credential.
+
 ## Reporting a vulnerability
 
 Report privately through GitHub's security advisory form on this repository

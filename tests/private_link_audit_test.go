@@ -190,7 +190,7 @@ func TestPrivateLinkUsesTheAuthorOriginNotTheReaderOrigin(t *testing.T) {
 	id := insertPoem(t, "A Work\n\nIts body.")
 
 	form := url.Values{"id": {id}}
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode()))
+	req := withTestLinkKey(httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode())))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Host = "author.example"
 	rec := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestPrivateLinkUsesTheAuthorOriginNotTheReaderOrigin(t *testing.T) {
 
 	// Render terminates TLS: r.TLS is nil and the original scheme arrives in X-Forwarded-Proto.
 	// A client-supplied "http" in front of an honest "https" must not downgrade the capability.
-	req = httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode()))
+	req = withTestLinkKey(httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode())))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("X-Forwarded-Proto", "http, https")
 	req.Host = "author.example"
@@ -240,7 +240,7 @@ func TestPrivateLinkRefusesAMalformedHost(t *testing.T) {
 	id := insertPoem(t, "A Work\n\nIts body.")
 
 	form := url.Values{"id": {id}}
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode()))
+	req := withTestLinkKey(httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/share/link", strings.NewReader(form.Encode())))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Host = "evil@example.com"
 	rec := httptest.NewRecorder()

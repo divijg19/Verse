@@ -50,3 +50,9 @@ func shareAddress() string {
 func guestLinkURL(base, token string) string {
 	return strings.TrimRight(base, "/") + guestLinkPath + url.PathEscape(token)
 }
+
+// publicLinkURL builds a public submission link on the authoring origin, using the same escaping
+// and base handling as private links so the two cannot drift apart.
+func publicLinkURL(base, token string) string {
+	return strings.TrimRight(base, "/") + publicLinkPath + url.PathEscape(token)
+}
