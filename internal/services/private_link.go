@@ -74,46 +74,117 @@ type WorkProposal struct {
 	AppliedAt *time.Time
 }
 
-// CreatePrivateLink mints a link for one work and returns the raw token once.
-//
-// The raw token is returned to the caller and never stored. Only its SHA-256 and a random seed are
-// written; a backup or a read of the table cannot open the link without the server's key. The token
-// is recomputed from the seed when the author loads Share, which is what makes Copy work on reload.
+// GetOrCreatePrivateLink returns the work's newest recoverable active link, or mints one when there
+// is none. It never extends an existing link's expiry and never changes its token: a repeated click
+// is a read, not a second capability. The poem row is locked for the whole decision so concurrent
+// clicks cannot both report that they created a link, and a revoke taking the same lock cannot turn
+// the returned URL into a dead one between the read and the commit.
+func GetOrCreatePrivateLink(ctx context.Context, key linktoken.Key, poemID string) (token, id, expiresAt string, created bool, err error) {
+	return createOrReusePrivateLink(ctx, key, poemID, false)
+}
+
+// CreatePrivateLink always mints a fresh row. It backs the explicit "New private link" action: each
+// row is one reviewer's conversation, so a new one is added rather than replacing an existing link
+// and invalidating the guest who holds it.
 func CreatePrivateLink(ctx context.Context, key linktoken.Key, poemID string) (token, id, expiresAt string, err error) {
+	token, id, expiresAt, _, err = createOrReusePrivateLink(ctx, key, poemID, true)
+	return token, id, expiresAt, err
+}
+
+func createOrReusePrivateLink(ctx context.Context, key linktoken.Key, poemID string, forceNew bool) (token, id, expiresAt string, created bool, err error) {
 	if err := database.Require(); err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
+	}
+
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return "", "", "", false, err
+	}
+	defer func() { discardRollback(tx.Rollback(ctx)) }()
+
+	// The poem row is the mutex for every mint on this work. ApplyWorkProposal locks proposal then
+	// poem, so taking only the poem lock here cannot close a cycle. The deleted_at guard withdraws
+	// links to works in the recycle.
+	var probe int
+	if err := tx.QueryRow(ctx, `SELECT 1 FROM poems WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, poemID).Scan(&probe); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", "", "", false, ErrNotFound
+		}
+		return "", "", "", false, err
+	}
+
+	now := clock.NowUTC()
+	if !forceNew {
+		// Newest first, with an id tiebreak: clock.NowUTC() is a seam, so tests can make two mints
+		// share an instant and the choice must still be deterministic.
+		rows, err := tx.Query(ctx, `
+            SELECT id, token_seed, token_hash, expires_at
+            FROM private_links
+            WHERE poem_id = $1 AND revoked_at IS NULL AND expires_at > $2
+            ORDER BY created_at DESC, id DESC`, poemID, now)
+		if err != nil {
+			return "", "", "", false, err
+		}
+		found := false
+		for rows.Next() {
+			var rowID, hash string
+			var seed sql.NullString
+			var expiry time.Time
+			if err := rows.Scan(&rowID, &seed, &hash, &expiry); err != nil {
+				rows.Close()
+				return "", "", "", false, err
+			}
+			if !seed.Valid {
+				continue // a pre-v0.5.9 row cannot be recovered; an older recoverable row may still serve
+			}
+			candidate, err := linktoken.Recover(key, linktoken.Private, seed.String, hash)
+			if err != nil {
+				continue // a rotated key cannot reproduce this row's token
+			}
+			token, id, expiresAt = candidate, rowID, expiry.UTC().Format(time.RFC3339)
+			found = true
+			break
+		}
+		rowErr := rows.Err()
+		rows.Close()
+		if rowErr != nil {
+			return "", "", "", false, rowErr
+		}
+		if found {
+			if err := tx.Commit(ctx); err != nil {
+				return "", "", "", false, err
+			}
+			return token, id, expiresAt, false, nil
+		}
 	}
 
 	seed, token, err := linktoken.Mint(key, linktoken.Private)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 	hash := linktoken.HashToken(token)
-
-	now := clock.NowUTC()
 	expiry := now.Add(PrivateLinkTTL)
 	linkID, err := uuid.NewRandom()
 	if err != nil {
-		return "", "", "", fmt.Errorf("generate a private link id: %w", err)
+		return "", "", "", false, fmt.Errorf("generate a private link id: %w", err)
 	}
-	id = linkID.String()
-
-	tag, err := database.Pool.Exec(ctx, `
+	tag, err := tx.Exec(ctx, `
         INSERT INTO private_links (id, poem_id, token_hash, token_seed, created_at, expires_at)
-        SELECT $1, $2, $3, $4, $5, $6
-        WHERE EXISTS (SELECT 1 FROM poems WHERE id = $2 AND deleted_at IS NULL)`,
+        VALUES ($1, $2, $3, $4, $5, $6)`,
 		linkID, poemID, hash, seed, now, expiry)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", false, err
 	}
 	if tag.RowsAffected() == 0 {
-		return "", "", "", ErrNotFound
+		return "", "", "", false, ErrNotFound
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", "", "", false, err
 	}
 
-	// The stored instant is returned rather than recomputed by the caller. Two independent clocks
-	// would let the JSON the author sees disagree with the row the server enforces, and the editor's
-	// countdown should count down to the instant that is actually stored.
-	return token, id, expiry.Format(time.RFC3339), nil
+	// Return the instant that was written so the editor's countdown matches the row the server
+	// enforces. UTC keeps this string identical to the one the reuse path formats from the row.
+	return token, linkID.String(), expiry.UTC().Format(time.RFC3339), true, nil
 }
 
 // ResolvePrivateLink validates a token and returns the session it grants.
@@ -201,7 +272,7 @@ func ListPrivateLinks(ctx context.Context, poemID string) ([]PrivateLink, error)
         SELECT id, poem_id, created_at, expires_at, revoked_at, token_seed, token_hash
         FROM private_links
         WHERE poem_id = $1
-        ORDER BY created_at DESC`, poemID)
+        ORDER BY created_at DESC, id DESC`, poemID)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +306,24 @@ func RevokePrivateLink(ctx context.Context, poemID, linkID string) error {
 		return err
 	}
 
-	tag, err := database.Pool.Exec(ctx, `
+	// Take the same poem lock as mint, in the same order. Without it a revoke can commit between
+	// mint's read of an active row and mint's response, handing the author a URL that is already
+	// dead. The lock is held until the revoke commits, so the two actions linearize cleanly.
+	tx, err := database.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { discardRollback(tx.Rollback(ctx)) }()
+
+	var probe int
+	if err := tx.QueryRow(ctx, `SELECT 1 FROM poems WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, poemID).Scan(&probe); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNoLink
+		}
+		return err
+	}
+
+	tag, err := tx.Exec(ctx, `
         UPDATE private_links SET revoked_at = $3
         WHERE id = $1 AND poem_id = $2 AND revoked_at IS NULL`, linkID, poemID, clock.NowUTC())
 	if err != nil {
@@ -244,7 +332,7 @@ func RevokePrivateLink(ctx context.Context, poemID, linkID string) error {
 	if tag.RowsAffected() == 0 {
 		return ErrNoLink
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 // ListWorkProposals returns a work's proposals, newest first.

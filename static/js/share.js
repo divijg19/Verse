@@ -171,7 +171,15 @@
       return null;
     }
   }
-  function linkButtons(id, copyAttr, revokeAttr, revoked, url) {
+  function linkButtons(
+    id,
+    copyAttr,
+    revokeAttr,
+    revoked,
+    url,
+    newAttr = null,
+    rotateAttr = null,
+  ) {
     const group = document.createElement("div");
     group.className = "verse-share-link-buttons";
     if (url) {
@@ -182,6 +190,22 @@
       copy.setAttribute(copyAttr, id);
       copy.setAttribute("data-copy-url", url);
       group.appendChild(copy);
+    }
+    if (newAttr) {
+      const fresh = document.createElement("button");
+      fresh.type = "button";
+      fresh.className = "verse-share-link-copy";
+      fresh.textContent = "New";
+      fresh.setAttribute(newAttr, id);
+      group.appendChild(fresh);
+    }
+    if (rotateAttr) {
+      const rotate = document.createElement("button");
+      rotate.type = "button";
+      rotate.className = "verse-share-link-copy";
+      rotate.textContent = "Rotate";
+      rotate.setAttribute(rotateAttr, id);
+      group.appendChild(rotate);
     }
     const revoke = document.createElement("button");
     revoke.type = "button";
@@ -241,6 +265,7 @@
           "data-revoke",
           link.revoked,
           link.url ?? "",
+          "data-new",
         ),
       );
       list.appendChild(row);
@@ -281,6 +306,8 @@
           "data-public-revoke",
           link.revoked,
           link.url ?? "",
+          null,
+          "data-public-rotate",
         ),
       );
       list.appendChild(row);
@@ -345,6 +372,47 @@
         if (!(target instanceof HTMLButtonElement)) {
           return;
         }
+        const freshID = target.dataset.new;
+        if (freshID) {
+          const current = picker();
+          const workID = current?.value ?? "";
+          const response = await postForm("/share/link/new", { id: workID });
+          if (!response?.ok) {
+            report("Could not create a new private link.");
+            return;
+          }
+          const data = await response.json();
+          const ok = await copyText(data.url);
+          report(
+            ok
+              ? "New private link copied."
+              : "New link created, but the clipboard is unavailable.",
+          );
+          await refreshLinks(workID);
+          return;
+        }
+        const rotateID = target.dataset.publicRotate;
+        if (rotateID) {
+          const current = picker();
+          const workID = current?.value ?? "";
+          const response = await postForm("/share/public-link/rotate", {
+            id: workID,
+            link: rotateID,
+          });
+          if (!response?.ok) {
+            report("Could not rotate that public link.");
+            return;
+          }
+          const data = await response.json();
+          const ok = await copyText(data.url);
+          report(
+            ok
+              ? "Public link rotated and copied. The previous URL no longer works."
+              : "Public link rotated, but the clipboard is unavailable.",
+          );
+          await refreshLinks(workID);
+          return;
+        }
         const copyID = target.dataset.copy ?? target.dataset.publicCopy;
         if (copyID) {
           const url = target.dataset.copyUrl;
@@ -391,12 +459,22 @@
         if (action === "public") {
           const response = await postForm("/share/public-link", { id });
           if (!response?.ok) {
-            report("Could not create a public link. Publish the work first.");
+            report(
+              response?.status === 409
+                ? "Publish the work first, or use Rotate on an existing public link."
+                : "Could not create a public link.",
+            );
             return;
           }
           const data = await response.json();
           const ok = await copyText(data.url);
-          report(ok ? "Public link copied." : "Could not copy the link.");
+          report(
+            ok
+              ? data.created
+                ? "Public link created and copied."
+                : "Existing public link copied."
+              : "Could not copy the link.",
+          );
           await refreshLinks(id);
           return;
         }
@@ -408,7 +486,13 @@
           }
           const data = await response.json();
           const ok = await copyText(data.url);
-          report(ok ? "Private link copied." : "Could not copy the link.");
+          report(
+            ok
+              ? data.created
+                ? "Private link created and copied."
+                : "Existing private link copied."
+              : "Could not copy the link.",
+          );
           await refreshLinks(id);
           return;
         }

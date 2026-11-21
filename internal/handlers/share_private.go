@@ -16,17 +16,39 @@ import (
 // Author-side endpoints for private links. All of these sit inside the authenticated group and must
 // pass CSRF: minting a capability to edit a work is as sensitive as publishing it.
 
-// ShareLinkHandler mints a private link for one work and returns its URL.
+// privateLinkResult is the shared response for the idempotent and explicit-create actions. The
+// created flag lets the browser say "Existing link copied" instead of claiming it made a new one.
+type privateLinkResult struct {
+	ID        string `json:"id"`
+	URL       string `json:"url"`
+	ExpiresAt string `json:"expiresAt"`
+	Created   bool   `json:"created"`
+}
+
+// ShareLinkHandler returns the work's active private link, minting one only if there is none.
 //
-// The raw token is shown here and can be copied again from Share while the link is active: the row
-// keeps a random seed and the token is derived from it under a server-held key. Only the hash and
-// the non-secret seed are stored, so a database read alone cannot reproduce a usable capability.
+// A repeated click is a read: the stored token and expiry are returned unchanged, so no holder is
+// invalidated and the eight-hour window is never extended. The explicit New action is the only way
+// to issue a second capability.
 func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireFormWorkID(w, r)
 	if !ok {
 		return
 	}
+	writePrivateLink(w, r, id, false)
+}
 
+// ShareLinkNewHandler always mints a fresh private link, leaving every existing row -- and the guest
+// conversation bound to it -- untouched. One link is one reviewer's continuous draft.
+func ShareLinkNewHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireFormWorkID(w, r)
+	if !ok {
+		return
+	}
+	writePrivateLink(w, r, id, true)
+}
+
+func writePrivateLink(w http.ResponseWriter, r *http.Request, id string, forceNew bool) {
 	key, ok := linktoken.KeyFrom(r.Context())
 	if !ok {
 		fail500(w, r, "link token key is not configured", errors.New("missing link token key"))
@@ -46,7 +68,14 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, linkID, expiresAt, err := services.CreatePrivateLink(r.Context(), key, id)
+	var token, linkID, expiresAt string
+	var created bool
+	if forceNew {
+		token, linkID, expiresAt, err = services.CreatePrivateLink(r.Context(), key, id)
+		created = true
+	} else {
+		token, linkID, expiresAt, created, err = services.GetOrCreatePrivateLink(r.Context(), key, id)
+	}
 	if err != nil {
 		if errors.Is(err, services.ErrNotFound) {
 			http.Error(w, "no such work", http.StatusNotFound)
@@ -56,14 +85,11 @@ func ShareLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shareJSON(w, struct {
-		ID        string `json:"id"`
-		URL       string `json:"url"`
-		ExpiresAt string `json:"expiresAt"`
-	}{
+	shareJSON(w, privateLinkResult{
 		ID:        linkID,
 		URL:       guestLinkURL(base, token),
 		ExpiresAt: expiresAt,
+		Created:   created,
 	})
 }
 

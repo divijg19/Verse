@@ -15,8 +15,9 @@ A Public Link is the only unauthenticated write surface: the URL is a bearer cap
 published work. Its submissions are appended, never applied automatically, and reviewed by the
 author. Entry and submission are rate-limited per address; a double-submit CSRF cookie is defence in
 depth, not the access control. A private link is a different capability for one person: the editor
-draft is keyed by the link, so two holders of the same URL would share one body. Mint a separate link
-for each reviewer. Drafts persist after expiry or revocation but become unreachable through the
+draft is keyed by the link, so two holders of the same URL would share one body. Use the explicit
+**New** action to create a separate link for each reviewer; the primary "Private Link" button
+returns the existing active link. Drafts persist after expiry or revocation but become unreachable through the
 guest routes.
 
 ### Link token recovery (v0.5.9+)
@@ -29,10 +30,17 @@ the application secret can recover active links. Plaintext tokens are never stor
 
 `token_hash` remains the lookup key and doubles as the integrity check — a derived token is only
 shown when its hash matches the stored value. Rotating `VERSE_AUTH_SECRET` therefore leaves existing
-URLs working for their holders but removes the author's ability to re-copy them; Share reports that
-the link must be recreated rather than handing out a token that would not resolve. Links created
-before v0.5.9 have no seed and likewise have no Copy button. No old key is retained, so rotation does
-not extend the lifetime of a session-forging credential.
+URLs working for their holders but removes the author's ability to re-copy them; Share shows no Copy
+button rather than handing out a token that would not resolve. Links created before v0.5.9 have no
+seed and likewise have no Copy button. No old key is retained, so rotation does not extend the
+lifetime of a session-forging credential.
+
+The two Share buttons are idempotent while a recoverable active link exists under the current key:
+they return the existing link without changing its token or expiry, so a repeated click never
+invalidates a capability already handed out. When no link can be recovered they mint a fresh one
+instead. **New** (private) adds a second conversation; **Rotate** (public) issues a fresh token on the
+same row and deliberately retires the old URL. A revoked or unrecoverable public link is never
+silently repaired, because the holders of the old URL cannot be told it changed.
 
 ## Reporting a vulnerability
 

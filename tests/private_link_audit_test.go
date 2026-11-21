@@ -266,7 +266,21 @@ func TestGuestDraftPersistsAndIsPerLink(t *testing.T) {
 	id := insertPoem(t, original)
 	srv := newTestServer(t)
 	_, firstToken := mintLink(t, srv.URL, id)
-	_, secondToken := mintLink(t, srv.URL, id)
+	// /share/link is idempotent now; a second reviewer needs the explicit New action.
+	status, newBody, _ := postForm(t, srv.URL+"/share/link/new", urlValues("id", id), nil)
+	if status != http.StatusOK {
+		t.Fatalf("new private link = %d; body: %s", status, truncate([]byte(newBody)))
+	}
+	var newLink struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(newBody), &newLink); err != nil {
+		t.Fatal(err)
+	}
+	secondToken := strings.TrimPrefix(newLink.URL, srv.URL+"/s/")
+	if secondToken == firstToken {
+		t.Fatal("New returned the existing link")
+	}
 
 	first := guestClient(t, srv)
 	if status, _, _ := guestGet(t, first, srv.URL+"/s/"+firstToken); status != http.StatusSeeOther {

@@ -20,7 +20,17 @@ import (
 
 const publicCSRFCookie = "verse_public_csrf"
 
-// SharePublicLinkHandler mints an unauthenticated submission link for a published work.
+// publicLinkResult is shared by the idempotent and rotate responses so the browser can distinguish
+// a reused link from a newly issued one without parsing the token.
+type publicLinkResult struct {
+	ID      string `json:"id"`
+	URL     string `json:"url"`
+	Created bool   `json:"created"`
+}
+
+// SharePublicLinkHandler returns the work's public submission link, minting one only when the work
+// has none. Reuse changes nothing: the token already handed out stays live. A revoked or
+// unrecoverable row is never silently repaired -- that would strand everyone holding the old URL.
 func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 	id, ok := requireFormWorkID(w, r)
 	if !ok {
@@ -36,19 +46,58 @@ func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 		fail500(w, r, "link token key is not configured", errors.New("missing link token key"))
 		return
 	}
-	token, linkID, err := services.CreatePublicLink(r.Context(), key, id)
+	token, linkID, created, err := services.GetOrCreatePublicLink(r.Context(), key, id)
 	if err != nil {
-		if errors.Is(err, services.ErrWorkNotPublic) {
-			http.Error(w, "only a published work can receive public submissions", http.StatusConflict)
-			return
-		}
-		fail500(w, r, "failed to create a public submission link", err)
+		writePublicLinkError(w, r, err, "failed to create a public submission link")
 		return
 	}
-	shareJSON(w, struct {
-		ID  string `json:"id"`
-		URL string `json:"url"`
-	}{ID: linkID, URL: publicLinkURL(base, token)})
+	shareJSON(w, publicLinkResult{ID: linkID, URL: publicLinkURL(base, token), Created: created})
+}
+
+// SharePublicLinkRotateHandler issues a fresh token on the same row. Submissions keep their link_id
+// attribution and the old URL stops resolving immediately. This is the only repair path for a
+// revoked or unrecoverable link.
+func SharePublicLinkRotateHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := requireFormWorkID(w, r)
+	if !ok {
+		return
+	}
+	linkID, ok := parseWorkID(r.FormValue("link"))
+	if !ok {
+		http.Error(w, "invalid link id", http.StatusBadRequest)
+		return
+	}
+	base, err := origin.FromRequest(r)
+	if err != nil {
+		http.Error(w, "could not build the public submission link", http.StatusBadRequest)
+		return
+	}
+	key, ok := linktoken.KeyFrom(r.Context())
+	if !ok {
+		fail500(w, r, "link token key is not configured", errors.New("missing link token key"))
+		return
+	}
+	token, publicID, err := services.RotatePublicLink(r.Context(), key, id, linkID)
+	if err != nil {
+		writePublicLinkError(w, r, err, "failed to rotate a public submission link")
+		return
+	}
+	shareJSON(w, publicLinkResult{ID: publicID, URL: publicLinkURL(base, token), Created: true})
+}
+
+func writePublicLinkError(w http.ResponseWriter, r *http.Request, err error, message string) {
+	switch {
+	case errors.Is(err, services.ErrWorkNotPublic):
+		http.Error(w, "only a published work can receive public submissions", http.StatusConflict)
+	case errors.Is(err, services.ErrPublicLinkRevoked):
+		http.Error(w, "the public link was revoked; rotate it for a fresh one", http.StatusConflict)
+	case errors.Is(err, services.ErrLinkNotRecoverable):
+		http.Error(w, "the public link cannot be recovered; rotate it", http.StatusConflict)
+	case errors.Is(err, services.ErrNoPublicLink):
+		http.Error(w, "no such public link", http.StatusNotFound)
+	default:
+		fail500(w, r, message, err)
+	}
 }
 
 // SharePublicLinkRevokeHandler withdraws a public submission link.
