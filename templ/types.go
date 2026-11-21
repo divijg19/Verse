@@ -100,6 +100,10 @@ type PublicLinkView struct {
 	CreatedAt       time.Time `json:"createdAt"`
 	Revoked         bool      `json:"revoked"`
 	SubmissionCount int       `json:"submissionCount"`
+
+	// URL is empty for revoked links, legacy rows without a recoverable seed, and works no longer
+	// published. The browser renders Copy only when it is present.
+	URL string `json:"url"`
 }
 
 // PublicSubmissionView is one appended text from a Public Link, shown read-only in History.
@@ -143,6 +147,9 @@ type PrivateLinkView struct {
 	ExpiresAt     time.Time `json:"expiresAt"`
 	Revoked       bool      `json:"revoked"`
 	ProposalCount int       `json:"proposalCount"`
+
+	// URL is empty for expired or revoked links and for legacy rows with no recoverable seed.
+	URL string `json:"url"`
 }
 
 // PoemVersionView is one superseded revision, as rendered in a poem's history.

@@ -15,6 +15,7 @@ import (
 
 	"github.com/divijg19/Verse/internal/database"
 	"github.com/divijg19/Verse/internal/handlers"
+	"github.com/divijg19/Verse/internal/linktoken"
 	"github.com/divijg19/Verse/internal/services"
 )
 
@@ -256,6 +257,11 @@ func NewRouter() (*chi.Mux, error) {
 
 	cfg := LoadServerConfig()
 
+	// The link token key is derived from the same validated secret that signs sessions, under a
+	// distinct domain label. It is injected below rather than read by services: internal/services is
+	// a leaf and must not depend on process configuration.
+	linkKey := linktoken.Derive(authCfg.secret)
+
 	r := chi.NewRouter()
 
 	// First, so nothing downstream sees an unbounded caller-supplied value. middleware.RequestID
@@ -373,6 +379,11 @@ func NewRouter() (*chi.Mux, error) {
 	r.Group(func(priv chi.Router) {
 		priv.Use(requireAuth(authCfg))
 		priv.Use(requireCSRF(authCfg))
+		priv.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				next.ServeHTTP(w, r.WithContext(linktoken.WithKey(r.Context(), linkKey)))
+			})
+		})
 
 		priv.Post("/logout", logoutHandler)
 

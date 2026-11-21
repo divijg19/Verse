@@ -20,6 +20,8 @@ interface PrivateLinkView {
   expiresAt: string;
   revoked: boolean;
   proposalCount: number;
+  /** Present only for an active link the server can still recover. */
+  url: string;
 }
 
 interface PublicLinkView {
@@ -28,6 +30,8 @@ interface PublicLinkView {
   createdAt: string;
   revoked: boolean;
   submissionCount: number;
+  /** Present only for an active link the server can still recover. */
+  url: string;
 }
 
 /** The work the endpoint returns. */
@@ -110,10 +114,9 @@ async function postForm(
   }
 }
 
-// A minted URL is shown once and only its hash is stored server-side, so an existing link row has
-// no URL to copy. This page-session cache is the one place the raw URL survives after the mint;
-// it disappears on reload, which is the same promise the server makes about storage.
-const mintedLinks = new Map<string, string>();
+// Copy URLs come from the Share payload, not from a page-session cache. The server derives each
+// active link's URL from a stored seed, so a row minted in an earlier session still has a working
+// Copy button after reload. A row whose token cannot be recovered simply has no URL and no Copy.
 
 /** Builds Copy and Revoke buttons for one link row, with Revoke always rightmost. */
 function linkButtons(
@@ -121,17 +124,18 @@ function linkButtons(
   copyAttr: string,
   revokeAttr: string,
   revoked: boolean,
+  url: string,
 ): HTMLElement {
   const group = document.createElement("div");
   group.className = "verse-share-link-buttons";
 
-  const url = mintedLinks.get(id);
   if (url) {
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "verse-share-link-copy";
     copy.textContent = "Copy";
     copy.setAttribute(copyAttr, id);
+    copy.setAttribute("data-copy-url", url);
     group.appendChild(copy);
   }
 
@@ -195,7 +199,13 @@ function renderLinks(links: PrivateLinkView[]): void {
 
     row.append(
       details,
-      linkButtons(link.id, "data-copy", "data-revoke", link.revoked),
+      linkButtons(
+        link.id,
+        "data-copy",
+        "data-revoke",
+        link.revoked,
+        link.url ?? "",
+      ),
     );
     list.appendChild(row);
   }
@@ -236,6 +246,7 @@ function renderPublicLinks(links: PublicLinkView[]): void {
         "data-public-copy",
         "data-public-revoke",
         link.revoked,
+        link.url ?? "",
       ),
     );
     list.appendChild(row);
@@ -318,7 +329,7 @@ function init(): void {
       }
       const copyID = target.dataset.copy ?? target.dataset.publicCopy;
       if (copyID) {
-        const url = mintedLinks.get(copyID);
+        const url = target.dataset.copyUrl;
         if (url) {
           void copyText(url).then((ok) =>
             report(
@@ -340,7 +351,6 @@ function init(): void {
         { id: workID, link: publicID ?? linkID ?? "" },
       );
       if (response?.ok) {
-        mintedLinks.delete(publicID ?? linkID ?? "");
         report("Link revoked.");
         await refreshLinks(workID);
       } else {
@@ -368,7 +378,6 @@ function init(): void {
           return;
         }
         const data = (await response.json()) as { id: string; url: string };
-        mintedLinks.set(data.id, data.url);
         const ok = await copyText(data.url);
         report(ok ? "Public link copied." : "Could not copy the link.");
         await refreshLinks(id);
@@ -382,7 +391,6 @@ function init(): void {
           return;
         }
         const data = (await response.json()) as { id: string; url: string };
-        mintedLinks.set(data.id, data.url);
         const ok = await copyText(data.url);
         report(ok ? "Private link copied." : "Could not copy the link.");
         await refreshLinks(id);

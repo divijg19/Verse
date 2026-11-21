@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"crypto/sha256"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/linktoken"
 	"github.com/divijg19/Verse/internal/migrate"
 	appserver "github.com/divijg19/Verse/internal/server"
 	"github.com/divijg19/Verse/internal/testsupport"
@@ -31,6 +33,14 @@ const (
 	testCSRFCookie    = "verse_csrf"
 	testSessionCookie = "verse_session"
 )
+
+// withTestLinkKey injects the derived link key into a direct handler request. Routed requests get it
+// from the router middleware; tests that call handlers directly must supply it themselves.
+func withTestLinkKey(req *http.Request) *http.Request {
+	digest := sha256.Sum256([]byte(testAuthSecret))
+	key := linktoken.Derive(digest[:])
+	return req.WithContext(linktoken.WithKey(req.Context(), key))
+}
 
 // authClient is the shared client for the suite. It carries a cookie jar and automatically attaches
 // the CSRF synchroniser token to mutating requests, mirroring what a browser does after login.

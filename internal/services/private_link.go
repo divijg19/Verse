@@ -2,9 +2,7 @@ package services
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/divijg19/Verse/internal/clock"
 	"github.com/divijg19/Verse/internal/database"
+	"github.com/divijg19/Verse/internal/linktoken"
 )
 
 // PrivateLinkTTL is how long a link may be opened and a proposal sent.
@@ -42,6 +41,12 @@ type PrivateLink struct {
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	RevokedAt *time.Time
+
+	// TokenSeed is NULL for links minted before v0.5.9; their tokens cannot be recovered. It is a
+	// sql.NullString because pgx refuses to scan a NULL into a plain string, which would otherwise
+	// make one legacy row hide every link on the work when Share swallows the list error.
+	TokenSeed sql.NullString
+	TokenHash string
 }
 
 // PrivateLinkSession is the scoped identity a link grants to its holder.
@@ -71,22 +76,19 @@ type WorkProposal struct {
 
 // CreatePrivateLink mints a link for one work and returns the raw token once.
 //
-// The raw token is returned to the caller and never stored. Only its SHA-256 is written, so a backup
-// or a read of the table cannot be used to open the link. 256 bits from crypto/rand make guessing it
-// infeasible, which is what lets the lookup be a hash comparison over an indexed column.
-func CreatePrivateLink(ctx context.Context, poemID string) (token, id, expiresAt string, err error) {
+// The raw token is returned to the caller and never stored. Only its SHA-256 and a random seed are
+// written; a backup or a read of the table cannot open the link without the server's key. The token
+// is recomputed from the seed when the author loads Share, which is what makes Copy work on reload.
+func CreatePrivateLink(ctx context.Context, key linktoken.Key, poemID string) (token, id, expiresAt string, err error) {
 	if err := database.Require(); err != nil {
 		return "", "", "", err
 	}
 
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", "", "", fmt.Errorf("generate a private link token: %w", err)
+	seed, token, err := linktoken.Mint(key, linktoken.Private)
+	if err != nil {
+		return "", "", "", err
 	}
-
-	token = hex.EncodeToString(raw)
-	sum := sha256.Sum256([]byte(token))
-	hash := hex.EncodeToString(sum[:])
+	hash := linktoken.HashToken(token)
 
 	now := clock.NowUTC()
 	expiry := now.Add(PrivateLinkTTL)
@@ -97,10 +99,10 @@ func CreatePrivateLink(ctx context.Context, poemID string) (token, id, expiresAt
 	id = linkID.String()
 
 	tag, err := database.Pool.Exec(ctx, `
-        INSERT INTO private_links (id, poem_id, token_hash, created_at, expires_at)
-        SELECT $1, $2, $3, $4, $5
+        INSERT INTO private_links (id, poem_id, token_hash, token_seed, created_at, expires_at)
+        SELECT $1, $2, $3, $4, $5, $6
         WHERE EXISTS (SELECT 1 FROM poems WHERE id = $2 AND deleted_at IS NULL)`,
-		linkID, poemID, hash, now, expiry)
+		linkID, poemID, hash, seed, now, expiry)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -131,8 +133,7 @@ func ResolvePrivateLink(ctx context.Context, token string) (PrivateLinkSession, 
 		return session, ErrNoLink
 	}
 
-	sum := sha256.Sum256([]byte(token))
-	hash := hex.EncodeToString(sum[:])
+	hash := linktoken.HashToken(token)
 
 	var linkID, poemID string
 	var expiresAt time.Time
@@ -197,7 +198,7 @@ func ListPrivateLinks(ctx context.Context, poemID string) ([]PrivateLink, error)
 	}
 
 	rows, err := database.Pool.Query(ctx, `
-        SELECT id, poem_id, created_at, expires_at, revoked_at
+        SELECT id, poem_id, created_at, expires_at, revoked_at, token_seed, token_hash
         FROM private_links
         WHERE poem_id = $1
         ORDER BY created_at DESC`, poemID)
@@ -209,7 +210,7 @@ func ListPrivateLinks(ctx context.Context, poemID string) ([]PrivateLink, error)
 	var out []PrivateLink
 	for rows.Next() {
 		var link PrivateLink
-		if err := rows.Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.ExpiresAt, &link.RevokedAt); err != nil {
+		if err := rows.Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.ExpiresAt, &link.RevokedAt, &link.TokenSeed, &link.TokenHash); err != nil {
 			return nil, err
 		}
 		out = append(out, link)

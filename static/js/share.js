@@ -171,17 +171,16 @@
       return null;
     }
   }
-  var mintedLinks = new Map();
-  function linkButtons(id, copyAttr, revokeAttr, revoked) {
+  function linkButtons(id, copyAttr, revokeAttr, revoked, url) {
     const group = document.createElement("div");
     group.className = "verse-share-link-buttons";
-    const url = mintedLinks.get(id);
     if (url) {
       const copy = document.createElement("button");
       copy.type = "button";
       copy.className = "verse-share-link-copy";
       copy.textContent = "Copy";
       copy.setAttribute(copyAttr, id);
+      copy.setAttribute("data-copy-url", url);
       group.appendChild(copy);
     }
     const revoke = document.createElement("button");
@@ -236,7 +235,13 @@
       details.append(summary, times);
       row.append(
         details,
-        linkButtons(link.id, "data-copy", "data-revoke", link.revoked),
+        linkButtons(
+          link.id,
+          "data-copy",
+          "data-revoke",
+          link.revoked,
+          link.url ?? "",
+        ),
       );
       list.appendChild(row);
     }
@@ -275,6 +280,7 @@
           "data-public-copy",
           "data-public-revoke",
           link.revoked,
+          link.url ?? "",
         ),
       );
       list.appendChild(row);
@@ -341,7 +347,7 @@
         }
         const copyID = target.dataset.copy ?? target.dataset.publicCopy;
         if (copyID) {
-          const url = mintedLinks.get(copyID);
+          const url = target.dataset.copyUrl;
           if (url) {
             copyText(url).then((ok) =>
               report(
@@ -365,7 +371,6 @@
           { id: workID, link: publicID ?? linkID ?? "" },
         );
         if (response?.ok) {
-          mintedLinks.delete(publicID ?? linkID ?? "");
           report("Link revoked.");
           await refreshLinks(workID);
         } else {
@@ -390,7 +395,6 @@
             return;
           }
           const data = await response.json();
-          mintedLinks.set(data.id, data.url);
           const ok = await copyText(data.url);
           report(ok ? "Public link copied." : "Could not copy the link.");
           await refreshLinks(id);
@@ -403,7 +407,6 @@
             return;
           }
           const data = await response.json();
-          mintedLinks.set(data.id, data.url);
           const ok = await copyText(data.url);
           report(ok ? "Private link copied." : "Could not copy the link.");
           await refreshLinks(id);

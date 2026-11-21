@@ -52,6 +52,8 @@ var forbiddenAuthoringPaths = []string{
 	"/logout",
 	"/library",
 	"/poem/",
+	"/s/", // private submission capability — never a public-site route
+	"/p/", // public submission capability — never a public-site route
 	"/static/js/",
 	"/static/css/",
 }

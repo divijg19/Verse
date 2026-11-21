@@ -36,6 +36,9 @@ const maxGuestName = 80
 // guestLinkPath is the prefix of every shareable private link.
 const guestLinkPath = "/s/"
 
+// publicLinkPath is the prefix of every shareable public submission link.
+const publicLinkPath = "/p/"
+
 // guestEditorPath is where an entry redirects and where the limited editor lives.
 const guestEditorPath = "/guest/edit"
 
