@@ -3,9 +3,9 @@ import { copyText, savePNG, type ShareWork } from "./share_card";
 // The public site's one script.
 //
 // The public site ships no JavaScript by default: the archive is the complete list of published
-// work, every work has its own page, and the Share page shows each work's address. All of that is in
-// the markup and works with the script blocked. What this file adds is convenience on top of it --
-// narrowing the archive, and copying a work's text, address or card.
+// work, and every work has its own page. All of that is in the markup and works with the script
+// blocked. What this file adds is convenience on top of it -- narrowing the archive, and copying a
+// work's text, address or card. The buttons are hidden until this file has wired them.
 //
 // It is still one script, because the validator permits exactly one and refuses an inline script or
 // a foreign one. The three Share actions use the shared module, so the reader's site and the
@@ -48,8 +48,8 @@ const indexURL = "/search.json";
 /**
  * The list this box filters.
  *
- * Nothing happens unless the archive's list is on the page, so the front screen and the share
- * screen are untouched by any of this.
+ * Nothing happens unless the archive's list is on the page, so the front screen and the work pages
+ * are untouched by any of this.
  */
 const list = document.querySelector<HTMLOListElement>(".work-list");
 
@@ -86,7 +86,7 @@ function entryFor(
   row: HTMLLIElement,
   entries: Map<string, VerseSearchEntry>,
 ): VerseSearchEntry | null {
-  const link = row.querySelector<HTMLAnchorElement>("a");
+  const link = row.querySelector<HTMLAnchorElement>("a.share-title");
   const path = link ? link.getAttribute("href") : null;
   return path ? (entries.get(path) ?? null) : null;
 }
@@ -307,8 +307,9 @@ function wireCard(card: HTMLElement): void {
   const title = card.querySelector(".share-title")?.textContent?.trim() ?? "";
   const link = card.querySelector<HTMLAnchorElement>("a.share-title");
   const path = link?.getAttribute("href") ?? "";
-  const address =
-    card.querySelector(".share-address")?.textContent?.trim() ?? "";
+  // The absolute address is carried in a data attribute, not shown as page text. The rooted path
+  // would be wrong for a reader sharing the work off this site.
+  const address = card.dataset.shareAddress ?? "";
   const published = card.querySelector("time")?.getAttribute("datetime") ?? "";
 
   const actions = card.querySelectorAll<HTMLButtonElement>(
@@ -320,10 +321,7 @@ function wireCard(card: HTMLElement): void {
 
       if (action === "link") {
         const ok = await copyText(address);
-        report(
-          button,
-          ok ? "Address copied." : "Could not copy; select the address above.",
-        );
+        report(button, ok ? "Address copied." : "Could not copy the address.");
         return;
       }
 
@@ -354,12 +352,18 @@ function wireCard(card: HTMLElement): void {
       }
     });
   }
+
+  // Only reveal controls that are already wired. A reader without this script sees no dead buttons.
+  const actionsBox = card.querySelector<HTMLElement>(".share-actions");
+  if (actionsBox) {
+    actionsBox.hidden = false;
+  }
 }
 
-function shareMain(): void {
+function wireArchiveActions(): void {
   for (const card of document.querySelectorAll<HTMLElement>(".share-item")) {
     wireCard(card);
   }
 }
 
-void shareMain();
+void wireArchiveActions();

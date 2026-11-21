@@ -131,16 +131,11 @@ func TestAuthorNavigationRenderedForEverySurface(t *testing.T) {
 	}
 }
 
-// TestPublicShellNavigatesOnScreen is the regression for the reader's navigation.
-//
-// The reader's pages were behind a bar of links. They are now in rails beside the content, so the
-// navigation is on the screen. The three reader-facing screens form a ring, and every one of them
-// carries a pill on each side.
+// TestPublicShellNavigatesOnScreen checks that each of the two reader screens carries one pill.
 func TestPublicShellNavigatesOnScreen(t *testing.T) {
 	for _, page := range []views.PublicPage{
 		views.PublicPageHome,
 		views.PublicPageArchive,
-		views.PublicPageShare,
 	} {
 		t.Run(string(page), func(t *testing.T) {
 			body := renderComponent(t, views.PublicLayout(
@@ -153,28 +148,25 @@ func TestPublicShellNavigatesOnScreen(t *testing.T) {
 
 			assertContainsAll(t, body,
 				`class="public-shell"`,
-				`class="public-rail public-rail--left"`,
-				`class="public-rail public-rail--right"`,
 				`class="rail-pill"`,
 				`class="rail-chevron"`,
 			)
+			if strings.Count(body, `class="rail-pill"`) != 1 {
+				t.Errorf("page %s does not carry exactly one rail", page)
+			}
 		})
 	}
 }
 
-// TestPublicRailsFormARing checks the shape of the reader's navigation.
-//
-// Home leads to the archive, the archive to share, and share back to home. The left rail is the
-// screen behind and the right rail is the screen ahead, so each page's two pills point in
-// opposite directions around the ring.
-func TestPublicRailsFormARing(t *testing.T) {
+// TestPublicRailsPointAtEachOther checks the two-screen navigation: Home and Archive point at one
+// another, and neither carries a second pill.
+func TestPublicRailsPointAtEachOther(t *testing.T) {
 	cases := []struct {
 		page        views.PublicPage
 		left, right string
 	}{
-		{page: views.PublicPageHome, left: "Share", right: "Archive"},
-		{page: views.PublicPageArchive, left: "Home", right: "Share"},
-		{page: views.PublicPageShare, left: "Archive", right: "Home"},
+		{page: views.PublicPageHome, right: "Archive"},
+		{page: views.PublicPageArchive, left: "Home"},
 	}
 
 	for _, tc := range cases {
@@ -189,7 +181,6 @@ func TestPublicRailsFormARing(t *testing.T) {
 
 			left := railLabelIn(body, "public-rail--left")
 			right := railLabelIn(body, "public-rail--right")
-
 			if left != tc.left {
 				t.Errorf("the left rail reads %q, want %q", left, tc.left)
 			}
@@ -233,7 +224,7 @@ func TestPublicBrandPillHoldsExternalSitesOnly(t *testing.T) {
 	)
 
 	// The site's own pages are not in the menu.
-	for _, internal := range []string{`href="/archive/"`, `href="/share/"`} {
+	for _, internal := range []string{`href="/archive/"`} {
 		if menu := between(body, `<div class="brand-menu">`, `</div>`); strings.Contains(menu, internal) {
 			t.Errorf("the brand menu links to the site's own page %q; the rails carry those", internal)
 		}
@@ -268,31 +259,20 @@ func TestPublicBrandPillIsAHomeLinkWithoutExternalSites(t *testing.T) {
 	}
 }
 
-// TestPublicPagesCarryNoAuthoringClassNames is the rule the public stylesheet states about itself.
-//
-// The public build ships no authoring markup, and a class name from the authoring side in a
-// public file is a class that renders unstyled. The Share page used two of them.
+// TestPublicPagesCarryNoAuthoringClassNames checks that no authoring marker reaches a public page.
 func TestPublicPagesCarryNoAuthoringClassNames(t *testing.T) {
 	site := views.PublicSite{Title: "Verse", BaseURL: "https://verse.test"}
 
 	for name, component := range map[string]page.Component{
 		"index":   views.PublicIndex(site),
 		"archive": views.PublicArchive(site),
-		"share":   views.PublicShare(site),
 		"404":     views.PublicNotFound(site),
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := renderComponent(t, component)
-
 			for _, forbidden := range []string{
-				"verse-button",
-				"verse-desktop-nav",
-				"verse-panel",
-				"verse-surface",
-				"verse-eyebrow",
-				"hx-get",
-				"hx-swap",
-				"hx-target",
+				"verse-button", "verse-desktop-nav", "verse-panel", "verse-surface",
+				"verse-eyebrow", "hx-get", "hx-swap", "hx-target",
 			} {
 				if strings.Contains(body, forbidden) {
 					t.Errorf("the public %s page carries the authoring marker %q", name, forbidden)
@@ -302,13 +282,9 @@ func TestPublicPagesCarryNoAuthoringClassNames(t *testing.T) {
 	}
 }
 
-// TestPublicShareOffersTheThreeActions checks the share surface.
-//
-// The reader gets the same three actions as the author: Copy Text, Copy Link and Card Export. The
-// address is still on the page in smaller text, as the fallback for a reader with no script; the
-// buttons are the primary path. Full body text is not in the markup, because it is not published
-// twice -- the actions read it from the work's own page.
-func TestPublicShareOffersTheThreeActions(t *testing.T) {
+// TestPublicArchiveOffersTheThreeActions checks the one screen that lists works and offers the three
+// actions. The address is not visible; it lives in a data attribute, and the buttons start hidden.
+func TestPublicArchiveOffersTheThreeActions(t *testing.T) {
 	site := views.PublicSite{
 		Title:   "Verse",
 		BaseURL: "https://verse.test",
@@ -317,54 +293,49 @@ func TestPublicShareOffersTheThreeActions(t *testing.T) {
 		},
 	}
 
-	body := renderComponent(t, views.PublicShare(site))
+	body := renderComponent(t, views.PublicArchive(site))
 
 	assertContainsAll(t, body,
 		`class="share-item"`,
-		`class="share-address">https://verse.test/w/a/</span>`,
-		`>The First Work</a>`,
+		`data-share-address="https://verse.test/w/a/"`,
+		`class="work-title share-title" href="/w/a/"`,
 		`data-share-action="text"`,
 		`data-share-action="link"`,
 		`data-share-action="card"`,
 		`>Copy Text</button>`,
 		`>Copy Link</button>`,
 		`>Card Export</button>`,
+		`<a href="/feed.xml">RSS feed</a>`,
 	)
-
-	// The address stays selectable in one click for the no-script fallback.
-	styles := readStaticFile(t, "../internal/publish/assets/public.css")
-	if !strings.Contains(styles, "user-select: all;") {
-		t.Error("the share address is not marked selectable in one click")
+	if strings.Contains(body, `class="share-address"`) || strings.Contains(body, `https://verse.test/w/a/</span>`) {
+		t.Error("the Archive exposes a raw work address as page text")
+	}
+	if strings.Contains(body, "Verse</h1>") {
+		t.Error("the Archive publishes a work's body twice")
 	}
 
-	// No work body may appear in the Share page: it lives on the work page alone.
-	if strings.Contains(body, "Verse</h1>") {
-		t.Error("the Share page publishes a work's body twice")
+	// The compiled bundle reads the data attribute and reveals the hidden group after wiring.
+	bundle := readRepoFile(t, "../internal/publish/assets/public.js")
+	for _, needle := range []string{"data-share-action", "dataset.shareAddress", "hidden = false"} {
+		if !strings.Contains(bundle, needle) {
+			t.Errorf("the public bundle does not contain %q", needle)
+		}
 	}
 }
 
-// TestPublicHomeShowsATeaserAndTheArchiveShowsEverything checks the redundancy the two pages used
-// to share.
-//
-// The front page showed a list of works and a link to a second list of the same works. The front
-// page now shows three, and the archive shows all of them and is the only place that lists every
-// work.
+// TestPublicHomeShowsATeaserAndTheArchiveShowsEverything checks that the front page stays a teaser
+// while the archive is the complete server-rendered index.
 func TestPublicHomeShowsATeaserAndTheArchiveShowsEverything(t *testing.T) {
-	// The dates are what decides the teaser, so they are the point of the fixture. Work Four is
-	// the newest and Work One the oldest; the front page shows the first three and leaves Work One
-	// behind.
+	// The dates decide the teaser: Work Four is newest and Work One oldest.
 	works := []views.PublicWork{
 		{ID: "a", Path: "/w/a/", Title: "Work One", PublishedAt: fixedPublicTime(1)},
 		{ID: "b", Path: "/w/b/", Title: "Work Two", PublishedAt: fixedPublicTime(2)},
 		{ID: "c", Path: "/w/c/", Title: "Work Three", PublishedAt: fixedPublicTime(3)},
 		{ID: "d", Path: "/w/d/", Title: "Work Four", PublishedAt: fixedPublicTime(4)},
 	}
+	site := views.PublicSite{Title: "Verse", BaseURL: "https://verse.test", Works: works}
 
-	home := renderComponent(t, views.PublicIndex(views.PublicSite{
-		Title: "Verse", BaseURL: "https://verse.test", Works: works,
-	}))
-
-	// The three most recent, and not the fourth.
+	home := renderComponent(t, views.PublicIndex(site))
 	for _, want := range []string{"Work Four", "Work Three", "Work Two"} {
 		if !strings.Contains(home, want) {
 			t.Errorf("the front page does not show %q", want)
@@ -374,22 +345,18 @@ func TestPublicHomeShowsATeaserAndTheArchiveShowsEverything(t *testing.T) {
 		t.Error("the front page shows more works than its teaser")
 	}
 
-	archive := renderComponent(t, views.PublicArchive(views.PublicSite{
-		Title: "Verse", BaseURL: "https://verse.test", Works: works,
-	}))
-
+	archive := renderComponent(t, views.PublicArchive(site))
 	for _, want := range []string{"Work One", "Work Two", "Work Three", "Work Four"} {
 		if !strings.Contains(archive, want) {
 			t.Errorf("the archive does not show %q", want)
 		}
 	}
+	if strings.Count(archive, `class="share-item"`) != len(works) {
+		t.Errorf("the archive rendered %d rows, want %d", strings.Count(archive, `class="share-item"`), len(works))
+	}
 }
 
-// TestPublicPagesDoNotBlatantlyTitleThemselves checks the redesign's premise.
-//
-// A page whose visible heading repeats the brand or the page name adds a line of large type
-// without adding information. Every page keeps a heading for the document's structure; none of
-// them shows it.
+// TestPublicPagesDoNotBlatantlyTitleThemselves checks that no visible heading repeats the page name.
 func TestPublicPagesDoNotBlatantlyTitleThemselves(t *testing.T) {
 	site := views.PublicSite{Title: "Verse", BaseURL: "https://verse.test"}
 
@@ -407,11 +374,6 @@ func TestPublicPagesDoNotBlatantlyTitleThemselves(t *testing.T) {
 	}
 	if !strings.Contains(archive, `<h1 class="visually-hidden">Archive</h1>`) {
 		t.Error("the archive has no heading at all")
-	}
-
-	share := renderComponent(t, views.PublicShare(site))
-	if strings.Contains(share, `<h1>Share</h1>`) {
-		t.Error("the share page renders its name as a visible heading")
 	}
 }
 
@@ -442,22 +404,16 @@ func TestPublicFrontScreenIsAHero(t *testing.T) {
 	}
 }
 
-// TestPublicShellHasNoFooter checks the footer's removal.
-//
-// The footer repeated the site's description, which the front screen already opens with, and it
-// sat at the bottom of a page whose content is the point.
+// TestPublicShellHasNoFooter checks that the footer is absent from every reader page.
 func TestPublicShellHasNoFooter(t *testing.T) {
 	site := views.PublicSite{Title: "Verse", BaseURL: "https://verse.test"}
-
 	for name, component := range map[string]page.Component{
 		"index":   views.PublicIndex(site),
 		"archive": views.PublicArchive(site),
-		"share":   views.PublicShare(site),
 		"404":     views.PublicNotFound(site),
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := renderComponent(t, component)
-
 			for _, footer := range []string{"public-footer", "<footer"} {
 				if strings.Contains(body, footer) {
 					t.Errorf("the public %s page still renders a footer", name)

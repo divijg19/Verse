@@ -54,7 +54,13 @@ func TestRecoverFailsClosed(t *testing.T) {
 	if _, err := Recover(testKey("secret-two"), Private, seed, hash); err == nil {
 		t.Error("a rotated key still recovered the token")
 	}
-	if _, err := Recover(key, Private, seed, hash[:len(hash)-1]+"0"); err == nil {
+	// Flip a hex digit to the other value so the mismatch is guaranteed, not a 1-in-16 flake.
+	last := hash[len(hash)-1]
+	changed := "0"
+	if last == '0' {
+		changed = "1"
+	}
+	if _, err := Recover(key, Private, seed, hash[:len(hash)-1]+changed); err == nil {
 		t.Error("a hash mismatch still recovered the token")
 	}
 	if _, err := Recover(key, Private, "", hash); err == nil {

@@ -251,10 +251,10 @@ func TestSharePickerMarksPublishedWorks(t *testing.T) {
 	}
 }
 
-// TestPublicShareCarriesNoBodyText holds the invariant the Share actions depend on: the full text
+// TestPublicArchiveCarriesNoBodyText holds the invariant the Share actions depend on: the full text
 // is on the work page alone, and the reader's script fetches it from there rather than from a
 // second published copy.
-func TestPublicShareCarriesNoBodyText(t *testing.T) {
+func TestPublicArchiveCarriesNoBodyText(t *testing.T) {
 	body := "a body that must not appear twice"
 	site := views.PublicSite{
 		Title:   "Verse",
@@ -268,8 +268,8 @@ func TestPublicShareCarriesNoBodyText(t *testing.T) {
 		}},
 	}
 
-	rendered := renderComponent(t, views.PublicShare(site))
+	rendered := renderComponent(t, views.PublicArchive(site))
 	if strings.Contains(rendered, body) {
-		t.Error("the public Share page contains a work's body")
+		t.Error("the public archive contains a work's body")
 	}
 }

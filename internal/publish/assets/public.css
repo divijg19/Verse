@@ -556,7 +556,11 @@ a:hover {
   color: var(--muted);
 }
 
-/* The archive's list: one work to a line, in order, each row a rule apart. */
+/* The archive's list: one work to a line, in order, each row a rule apart.
+ *
+ * The grid lives on an inner wrapper, not on the <li>: search hides a row by setting its `hidden`
+ * attribute, and an author `display` on the <li> would beat the user-agent rule that honours it.
+ */
 .work-list {
   list-style: none;
   margin: 0;
@@ -567,27 +571,36 @@ a:hover {
   border-top: 1px solid var(--rule);
 }
 
-.work-list a {
-  display: flex;
+.work-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title    date"
+    "excerpt  excerpt"
+    "actions  status";
   align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   padding: var(--space-2) 0;
-  text-decoration: none;
 }
 
-.work-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-width: 0;
+.work-row > .share-title {
+  grid-area: title;
 }
 
-.work-title {
-  font-size: var(--text-title);
-  line-height: 1.45;
-  min-width: 0;
-  overflow-wrap: anywhere;
+.work-row > .work-excerpt {
+  grid-area: excerpt;
+}
+
+.work-row > time {
+  grid-area: date;
+}
+
+.work-list time {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-meta);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* The excerpt.
@@ -619,15 +632,6 @@ a:hover {
   color: var(--ink);
   border-radius: 2px;
   padding: 0 0.1em;
-}
-
-.work-list time {
-  flex: 0 0 auto;
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: var(--text-meta);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -686,81 +690,25 @@ a:hover {
   color: var(--muted);
 }
 
-The
-  share
-  surface
-  ------------------------------------------------------------------------------------------
-  A
-  reader
-  comes
-  here
-  to
-  send
-  a
-  work
-  to
-  somebody,
-so
-  the
-  address
-  is
-  on
-  the
-  page
-  rather
-  than
-  behind
-  a
-  link.
-  It
-  is
-  selectable
-  in
-  one
-  click,
-which
-  is
-  a
-  copy
-  button
-  without
-  a
-  line
-  of
-  script.
-  ------------------------------------------------------------------------------------------
-  */
-  .share-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-2);
-}
-
-.share-item {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: 1rem;
-  background: linear-gradient(
-    180deg,
-    rgba(23, 23, 23, 0.66) 0%,
-    rgba(10, 10, 10, 0.34) 100%
-  );
-}
-
-/* The three actions, in the author's mode-card language.
- *
- * They are rendered as buttons rather than inserted by the script, so the page says what it offers
- * even when the script is blocked. Without the script they do nothing, and the address below the
- * title is the fallback: the reader can still select it and copy it by hand.
+/* The archive row carries the three share actions beside the work's details. They start hidden and
+ * are revealed only by the script after it has attached their listeners, so a reader without the
+ * script never sees a button that does nothing. The complete list and real title links are the
+ * no-script fallback.
  */
+.share-item {
+  min-width: 0;
+}
+
+/* The three actions, in the author's mode-card language. The script reveals them once wired. */
 .share-actions {
+  grid-area: actions;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.share-actions[hidden] {
+  display: none;
 }
 
 .share-action {
@@ -795,6 +743,7 @@ which
 }
 
 .share-status {
+  grid-area: status;
   min-height: 1rem;
   margin: 0;
   font-size: var(--text-meta);
@@ -806,54 +755,19 @@ which
 .share-title {
   font-size: var(--text-title);
   line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-decoration: none;
 }
 
-.share-address {
-  display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.78rem;
-  line-height: 1.6;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-  /* One click selects the whole address. The cursor says so before the click happens. It is the
-   * fallback when the script is blocked, so it stays selectable rather than being replaced. */
-  user-select: all;
-  -webkit-user-select: all;
-  cursor: text;
-}
-
-.share-item .share-address {
-  font-size: 0.68rem;
-  color: rgb(115 115 115);
-}
-
-.share-address:hover {
-  color: var(--accent);
-}
-
-.share-date {
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  font-size: var(--text-meta);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.share-feed {
+.archive-feed {
   margin-top: var(--space-5);
   padding-top: var(--space-4);
   border-top: 1px solid var(--rule);
 }
 
-.share-feed-line {
-  margin: 0 0 var(--space-1);
-}
-
-.share-feed-note {
+.archive-feed p {
   margin: 0;
-  font-size: 0.9rem;
-  color: var(--muted);
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -896,7 +810,7 @@ which
    Narrow screens
    ------------------------------------------------------------------------------------------
    The rails cannot sit beside the content on a phone, so they come above it, side by side. The
-   arrows keep their directions, so the ring is still legible.
+   arrows keep their directions, so the two-screen route is still legible.
    ------------------------------------------------------------------------------------------ */
 
 @media (max-width: 62rem) {
@@ -938,9 +852,18 @@ which
 }
 
 @media (max-width: 34rem) {
-  .work-list a {
-    flex-direction: column;
-    gap: var(--space-1);
+  .work-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "date"
+      "excerpt"
+      "actions"
+      "status";
+  }
+
+  .share-action {
+    min-height: 2.75rem;
   }
 
   .work-grid {

@@ -81,18 +81,15 @@ type PublicLink struct {
 // PublicPage names one of the reader's screens.
 //
 // The page is passed to the layout rather than inferred, because the layout's job is to place the
-// two navigation pills that flank it, and which pills those are follows from the page.
+// navigation pill that flanks it, and which pill that is follows from the page.
 type PublicPage string
 
 const (
 	// PublicPageHome is the front screen: the site's line and the most recent work.
 	PublicPageHome PublicPage = "home"
 
-	// PublicPageArchive is the complete chronological index.
+	// PublicPageArchive is the single reader screen: the complete index and the share surface.
 	PublicPageArchive PublicPage = "archive"
-
-	// PublicPageShare is the surface for sending a work to somebody else.
-	PublicPageShare PublicPage = "share"
 
 	// PublicPageWork is a single published work.
 	PublicPageWork PublicPage = "work"
@@ -103,10 +100,9 @@ const (
 
 // PublicRail is one navigation pill beside the content.
 //
-// The reader's pages form a ring -- home, then the archive, then share, and home again -- so every
-// screen has a neighbor on each side and no screen is more than one click from either of the
-// others. The pill's arrow points the way its destination lies: left for the page behind, right
-// for the page ahead.
+// The reader has two screens -- home and the archive -- so each carries one pill pointing at the
+// other. A work and the not-found page carry a single onward pill as well. The pill's arrow points
+// the way its destination lies: left for the page behind, right for the page ahead.
 //
 // The side is not a field, because the renderer already knows it -- it asks for the left rail or
 // the right rail, and a rail that knew its own side would be a second place for that to be true.
@@ -120,20 +116,13 @@ type PublicRail struct {
 
 // publicRails returns the two pills that flank a page.
 //
-// The three reader-facing screens form a ring, so each one's left rail is the screen before it and
-// its right rail is the screen after it. A work and the not-found page are not part of the ring:
-// they carry a single onward pill, on the right, pointing forward into the site.
+// The two reader screens point at each other. Work and not-found pages carry a single onward pill.
 func publicRails(page PublicPage) (left *PublicRail, right *PublicRail) {
 	switch page {
 	case PublicPageHome:
-		return &PublicRail{Label: "Share", Path: "/share/"},
-			&PublicRail{Label: "Archive", Path: "/archive/"}
+		return nil, &PublicRail{Label: "Archive", Path: "/archive/"}
 	case PublicPageArchive:
-		return &PublicRail{Label: "Home", Path: "/"},
-			&PublicRail{Label: "Share", Path: "/share/"}
-	case PublicPageShare:
-		return &PublicRail{Label: "Archive", Path: "/archive/"},
-			&PublicRail{Label: "Home", Path: "/"}
+		return &PublicRail{Label: "Home", Path: "/"}, nil
 	case PublicPageWork:
 		return nil, &PublicRail{Label: "Archive", Path: "/archive/"}
 	case PublicPageMissing:
@@ -170,9 +159,9 @@ type PublicSite struct {
 
 // Address returns the absolute address of a path on this site.
 //
-// The share surface shows this rather than the rooted path, because the rooted path is what the
-// site uses for itself and the absolute address is what the reader needs in order to send it to
-// somebody else.
+// The archive carries this in a data attribute rather than as visible text, because the rooted path
+// is what the site uses for itself and the absolute address is what the reader needs in order to
+// send a work to somebody else.
 func (s PublicSite) Address(path string) string {
 	return strings.TrimRight(s.BaseURL, "/") + path
 }

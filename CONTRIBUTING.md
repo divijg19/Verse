@@ -61,10 +61,10 @@ run` does not enforce the formatters section, so the formatting gate is load-bea
     bun run lint           # golangci-lint, including misspell and gosec
     bun run staticcheck    # whole-program analysis
     bun run vuln           # govulncheck
-    bun run test           # go test, race-enabled
+    bun run test           # bun test, then go test with -race
     ```
 
-    `bun run qa` runs all of them in that order. The scripts pin the tool versions CI installs,
+    `bun run qa` runs those commands and the bundle-currency check in that order. The scripts pin the tool versions CI installs,
     so a local pass means the same thing CI means; there is no Makefile to keep in step. The
     database-backed tests still need the two environment variables above, or they skip and the exit
     status stays zero.

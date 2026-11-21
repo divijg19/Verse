@@ -204,7 +204,7 @@ func TestTheDocumentationCallsTheCommandsWithFlagsTheyDefine(t *testing.T) {
 }
 
 // TestPublishRefusesAPlaceholderOrigin pins the v0.5.6 guard that stopped a manual publish from
-// silently writing https://verse.example into the reader's no-script Share page. A source-level
+// silently writing https://verse.example into the reader's archive copy links. A source-level
 // assertion is enough here: the strings are the contract, and running the command needs a database.
 func TestPublishRefusesAPlaceholderOrigin(t *testing.T) {
 	source := string(mustReadRepo(t, filepath.Join("cmd", "publish", "main.go")))

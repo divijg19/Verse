@@ -4,8 +4,8 @@ import "fmt"
 
 // publicRailFor returns the navigation pill on one side of a page, and whether there is one.
 //
-// The two sides of a page are its neighbors in the ring. A work and the not-found page have one
-// neighbor and one blank side, and a blank side renders nothing at all rather than an empty pill.
+// The two sides of a page are its neighbors. The two reader screens have one neighbor each; a
+// work and the not-found page do too. A blank side renders nothing rather than an empty pill.
 func publicRailFor(page PublicPage, side string) (PublicRail, bool) {
 	left, right := publicRails(page)
 	switch side {
@@ -42,8 +42,8 @@ func railClass(side string) string {
 // railLabel names a rail for a screen reader.
 //
 // The visible label on the pill is the destination's name, which on its own tells a screen reader
-// that there is a link called "Archive" and nothing about where it goes. These say which way round
-// the ring the link lies.
+// that there is a link called "Archive" and nothing about where it goes. These say which way the
+// link lies.
 func railLabel(side string) string {
 	switch side {
 	case "left":
