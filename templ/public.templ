@@ -7,8 +7,8 @@ package templ
 // Two rules govern this file.
 //
 // The first is that the reader's navigation happens on the screen. The rails beside the content
-// carry the site's own pages, so a reader is never more than one click from either of the other
-// screens and never has to open a menu to get there.
+// carry the site's own pages, so a reader is never more than one click from the other screen and
+// never has to open a menu to get there.
 //
 // The second is that the brand pill points outward. Its menu holds the author's other portfolio
 // sites and nothing else. The site never puts its own pages behind a toggle, because a toggle hides
@@ -16,7 +16,7 @@ package templ
 
 // PublicLayout is the shell every public page is rendered into.
 //
-// The page decides which two navigation pills flank the content, so the rails are a property of
+// The page decides which navigation pill flanks the content, so the rails are a property of
 // where the reader is rather than a property of the template that drew them.
 templ PublicLayout(site PublicSite, page PublicPage, title string, description string, content templ.Component) {
 	<!DOCTYPE html>
@@ -32,8 +32,8 @@ templ PublicLayout(site PublicSite, page PublicPage, title string, description s
 			<meta name="verse-digest" content={ site.Digest }/>
 			<link rel="stylesheet" href={ site.AssetPath }/>
 			<link rel="alternate" type="application/rss+xml" title={ site.Title } href="/feed.xml"/>
-			<!-- The only script the public site ships: the archive's search box. The site works
-			     without it, because the archive page is the complete list either way. -->
+			<!-- The only script the public site ships: the archive's search box and share actions.
+			     The site works without it, because the archive is the complete list either way. -->
 			<script src={ site.ScriptPath } defer></script>
 		</head>
 		<body>
@@ -87,10 +87,10 @@ templ brandPill(site PublicSite) {
 	}
 }
 
-// rail is one of the two navigation pills that flank the content.
+// rail is one of the navigation pills that flank the content.
 //
 // The pill's arrow points the way its destination lies: the left rail's points left and the right
-// rail's points right, so the two arrows describe the ring the reader is walking around.
+// rail's points right, so the arrow describes where the other screen is.
 templ rail(page PublicPage, side string) {
 	if p, ok := publicRailFor(page, side); ok {
 		<nav class={ railClass(side) } aria-label={ railLabel(side) }>
@@ -113,8 +113,8 @@ templ PublicIndex(site PublicSite) {
 // read. What the line says instead is what the site is for, and the description underneath says
 // what a reader will find in it.
 //
-// The screen does not carry the whole archive: the archive is one click away in the right rail, and
-// a front page that lists everything is a second copy of the archive with a different arrangement.
+// The screen does not carry the whole archive: it is one click away in the right rail, and a front
+// page that lists everything would be a second copy with a different arrangement.
 templ PublicIndexBody(site PublicSite) {
 	<section class="hero">
 		<h1 class="visually-hidden">{ site.Title }</h1>
@@ -146,10 +146,13 @@ templ PublicArchive(site PublicSite) {
 	@PublicLayout(site, PublicPageArchive, "Archive — "+site.Title, site.Description, PublicArchiveBody(site))
 }
 
-// PublicArchiveBody is the complete index, and the only place every published work is listed.
+// PublicArchiveBody is the one screen that does both jobs: the complete index of published work and
+// the place to send one on. There is no second Share screen and no separate index -- a reader who
+// wants either can stay on this page.
 //
-// It is a list rather than the archive's grid because a list is what an index is for: one work per
-// row, in order, each one a line the eye can run down.
+// The absolute address is deliberately absent from the visible page. It lives in a data attribute
+// so the script can copy it, and the feed is a rooted link. A reader without the script still has
+// the complete list, real title links, and the work pages; those are the honest fallback.
 templ PublicArchiveBody(site PublicSite) {
 	<h1 class="visually-hidden">Archive</h1>
 	<p class="eyebrow eyebrow--row">
@@ -164,17 +167,26 @@ templ PublicArchiveBody(site PublicSite) {
 	} else {
 		<ol class="work-list">
 			for _, work := range site.Works {
-				<li>
-					<a href={ work.Path }>
-						<span class="work-text">
-							<span class="work-title">{ work.Title }</span>
-							<span class="work-excerpt">{ work.Excerpt }</span>
-						</span>
+				<li class="share-item" data-share-address={ site.Address(work.Path) }>
+					<div class="work-row">
+						<a class="work-title share-title" href={ work.Path }>{ work.Title }</a>
+						<span class="work-excerpt">{ work.Excerpt }</span>
 						<time datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
-					</a>
+						<div class="share-actions" role="group" aria-label={ "Share " + work.Title } hidden>
+							<button type="button" class="share-action" data-share-action="text">Copy Text</button>
+							<button type="button" class="share-action" data-share-action="link">Copy Link</button>
+							<button type="button" class="share-action" data-share-action="card">Card Export</button>
+						</div>
+						<p class="share-status" role="status" aria-live="polite"></p>
+					</div>
 				</li>
 			}
 		</ol>
+
+		<section class="archive-feed" aria-labelledby="feed-heading">
+			<p class="eyebrow" id="feed-heading">Follow</p>
+			<p><a href="/feed.xml">RSS feed</a></p>
+		</section>
 	}
 }
 
@@ -198,51 +210,4 @@ templ PublicNotFoundBody(site PublicSite) {
 	<h1 class="visually-hidden">Page not found</h1>
 	<p class="eyebrow">404</p>
 	<p class="lede">This page does not exist, or it was never published.</p>
-}
-
-templ PublicShare(site PublicSite) {
-	@PublicLayout(site, PublicPageShare, "Share — "+site.Title, site.Description, PublicShareBody(site))
-}
-
-// PublicShareBody is the surface for sending a work to somebody else.
-//
-// It uses the same three actions as the author's Share screen -- Copy Text, Copy Link and Card
-// Export -- because the two surfaces must mean the same thing by those names. The page works
-// without the script: each title is a real link and each address is plain selectable text. The
-// script adds the buttons' behaviour on top; it does not add the information.
-//
-// The address is deliberately still on the page, in smaller type under the title. It is the
-// no-script fallback and the honest account of where the link points.
-templ PublicShareBody(site PublicSite) {
-	<h1 class="visually-hidden">Share</h1>
-	<p class="eyebrow">Share</p>
-	<p class="lede">Send a work on: copy its text, its address, or a card made from it.</p>
-
-	if len(site.Works) == 0 {
-		<p class="empty">Nothing published yet.</p>
-	} else {
-		<ul class="share-list">
-			for _, work := range site.Works {
-				<li class="share-item">
-					<a class="share-title" href={ work.Path }>{ work.Title }</a>
-					<time class="share-date" datetime={ work.ISODate() }>{ work.DisplayDate() }</time>
-					<span class="share-address">{ site.Address(work.Path) }</span>
-					<div class="share-actions" role="group" aria-label={ "Share " + work.Title }>
-						<button type="button" class="share-action" data-share-action="text">Copy Text</button>
-						<button type="button" class="share-action" data-share-action="link">Copy Link</button>
-						<button type="button" class="share-action" data-share-action="card">Card Export</button>
-					</div>
-					<p class="share-status" role="status" aria-live="polite"></p>
-				</li>
-			}
-		</ul>
-
-		<section class="share-feed" aria-labelledby="feed-heading">
-			<p class="eyebrow" id="feed-heading">Follow</p>
-			<p class="share-feed-line">
-				<span class="share-address">{ site.Address("/feed.xml") }</span>
-			</p>
-			<p class="share-feed-note">New work appears in the feed as it is published.</p>
-		</section>
-	}
 }

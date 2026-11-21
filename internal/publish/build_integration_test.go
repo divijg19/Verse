@@ -140,7 +140,7 @@ func TestBuildIsByteIdenticalAcrossRuns(t *testing.T) {
 	}
 }
 
-func TestBuildOnAnEmptyLibrary(t *testing.T) {
+func TestBuildOnAnEmptyArchive(t *testing.T) {
 	dsn := requireDSN(t)
 	ctx := context.Background()
 

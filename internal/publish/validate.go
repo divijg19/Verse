@@ -20,7 +20,6 @@ import (
 var requiredOutputs = []string{
 	"index.html",
 	"archive/index.html",
-	"share/index.html",
 	"404.html",
 	"search.json",
 	"sitemap.xml",
@@ -41,12 +40,11 @@ var forbiddenSecretSubstrings = []string{
 
 // forbiddenAuthoringPaths are checked only where they can act as a route: href, src, and the URL
 // elements of the sitemap and feed. Scanning prose for these would reject a poem that happens to
-// mention the word "library", which is not a leak.
+// mention one of these words, which is not a leak.
 //
 // The list is checked against this site's own addresses only. An absolute address names another
-// site, and "/library" on somebody else's site is their route and not this application's; the
-// portfolio menu links outward, and a link to https://example.com/library/ is not a leak of
-// anything. The authoring host is a separate check, and it applies to every address.
+// site; the portfolio menu links outward, and a link to https://example.com/library/ is not a leak
+// of anything. The authoring host is a separate check, and it applies to every address.
 var forbiddenAuthoringPaths = []string{
 	"/login",
 	"/logout",
@@ -154,8 +152,8 @@ func scanHTML(name string, body []byte, ownHost string, scriptPath string) error
 	walk = func(node *html.Node) error {
 		if node.Type == html.ElementNode {
 			if node.Data == "script" {
-				// The public site ships exactly one script: the archive's search box, which the
-				// publisher writes and points at by its own content-addressed path.
+				// The public site ships exactly one script: the archive's search box and share actions,
+				// which the publisher writes and points at by its own content-addressed path.
 				//
 				// The permission is narrow on purpose. A script element with no src is an inline
 				// script, and an inline script is the thing the policy this site was built around
@@ -264,11 +262,11 @@ func scanXML(name string, body []byte, ownHost string) error {
 
 // checkPublicURL refuses an address that leaks an authoring route.
 //
-// The rule turns on whose address it is. A path on this site -- "/library", rooted or written out
-// in full -- is this application's route and is a leak wherever it appears. An address naming
-// another host is that host's business: "/library" on somebody else's site is their route, not a
-// leak of this one, and the portfolio menu links outward on purpose. An address naming this site's
-// own host is checked, because on this host the path means exactly what it means everywhere else.
+// The rule turns on whose address it is. A forbidden authoring path such as "/library", rooted or
+// written out in full, is a leak wherever it appears on this site. An address naming another host
+// is that host's business, and the portfolio menu links outward on purpose. An address naming this
+// site's own host is checked, because on this host the path means exactly what it means everywhere
+// else. The authoring-host check also catches absolute links to the authoring app.
 func checkPublicURL(name, value, ownHost string) error {
 	lower := strings.ToLower(value)
 

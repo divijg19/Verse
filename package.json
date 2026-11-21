@@ -14,15 +14,15 @@
     "dev:public": "bun scripts/dev.ts public",
     "dev:setup": "bun scripts/dev.ts setup",
     "build": "go build ./...",
-    "qa": "bun fmt --check && bun check && bun fmt:go && bun vet && bun lint && bun staticcheck && bun test:scripts && bun vuln && bun run test",
-    "test": "go test ./... -count=1 -race",
+    "qa": "bun fmt --check && bun check && bun scripts/build_js.ts --check && bun fmt:go && bun vet && bun lint && bun staticcheck && bun vuln && bun run test",
+    "test": "bun test && go test ./... -count=1 -race",
     "test:scripts": "bun test scripts/"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.3.5"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.4",
+    "@types/bun": "^1.4.5",
     "tailwindcss": "^4.3.5"
   }
 }

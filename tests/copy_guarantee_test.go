@@ -57,7 +57,8 @@ func TestViewerBundleWiresCopy(t *testing.T) {
 	bundle := readRepoFile(t, filepath.Join("internal", "publish", "assets", "public.js"))
 	for _, needle := range []string{
 		`data-share-action`,
-		`share-address`,
+		`dataset.shareAddress`,
+		`hidden = false`,
 		`copyText`,
 	} {
 		if !strings.Contains(bundle, needle) {

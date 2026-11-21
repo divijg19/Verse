@@ -83,8 +83,9 @@ func run() error {
 	}
 
 	if *baseURL == publish.DefaultBaseURL {
-		// The address is also the no-script fallback on the reader's Share page, so a placeholder
-		// would be copied as a real link with a success message. A real build must name its origin.
+		// The address is carried on the reader's archive rows for Copy Link and Card Export, so a
+		// placeholder would be copied as a real link with a success message. A real build must name
+		// its origin.
 		if !*allowPlaceholder {
 			return fmt.Errorf("refusing to build with the placeholder public origin %s; set -base-url or PUBLIC_BASE_URL, or pass -allow-placeholder for a local preview", publish.DefaultBaseURL)
 		}

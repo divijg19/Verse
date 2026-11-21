@@ -22,7 +22,7 @@ func TestThePublicSiteCarriesOneScriptAndNoInlineOne(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 
-	for _, name := range []string{"index.html", "archive/index.html", "share/index.html", "404.html"} {
+	for _, name := range []string{"index.html", "archive/index.html", "404.html"} {
 		page, ok := files[name]
 		if !ok {
 			t.Fatalf("the build has no %q", name)

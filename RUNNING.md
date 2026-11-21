@@ -11,7 +11,7 @@ tracking, and release planning are engineering records and are not part of this 
 ## What Verse is
 
 A private, single-author web application for writing poems, prose, fragments, and letters. It
-requires a passphrase to enter. It is not a blog, a social network, or a reader-facing site.
+requires a passphrase to enter. The authoring app is private; its published work is read on a separate static site.
 
 ---
 
@@ -112,7 +112,7 @@ the command rather than something to remember.
 
 `bun dev:public` publishes the public site into `dist/` and serves it, so the reading surface can
 be inspected at <http://localhost:4000> without a deploy. It serves the same contract the
-deployment does: `/`, `/archive/` and `/share/` resolve to their `index.html`, and an unknown path
+deployment does: `/` and `/archive/` resolve to their `index.html`, and an unknown path
 answers with the built `404.html`. The public build reads the published set from the database, so it
 needs a `DATABASE_URL` that has published work in it.
 
@@ -179,11 +179,10 @@ distinct effects:
    its hash matches the row. Under a new secret every link seeded under the old one fails that check.
    Share omits the Copy button and never emits a token that would 404. Use the **New** button on a
    private-link row or **Rotate** on a public-link row to write a fresh seed and hash under the new
-   key. The plain "Private Link" and "Public Link" buttons are idempotent from v0.5.10 **while a
-   recoverable active link exists under the current key**: they return the existing URL without
-   changing it. After a rotation no link is recoverable, so those buttons mint a fresh capability
-   instead. Rotate keeps the row id and all submissions, and retires the old URL, so hand out the
-   new one.
+   key. The primary buttons are idempotent while a recoverable active link exists under the current
+   key. After a rotation, a private click mints a fresh row while a public click refuses with "rotate
+   it" -- a public link has only one row, so repairing it would silently invalidate a URL already
+   handed out. Rotate keeps the row id and all submissions, and retires the old URL.
 
 Do not add a `VERSE_AUTH_SECRET_PREVIOUS` variable. The previous secret can forge sessions; keeping it
 in the environment would preserve exactly the credential rotation is meant to retire.
@@ -738,7 +737,7 @@ If you add a static asset, add it to the same assertions. The allowlist in
 
 ### Building and deploying the public site
 
-The public archive is a static build, not a second web service. It reads the published set, renders
+The public site is a static build, not a second web service. It reads the published set, renders
 every page in memory, validates the result, and writes the output directory. Readers never hold a
 database credential, and the deployed files do not depend on Render or Neon at request time.
 
@@ -794,14 +793,14 @@ origin; there is no build timestamp, so two builds from the same input are byte-
 
 ### The reader's site, and where its navigation lives
 
-The public site is three screens: a front page, an archive, and a share surface. Its navigation is
-**on the screen**, in a rail on each side of the content, and the two rails point at the reader's
-neighbours in a ring: home, then the archive, then share, and home again. Every screen is one click
-from both of the others.
+The public site is two screens: a front page and the **archive**. Its navigation is **on the
+screen**, in one rail beside the content: the front page points to the archive and the archive points
+home. The archive is both the complete index and the share surface -- there is no separate index or
+share page.
 
 The brand pill in the corner is the one thing that opens a menu, and that menu points **outward**:
 at the author's other portfolio sites. It is a `<details>` element, so it toggles on click, takes
-focus, and opens on Enter or Space, and the public build ships no JavaScript at all. The site's own
+focus, and opens on Enter or Space. The public build ships exactly one script. The site's own
 pages are never in that menu — they are in the rails, where they can be seen.
 
 The portfolio links are configuration, not markup:
@@ -818,15 +817,16 @@ that is not an `http` or `https` address stops the build rather than producing a
 With no links configured the pill is a plain link home, because a button that opens nothing is
 worse than a link.
 
-The reader's share surface offers three actions for each published work: **Copy Text**, **Copy Link**
-and **Card Export**. The authoring side's Share screen has those three plus **Private Link**, which
-is deliberately not a publication. The first three are backed by one shared TypeScript module, so
-the two surfaces cannot disagree about what a name means.
+Every archive row offers three actions: **Copy Text**, **Copy Link** and **Card Export**. The
+authoring side's Share screen has those three plus **Private Link**, which is deliberately not a
+publication. The first three are backed by one shared TypeScript module, so the two surfaces cannot
+disagree about what a name means. The buttons start hidden and the script reveals them only after
+wiring them, so a reader without the script never sees a control that does nothing.
 
-The page still works with no script. Each title is a real link and each address is plain selectable
-text in a monospace face with `user-select: all`, so a reader can copy it by hand. The script adds the
-buttons on top; it does not add the information. It is the site's one script, shared with the
-archive's search box, so the one-script rule is unchanged.
+The absolute address is not printed in the page. It is carried in a `data-share-address` attribute
+for Copy Link and Card Export, and the feed is a rooted `/feed.xml` link. The no-script fallback
+is the complete server-rendered list with real title links and the work pages. It is the site's one
+script, shared with the archive's search box, so the one-script rule is unchanged.
 
 Copy Text puts the work's title and full body on the clipboard. The body is **not** published a
 second time: the script fetches the work's own page and reads the `.poem` element from it. Card
@@ -1117,9 +1117,10 @@ Bun does not downlevel. A `??` written in a source file is a `??` in the output,
 tsconfig says, so the transpile floor is held by the `lib` setting -- an ES2022 library call is a
 type error -- and by the rule that the source stays inside ES2020.
 
-The public site's one script is the archive's search box. It is inserted by the script rather than
-being in the markup, so a reader with no script sees no input at all rather than an input that
-cannot search, and the archive page is the complete list of published work either way.
+The public site's one script narrows the archive and wires its share actions. The search box is
+inserted by the script rather than being in the markup, so a reader with no script sees no input at
+all rather than one that cannot search, and the archive is the complete list of published work
+either way.
 
 ### `render.yaml` is the source of truth; the dashboard must mirror it
 

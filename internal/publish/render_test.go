@@ -85,6 +85,47 @@ func TestRenderProducesTheRequiredSurface(t *testing.T) {
 	}
 }
 
+// TestRenderMergesShareIntoTheArchive pins the single-screen contract: there is no separate Share
+// page, no link to one, and no absolute work address in visible text. The address is data a script
+// reads, and the sitemap names the archive as the single index.
+func TestRenderMergesShareIntoTheArchive(t *testing.T) {
+	files, err := publish.Render(sampleWorks(), testOptions())
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	for _, retired := range []string{"share/index.html", "library/index.html"} {
+		if _, ok := files[retired]; ok {
+			t.Errorf("the build still emits the retired %q", retired)
+		}
+	}
+	archive := string(files["archive/index.html"])
+	if strings.Count(archive, `data-share-address="https://verse.test/w/`) != 2 {
+		t.Errorf("the archive does not carry both addresses in data attributes: %s", truncateForTest(archive))
+	}
+	if strings.Contains(archive, `class="share-address"`) {
+		t.Error("the archive prints a raw address as page text")
+	}
+	if strings.Count(archive, `data-share-action=`) != 6 {
+		t.Errorf("the archive does not carry three actions on each of two rows")
+	}
+	for name, body := range files {
+		if strings.Contains(string(body), `href="/share/"`) || strings.Contains(string(body), `href="/library/"`) {
+			t.Errorf("%s still links to a retired reader route", name)
+		}
+	}
+	sitemap := string(files["sitemap.xml"])
+	if !strings.Contains(sitemap, "https://verse.test/archive/") || strings.Contains(sitemap, "/library/") || strings.Contains(sitemap, "/share/") {
+		t.Errorf("the sitemap does not name the archive as the single index: %s", sitemap)
+	}
+}
+
+func truncateForTest(value string) string {
+	if len(value) > 200 {
+		return value[:200]
+	}
+	return value
+}
+
 func TestRenderIsDeterministic(t *testing.T) {
 	first, err := publish.Render(sampleWorks(), testOptions())
 	if err != nil {
@@ -118,7 +159,7 @@ func TestRenderEscapesHostileContent(t *testing.T) {
 
 	page := string(files["w/33333333-3333-3333-3333-333333333333/index.html"])
 
-	// The page carries exactly one script: the archive's search bundle, which this build wrote.
+	// The page carries exactly one script: the archive's search and share bundle, which this build wrote.
 	// The hostile content must not add a second one, and must not have produced an inline script
 	// either, which is the form the content security policy forbids.
 	if got := strings.Count(page, "<script"); got != 1 {

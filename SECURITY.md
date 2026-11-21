@@ -37,9 +37,10 @@ lifetime of a session-forging credential.
 
 The two Share buttons are idempotent while a recoverable active link exists under the current key:
 they return the existing link without changing its token or expiry, so a repeated click never
-invalidates a capability already handed out. When no link can be recovered they mint a fresh one
-instead. **New** (private) adds a second conversation; **Rotate** (public) issues a fresh token on the
-same row and deliberately retires the old URL. A revoked or unrecoverable public link is never
+invalidates a capability already handed out. When no link can be recovered they fail closed: a
+private click mints a fresh row, while a public click returns 409 because its single row cannot be
+replaced without invalidating a URL already handed out. **New** (private) adds a second conversation;
+**Rotate** (public) issues a fresh token on the same row and deliberately retires the old URL. A revoked or unrecoverable public link is never
 silently repaired, because the holders of the old URL cannot be told it changed.
 
 ## Reporting a vulnerability

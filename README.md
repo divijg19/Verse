@@ -4,8 +4,9 @@
 > Write. Reflect. Return.
 
 Verse is a private, single-author web application for disciplined poetic practice. It is a writing
-ritual, not a social platform, publishing tool, or productivity dashboard. There are no feeds, no
-recommendations, and no algorithmic interference.
+ritual, not a social platform or productivity dashboard. Published work is read on a separate static
+site with an archive, a feed and share-by-link; the private writing space has no recommendations and
+no algorithmic interference.
 
 ## What it does
 

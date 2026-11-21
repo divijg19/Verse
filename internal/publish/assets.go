@@ -44,12 +44,13 @@ func publicStylesheet() (string, []byte, error) {
 
 // publicScript returns the public site's script.
 //
-// It is the archive's search box, and it is the only JavaScript the public site ships. The site
-// works without it: the archive page is the complete list of published work whether the script
-// loads or not, and the search box is inserted by the script rather than being in the markup.
+// It narrows the archive and wires its three share actions, and it is the only JavaScript the
+// public site ships. The site works without it: the archive is the complete list of published work
+// whether the script loads or not, and the search box is inserted by the script rather than being
+// in the markup. The action buttons are hidden until the script has wired them.
 //
-// The bundle is built from web/ts/public_search.ts by scripts/build_js.ts and committed, so the
-// publish binary needs no TypeScript toolchain and the output is byte-stable.
+// The bundle is built from web/ts/public.ts by scripts/build_js.ts and committed, so the publish
+// binary needs no TypeScript toolchain and the output is byte-stable.
 func publicScript() (string, []byte, error) {
 	return publicAsset("public.js")
 }

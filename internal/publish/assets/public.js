@@ -152,7 +152,7 @@
     }
   }
   function entryFor(row, entries) {
-    const link = row.querySelector("a");
+    const link = row.querySelector("a.share-title");
     const path = link ? link.getAttribute("href") : null;
     return path ? (entries.get(path) ?? null) : null;
   }
@@ -286,8 +286,7 @@
     const title = card.querySelector(".share-title")?.textContent?.trim() ?? "";
     const link = card.querySelector("a.share-title");
     const path = link?.getAttribute("href") ?? "";
-    const address =
-      card.querySelector(".share-address")?.textContent?.trim() ?? "";
+    const address = card.dataset.shareAddress ?? "";
     const published =
       card.querySelector("time")?.getAttribute("datetime") ?? "";
     const actions = card.querySelectorAll("button[data-share-action]");
@@ -298,9 +297,7 @@
           const ok = await copyText(address);
           report(
             button,
-            ok
-              ? "Address copied."
-              : "Could not copy; select the address above.",
+            ok ? "Address copied." : "Could not copy the address.",
           );
           return;
         }
@@ -330,11 +327,15 @@ ${work.body}`);
         }
       });
     }
+    const actionsBox = card.querySelector(".share-actions");
+    if (actionsBox) {
+      actionsBox.hidden = false;
+    }
   }
-  function shareMain() {
+  function wireArchiveActions() {
     for (const card of document.querySelectorAll(".share-item")) {
       wireCard(card);
     }
   }
-  shareMain();
+  wireArchiveActions();
 })();
