@@ -10,6 +10,7 @@ import (
 // payload's per-row URL, not from an in-memory map that disappears on reload.
 func TestAuthorCopyUsesServerURL(t *testing.T) {
 	source := readRepoFile(t, filepath.Join("web", "ts", "share.ts"))
+	bundle := readRepoFile(t, filepath.Join("static", "js", "share.js"))
 	if strings.Contains(source, "mintedLinks") {
 		t.Error("the page-session mint cache is still present")
 	}
@@ -23,9 +24,25 @@ func TestAuthorCopyUsesServerURL(t *testing.T) {
 		}
 	}
 
+	// The two explicit actions must stay wired alongside the idempotent primary buttons. These are
+	// row-level buttons built in TypeScript, so the compiled bundle must carry them too.
+	for _, needle := range []string{
+		`/share/link/new`,
+		`/share/public-link/rotate`,
+		`data-new`,
+		`data-public-rotate`,
+		`data.created`,
+	} {
+		if !strings.Contains(source, needle) {
+			t.Errorf("share.ts does not contain %q", needle)
+		}
+		if !strings.Contains(bundle, needle) {
+			t.Errorf("the compiled Share bundle does not contain %q", needle)
+		}
+	}
+
 	// The compiled bundle is what browsers actually execute. A stale bundle would ship the old
 	// cache-based behavior even with a correct source file.
-	bundle := readRepoFile(t, filepath.Join("static", "js", "share.js"))
 	if strings.Contains(bundle, "mintedLinks") {
 		t.Error("the compiled Share bundle still carries the page-session cache")
 	}

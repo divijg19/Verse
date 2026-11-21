@@ -33,11 +33,13 @@ var privateRoutes = []struct {
 	// The Share picker's work data. Added in v0.5.0's successor: it returns one work verbatim, so
 	// it stays behind the session like every other read of work text.
 	{http.MethodGet, "/share/work/some-id"},
-	// Private links: minting a capability to edit one work, revoking one, and applying the
-	// suggestion a guest sent back. All three mutate and all three carry the author's CSRF token.
+	// Private and public links: the primary action is idempotent, New and Rotate issue a fresh
+	// capability, and Revoke withdraws one. All mutate except the primary action; all carry CSRF.
 	{http.MethodPost, "/share/link"},
+	{http.MethodPost, "/share/link/new"},
 	{http.MethodPost, "/share/link/revoke"},
 	{http.MethodPost, "/share/public-link"},
+	{http.MethodPost, "/share/public-link/rotate"},
 	{http.MethodPost, "/share/public-link/revoke"},
 	{http.MethodPost, "/poem/proposal/apply"},
 	{http.MethodGet, "/poems"},

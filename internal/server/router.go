@@ -400,8 +400,10 @@ func NewRouter() (*chi.Mux, error) {
 		// Private links mint and revoke capabilities to edit one work. They are mutations despite
 		// living on the Share screen, so CSRF applies to both.
 		priv.Post("/share/link", handlers.ShareLinkHandler)
+		priv.Post("/share/link/new", handlers.ShareLinkNewHandler)
 		priv.Post("/share/link/revoke", handlers.ShareLinkRevokeHandler)
 		priv.Post("/share/public-link", handlers.SharePublicLinkHandler)
+		priv.Post("/share/public-link/rotate", handlers.SharePublicLinkRotateHandler)
 		priv.Post("/share/public-link/revoke", handlers.SharePublicLinkRevokeHandler)
 		// Applying a guest's suggestion is an ordinary edit of the author's draft.
 		priv.Post("/poem/proposal/apply", handlers.ShareProposalApplyHandler)

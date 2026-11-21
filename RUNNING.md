@@ -175,11 +175,15 @@ distinct effects:
 
 1. **Already-distributed URLs keep working.** A presented token is checked by hashing it and
    comparing with the stored `token_hash`; that check does not use the derived key.
-2. **Copy disappears until a link is recreated.** Recovery derives a token and accepts it only when
+2. **Copy disappears until a link is replaced.** Recovery derives a token and accepts it only when
    its hash matches the row. Under a new secret every link seeded under the old one fails that check.
-   Share omits the Copy button and reports that the link must be recreated; it never emits a token
-   that would 404. Mint the link again from Share to write a fresh seed and hash under the new key.
-   Recreating a public link replaces that work's token in place, so hand out the new URL.
+   Share omits the Copy button and never emits a token that would 404. Use the **New** button on a
+   private-link row or **Rotate** on a public-link row to write a fresh seed and hash under the new
+   key. The plain "Private Link" and "Public Link" buttons are idempotent from v0.5.10 **while a
+   recoverable active link exists under the current key**: they return the existing URL without
+   changing it. After a rotation no link is recoverable, so those buttons mint a fresh capability
+   instead. Rotate keeps the row id and all submissions, and retires the old URL, so hand out the
+   new one.
 
 Do not add a `VERSE_AUTH_SECRET_PREVIOUS` variable. The previous secret can forge sessions; keeping it
 in the environment would preserve exactly the credential rotation is meant to retire.
@@ -858,7 +862,8 @@ the Share screen; unlike a public link, it grants a limited session rather than 
   first-party and only autosaves, so the plain form still works without it.
 - **One link, one person, one conversation.** A link is a bearer capability, so it must be given to
   one person. The draft is keyed by the link: two holders of the same URL would share one body and
-  could read or overwrite each other's unsent text. For another reviewer, mint another link.
+  could read or overwrite each other's unsent text. For another reviewer, click **New** on the row;
+  the primary "Private Link" button returns the existing active link.
 - **A continuous draft per branch.** `guest_drafts` holds one body per `(link_id, branch)`, autosaved
   and restored on every visit for the eight-hour window. A vertical rail down the left of the editor
   lists the guest's versions, each with its own continuous body; on narrow screens it becomes a

@@ -34,12 +34,15 @@ const (
 	testSessionCookie = "verse_session"
 )
 
+func testLinkKey() linktoken.Key {
+	digest := sha256.Sum256([]byte(testAuthSecret))
+	return linktoken.Derive(digest[:])
+}
+
 // withTestLinkKey injects the derived link key into a direct handler request. Routed requests get it
 // from the router middleware; tests that call handlers directly must supply it themselves.
 func withTestLinkKey(req *http.Request) *http.Request {
-	digest := sha256.Sum256([]byte(testAuthSecret))
-	key := linktoken.Derive(digest[:])
-	return req.WithContext(linktoken.WithKey(req.Context(), key))
+	return req.WithContext(linktoken.WithKey(req.Context(), testLinkKey()))
 }
 
 // authClient is the shared client for the suite. It carries a cookie jar and automatically attaches

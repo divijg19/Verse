@@ -15,9 +15,8 @@ import (
 )
 
 type shareLinkRow struct {
-	ID      string `json:"id"`
-	URL     string `json:"url"`
-	Revoked bool   `json:"revoked"`
+	ID  string `json:"id"`
+	URL string `json:"url"`
 }
 
 func shareLinkPayload(t *testing.T, srvURL, poemID string) struct {
@@ -102,9 +101,10 @@ func TestLegacyLinkHasNoCopyURL(t *testing.T) {
 	}
 }
 
-// TestPublicReMintWithSubmissionKeepsIdentity reproduces the FK violation that made a second Public
-// Link click return 500 once a submission existed. The row id and its submissions must survive.
-func TestPublicReMintWithSubmissionKeepsIdentity(t *testing.T) {
+// TestPublicIdempotentReturnAndExplicitRotateKeepIdentity pins both halves of v0.5.10: a repeated
+// Public Link click returns the existing capability without a write, while an explicit Rotate issues
+// a fresh token on the same row. In both cases the submissions and their attribution survive.
+func TestPublicIdempotentReturnAndExplicitRotateKeepIdentity(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
 
@@ -134,32 +134,77 @@ func TestPublicReMintWithSubmissionKeepsIdentity(t *testing.T) {
 		t.Fatalf("submit = %d", status)
 	}
 
-	status, body, _ := postForm(t, srv.URL+"/share/public-link", urlValues("id", id), nil)
-	if status != http.StatusOK {
-		t.Fatalf("re-mint with a submission = %d; body: %s", status, truncate([]byte(body)))
-	}
-	var again shareLinkRow
-	if err := json.Unmarshal([]byte(body), &again); err != nil {
+	// Snapshot the row: an accidental write on the reuse path must be caught even if the response
+	// still looks correct.
+	var beforeHash, beforeCreated string
+	if err := database.Pool.QueryRow(t.Context(), `
+        SELECT token_hash, created_at::text FROM public_links WHERE id = $1`, wantID).
+		Scan(&beforeHash, &beforeCreated); err != nil {
 		t.Fatal(err)
 	}
-	if again.ID != wantID {
-		t.Errorf("re-mint changed the link id: got %q, want %q", again.ID, wantID)
+
+	// A repeated click is a pure read: the same id and URL, created:false, and the old token still live.
+	status, body, _ := postForm(t, srv.URL+"/share/public-link", urlValues("id", id), nil)
+	if status != http.StatusOK {
+		t.Fatalf("second click with a submission = %d; body: %s", status, truncate([]byte(body)))
 	}
-	// Re-mint deliberately rotates the token while keeping the row id, which is what preserves the
-	// submission rows and their attribution. Idempotent return is a later release.
-	if !strings.HasPrefix(again.URL, srv.URL+"/p/") || again.URL == srv.URL+"/p/"+token {
-		t.Errorf("re-mint did not rotate the token: %q", again.URL)
+	var reused struct {
+		ID      string `json:"id"`
+		URL     string `json:"url"`
+		Created bool   `json:"created"`
+	}
+	if err := json.Unmarshal([]byte(body), &reused); err != nil {
+		t.Fatal(err)
+	}
+	if reused.ID != wantID || reused.URL != srv.URL+"/p/"+token || reused.Created {
+		t.Errorf("idempotent click = %+v, want original id/url with created=false", reused)
+	}
+	if status, _, _ := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+token); status != http.StatusOK {
+		t.Errorf("idempotent click invalidated the old token: %d", status)
+	}
+	var afterHash, afterCreated string
+	if err := database.Pool.QueryRow(t.Context(), `
+        SELECT token_hash, created_at::text FROM public_links WHERE id = $1`, wantID).
+		Scan(&afterHash, &afterCreated); err != nil {
+		t.Fatal(err)
+	}
+	if afterHash != beforeHash || afterCreated != beforeCreated {
+		t.Errorf("idempotent click mutated the row: hash %q -> %q, created %q -> %q",
+			beforeHash, afterHash, beforeCreated, afterCreated)
+	}
+
+	// The explicit Rotate changes the token but keeps the row id and its history.
+	status, body, _ = postForm(t, srv.URL+"/share/public-link/rotate", url.Values{"id": {id}, "link": {wantID}}, nil)
+	if status != http.StatusOK {
+		t.Fatalf("rotate with a submission = %d; body: %s", status, truncate([]byte(body)))
+	}
+	var rotated struct {
+		ID      string `json:"id"`
+		URL     string `json:"url"`
+		Created bool   `json:"created"`
+	}
+	if err := json.Unmarshal([]byte(body), &rotated); err != nil {
+		t.Fatal(err)
+	}
+	if rotated.ID != wantID || !rotated.Created || rotated.URL == srv.URL+"/p/"+token {
+		t.Errorf("rotate = %+v, want same id, fresh URL, created=true", rotated)
 	}
 	if status, _, _ := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+token); status != http.StatusNotFound {
-		t.Errorf("old public token still resolves: %d", status)
+		t.Errorf("old public token still resolves after rotate: %d", status)
+	}
+	// The token_hash guard also rejects an in-flight POST that already has the old CSRF cookie.
+	if status, _, _ = guestPost(t, guest, srv.URL+"/p/"+token+"/submit", url.Values{
+		"csrf": {csrfFromBody(t, page)}, "name": {"Reader"}, "content": {"Too late."},
+	}); status != http.StatusNotFound {
+		t.Errorf("old token accepted a submission after rotate: %d", status)
 	}
 
 	second := shareLinkPayload(t, srv.URL, id)
 	if len(second.PublicLinks) != 1 {
 		t.Fatalf("second payload = %+v", second.PublicLinks)
 	}
-	if second.PublicLinks[0].URL != again.URL {
-		t.Errorf("Share payload URL = %q, want the rotated %q", second.PublicLinks[0].URL, again.URL)
+	if second.PublicLinks[0].URL != rotated.URL {
+		t.Errorf("Share payload URL = %q, want the rotated %q", second.PublicLinks[0].URL, rotated.URL)
 	}
 	count, err := services.CountPublicSubmissionsByLink(t.Context(), id)
 	if err != nil {
