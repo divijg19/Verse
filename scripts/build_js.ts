@@ -1,7 +1,8 @@
 // The TypeScript build.
 //
-// Five bundles come out of this: the editor's Focus Mode, the guest editor's autosave, the
-// navigation, the author's Share actions, and the public site's archive search. Bun is the compiler,
+// Six bundles come out of this: the editor's Focus Mode, the guest editor's autosave, the
+// navigation, the author's Share actions, the public site's archive search, and the public
+// submission page's Copy Text action. Bun is the compiler,
 // because Bun is already a build dependency of this repository
 // for the authoring stylesheet, and a second toolchain for a second language would cost more than the
 // type-checking is worth.
@@ -56,8 +57,9 @@ interface Bundle {
 /**
  * The bundles, and the only place the mapping is written down.
  *
- * The authoring bundles keep their names, so the URLs the templates already reference do not
- * change and the static allowlist does not have to learn a new entry.
+ * The existing authoring bundles keep their names, so the URLs the templates already reference do
+ * not change. The new public submission bundle is the one new entry the static allowlist had to
+ * learn.
  *
  * The public bundle is embedded by the publish command and content-addressed at build time, the
  * same way the public stylesheet is. It lives beside that stylesheet because both are the public
@@ -71,6 +73,10 @@ const bundles: Bundle[] = [
   {
     source: "web/ts/public.ts",
     output: "internal/publish/assets/public.js",
+  },
+  {
+    source: "web/ts/public_submit.ts",
+    output: "static/js/public_submit.js",
   },
 ];
 

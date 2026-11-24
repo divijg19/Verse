@@ -132,7 +132,7 @@ jobs:
         # `bun check` is Bun's own type checker, not a script in package.json: it reads the
         # tsconfig and reports the same errors `tsc --noEmit` does, down to the codes
         # --strict-family flags produce. Using it means the repository does not carry the
-        # TypeScript compiler as a dependency for the sake of checking eleven files, and the
+        # TypeScript compiler as a dependency for the sake of checking the TypeScript sources, and the
         # version of the checker is the version of the bundler that compiles the sources.
         run: bun check
 
@@ -941,7 +941,7 @@ jobs:
             # build paths disagreed. These four assertions are the difference: the image is asked for
             # the files a browser requests, and the stylesheet is inspected for a class that can only
             # be present if the templates were scanned when it was built.
-            for asset in /static/js/htmx.min.js /static/js/navigation.js /static/css/output.css; do
+            for asset in /static/js/htmx.min.js /static/js/navigation.js /static/js/public_submit.js /static/css/output.css; do
               code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:8080${asset}")
               if [ "$code" != "200" ]; then
                 echo "::error::${asset} returned ${code} from the image; expected 200"

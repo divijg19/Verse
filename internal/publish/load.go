@@ -170,10 +170,7 @@ type source struct {
 func publicWorks(sources []source) []publictempl.PublicWork {
 	works := make([]publictempl.PublicWork, 0, len(sources))
 	for _, s := range sources {
-		title := presenters.FirstNonEmptyLine(s.Content)
-		if title == "" {
-			title = "Untitled"
-		}
+		title := presenters.DisplayTitle(s.Content)
 
 		works = append(works, publictempl.PublicWork{
 			ID:          s.ID,

@@ -17,6 +17,7 @@ type Poem struct {
 	//
 	//	read                       deleted_at            published_at
 	//	GetPoem                    nil (filtered)        not selected
+	//	GetPublicLinkPoem          nil (filtered)        not selected
 	//	ListPoems, SearchPoems     nil (filtered)        selected
 	//	DashboardSummary.Latest    nil (filtered)        not selected
 	//	GetPoemIncludingDeleted    selected              not selected

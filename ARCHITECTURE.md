@@ -58,7 +58,7 @@ HTMX handles:
 - Retain and restore a superseded revision
 
 Minimal JS. Declarative interactivity. The reader's site has exactly one script; the authoring site
-has four, each compiled from TypeScript in `web/ts` by `scripts/build_js.ts`.
+has five, each compiled from TypeScript in `web/ts` by `scripts/build_js.ts`.
 
 ### TailwindCSS
 
@@ -107,16 +107,17 @@ verse/
 |   ├── layout.templ   shell, navigation, and the CSP-relevant script tags
 |   ├── editor.templ   the editor and its Focus Mode
 |   ├── guest.templ    the private-link editor and its submission confirmation
-|   ├── public_submit.templ  the unauthenticated public submission form
+|   ├── public_submit.templ  the unauthenticated two-slide public submission page
 |   ├── heatmap.templ  the month grid
 |   ├── public.templ   the static public site: index, archive, work pages, and 404
 |   └── security.go    the CSRF field the mutating routes require
 |
-├── web/ts/            TypeScript sources: editor.ts, navigation.ts, share.ts, guest.ts, public.ts, plus the
-|                      dom.ts/scroll_lock.ts/share_card.ts modules they import
+├── web/ts/            TypeScript sources: editor.ts, navigation.ts, share.ts, guest.ts, public.ts,
+|                      public_submit.ts, plus the dom.ts/scroll_lock.ts/share_card.ts modules they import
 ├── static/
 |   ├── css/input.css  Tailwind entry point, with its @source directives
-|   └── js/            compiled editor.js, navigation.js, share.js, guest.js, and vendored htmx
+|   └── js/            compiled editor.js, navigation.js, share.js, guest.js, public_submit.js,
+|                      and vendored htmx
 |
 ├── migrations/        embedded SQL migrations, applied by the server, cmd/migrate and cmd/publish
 |
@@ -153,6 +154,13 @@ link is a token for one published work; every submission is appended to `public_
 reviewed read-only in History. The route group carries no-store/noindex, its token is redacted from
 logs, both entry and submit are rate-limited per address, and a double-submit CSRF cookie guards the
 form. The reader's static site is unchanged.
+
+`GET /p/{token}` renders two slides. The first is the linked work, read-only, with Copy Text wired by
+the page's one first-party bundle from the text the server rendered; the second is the form above.
+The switch is a pair of native radios with CSS sibling selectors, so it works with no script at all.
+The page never enumerates other works, issues a session, or exposes the `/p` capability as a link.
+The work's text and the publication/revocation check come from one service statement, so an
+unpublish, soft delete or revoke between two reads cannot leave a withdrawn body on screen.
 
 ## Database Schema
 

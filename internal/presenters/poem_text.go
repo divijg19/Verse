@@ -117,6 +117,24 @@ const (
 	TitleWidthNarrow = 72 // the dashboard's last-work summary
 )
 
+// DisplayTitle is the complete title with no width limit.
+//
+// WorkTitle elides to fit a narrow row. A page whose text can be selected and copied must not put
+// an ellipsis on the clipboard, so it shows this and leaves any visual clipping to CSS. The reader
+// uses the same untruncated derivation, which is why Copy Text on the reader and on the public
+// submission page agree.
+//
+// The fallback is unreachable through the application, because validateContent rejects a work that
+// trims to nothing. It is kept because a row inserted by hand in SQL can be empty, and the records
+// note that hand-editing is a real thing an author does.
+func DisplayTitle(content string) string {
+	title := FirstNonEmptyLine(content)
+	if title == "" {
+		return "Untitled"
+	}
+	return title
+}
+
 // WorkTitle derives the display title for a work, truncated to the given width.
 //
 // It is the same title the public site uses, with the same derivation, so the two cannot disagree
@@ -126,14 +144,6 @@ const (
 // to fit -- were written out five times across internal/handlers, at two widths, and three of the
 // five remembered the fallback. One definition is the whole reason this function exists: the copies
 // agreed today, and nothing said they had to.
-//
-// The fallback is unreachable through the application, because validateContent rejects a work that
-// trims to nothing. It is kept because a row inserted by hand in SQL can be empty, and the records
-// note that hand-editing is a real thing an author does.
 func WorkTitle(content string, width int) string {
-	title := FirstNonEmptyLine(content)
-	if title == "" {
-		title = "Untitled"
-	}
-	return TruncateRunes(title, width)
+	return TruncateRunes(DisplayTitle(content), width)
 }

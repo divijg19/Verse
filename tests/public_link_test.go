@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -141,6 +142,13 @@ func TestPublicLinkRevocationStopsSubmissions(t *testing.T) {
 	if status != http.StatusNotFound {
 		t.Errorf("submit after revocation = %d, want 404", status)
 	}
+	status, withdrawnPage, _ := guestGet(t, visitor, srv.URL+"/p/"+token)
+	if status != http.StatusNotFound {
+		t.Errorf("form after revocation = %d, want 404", status)
+	}
+	if strings.Contains(withdrawnPage, "Its body.") {
+		t.Error("a revoked link still renders the work's body")
+	}
 }
 
 func TestPublicEntryIsRateLimited(t *testing.T) {
@@ -211,4 +219,202 @@ func TestPublicLinkStopsWorkingWhenTheWorkIsWithdrawn(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPublicCarouselShowsOnlyTheLinkedWork pins the v0.5.14 surface contract: the anonymous reader
+// gets the linked work's full title and body as a read-only slide, the unchanged form as a second
+// slide, and nothing that belongs to the author or to another work.
+func TestPublicCarouselShowsOnlyTheLinkedWork(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "The Linked Work\n\nA unique body sentinel.\nA second line.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+	other := insertPoem(t, "An Unrelated Work\n\nOTHER WORK SENTINEL.")
+	if err := services.PublishPoem(t.Context(), other); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := newTestServer(t)
+	defer srv.Close()
+	token := mintPublicLink(t, srv.URL, id)
+	visitor := guestClient(t, srv)
+	status, page, headers := guestGet(t, visitor, srv.URL+"/p/"+token)
+	if status != http.StatusOK {
+		t.Fatalf("public page = %d; body: %s", status, truncate([]byte(page)))
+	}
+
+	for _, needle := range []string{
+		`data-copy-title>The Linked Work</h1>`,
+		`data-copy-body>A unique body sentinel.`,
+		`name="verse-public-view"`,
+		`id="verse-public-read" class="verse-public-radio" checked`,
+		`id="verse-public-write" class="verse-public-radio"`,
+		`id="verse-public-read-panel" class="verse-public-panel"`,
+		`id="verse-public-write-panel" class="verse-public-panel"`,
+		`role="region"`,
+		`aria-labelledby="verse-public-read-label"`,
+		`aria-labelledby="verse-public-write-label"`,
+		`data-public-copy-text`,
+		`data-public-actions hidden`,
+		`data-public-copy-hint`,
+		`<script src="/static/js/public_submit.js" defer>`,
+		`name="csrf" value="`,
+	} {
+		if !strings.Contains(page, needle) {
+			t.Errorf("public page is missing %q", needle)
+		}
+	}
+	for _, needle := range []string{
+		"OTHER WORK SENTINEL",
+		"An Unrelated Work",
+		"verse-dashboard",
+		"verse-desktop-nav",
+		"hx-get", "hx-swap", "hx-target", "htmx.min.js",
+		`data-share-address`,
+		`data-copy-url="/p/`,
+		"verse_session=", "verse_guest=", "verse_csrf=",
+	} {
+		if strings.Contains(page, needle) {
+			t.Errorf("public page leaks %q", needle)
+		}
+	}
+
+	if headers.Get("Cache-Control") != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", headers.Get("Cache-Control"))
+	}
+	if !strings.Contains(headers.Get("X-Robots-Tag"), "noindex") {
+		t.Errorf("X-Robots-Tag = %q, want noindex", headers.Get("X-Robots-Tag"))
+	}
+	if !strings.Contains(headers.Get("Content-Security-Policy"), "script-src 'self'") {
+		t.Errorf("CSP = %q, want pinned script-src", headers.Get("Content-Security-Policy"))
+	}
+	if headers.Get("Referrer-Policy") != "no-referrer" {
+		t.Errorf("Referrer-Policy = %q, want no-referrer", headers.Get("Referrer-Policy"))
+	}
+}
+
+// TestPublicCarouselCopiesTheUntruncatedTitle pins the reason /p uses DisplayTitle rather than the
+// width-limited WorkTitle: an ellipsis in the heading would land on the clipboard too.
+func TestPublicCarouselCopiesTheUntruncatedTitle(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	long := strings.Repeat("T", 100)
+	id := insertPoem(t, long+"\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+	srv := newTestServer(t)
+	defer srv.Close()
+	token := mintPublicLink(t, srv.URL, id)
+
+	status, page, _ := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+token)
+	if status != http.StatusOK {
+		t.Fatalf("public page = %d", status)
+	}
+	if !strings.Contains(page, `data-copy-title>`+long) {
+		t.Error("the public page truncates the title it offers to copy")
+	}
+}
+
+// TestPublicCarouselEscapesTheWork covers the new read-only slide with hostile content. Templ
+// escapes both text nodes and attributes, and the copy script reads textContent, so the clipboard
+// receives the original text while the browser renders no executable markup.
+func TestPublicCarouselEscapesTheWork(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	// Literal payloads, not hostileInputs[n]: this test must not change meaning when another file
+	// reorders its slice. Both the title and the body are asserted inside the read slide so the test
+	// cannot pass on the <head><title> alone or on an empty body.
+	title := `"><script>alert(1)</script>`
+	body := `"><img src=x onerror=alert(1)>`
+	id := insertPoem(t, title+"\n\n"+body)
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+	srv := newTestServer(t)
+	defer srv.Close()
+	token := mintPublicLink(t, srv.URL, id)
+
+	status, page, _ := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+token)
+	if status != http.StatusOK {
+		t.Fatalf("public page = %d", status)
+	}
+	for _, needle := range []string{
+		`<script>alert(1)</script>`,
+		`<img src=x onerror=alert(1)>`,
+	} {
+		if strings.Contains(page, needle) {
+			t.Errorf("public page renders executable markup %q", needle)
+		}
+	}
+	for _, needle := range []string{
+		`data-copy-title>&#34;&gt;&lt;script&gt;alert(1)&lt;/script&gt;</h1>`,
+		`data-copy-body>&#34;&gt;&lt;img src=x onerror=alert(1)&gt;</div>`,
+	} {
+		if !strings.Contains(page, needle) {
+			t.Errorf("public page does not carry escaped hostile text in the read slide: %q", needle)
+		}
+	}
+}
+
+// TestGetPublicLinkPoemRefusesWithdrawnWork pins the single-statement read: a link whose work was
+// unpublished, soft-deleted or revoked must fail before any body can be rendered.
+func TestGetPublicLinkPoemRefusesWithdrawnWork(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		withdraw func(context.Context, string) error
+	}{
+		{"unpublish", services.UnpublishPoem},
+		{"soft delete", services.SoftDeletePoem},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			connectTestDB(t)
+			truncatePoems(t)
+			id := insertPoem(t, "A Withdrawn Work\n\nIts body.")
+			if err := services.PublishPoem(t.Context(), id); err != nil {
+				t.Fatal(err)
+			}
+			srv := newTestServer(t)
+			defer srv.Close()
+			token := mintPublicLink(t, srv.URL, id)
+
+			if _, poem, err := services.GetPublicLinkPoem(t.Context(), token); err != nil {
+				t.Fatalf("read before withdrawal: %v", err)
+			} else if !strings.Contains(poem.Content, "Its body.") {
+				t.Fatalf("read returned the wrong work: %q", poem.Content)
+			}
+			if err := tc.withdraw(t.Context(), id); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := services.GetPublicLinkPoem(t.Context(), token); !errors.Is(err, services.ErrNoPublicLink) {
+				t.Errorf("read after %s = %v, want ErrNoPublicLink", tc.name, err)
+			}
+		})
+	}
+	t.Run("revoke", func(t *testing.T) {
+		connectTestDB(t)
+		truncatePoems(t)
+		id := insertPoem(t, "A Revoked Work\n\nIts body.")
+		if err := services.PublishPoem(t.Context(), id); err != nil {
+			t.Fatal(err)
+		}
+		srv := newTestServer(t)
+		defer srv.Close()
+		token := mintPublicLink(t, srv.URL, id)
+		links, err := services.ListPublicLinks(t.Context(), id)
+		if err != nil || len(links) != 1 {
+			t.Fatalf("links = %+v, err = %v", links, err)
+		}
+		if err := services.RevokePublicLink(t.Context(), id, links[0].ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := services.GetPublicLinkPoem(t.Context(), token); !errors.Is(err, services.ErrNoPublicLink) {
+			t.Errorf("read after revoke = %v, want ErrNoPublicLink", err)
+		}
+	})
 }

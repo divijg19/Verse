@@ -13,7 +13,10 @@ granting itself DDL. See RUNNING.md.
 ## Public submission links
 
 A Public Link is the only write surface open to anyone who obtains its URL: it is a bearer
-capability for one published work. Private links also allow unauthenticated writes, but only after
+capability for one published work. Its entry page shows that work's published text read-only on a
+first slide; it carries no other works, drafts, proposals or authoring chrome, and its one first-party
+script only wires Copy Text from the text the server rendered (it also reloads on a
+back/forward-cache restore). Private links also allow unauthenticated writes, but only after
 the holder redeems a per-link URL. Its submissions are appended, never applied automatically, and reviewed by the
 author. Entry and submission are rate-limited per address; a double-submit CSRF cookie is defence in
 depth, not the access control. A private link is a different capability for one person: the editor

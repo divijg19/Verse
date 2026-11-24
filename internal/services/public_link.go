@@ -190,6 +190,40 @@ func ResolvePublicLink(ctx context.Context, token string) (PublicLink, error) {
 	return link, err
 }
 
+// GetPublicLinkPoem resolves a public capability and reads its one work in a single statement.
+//
+// ResolvePublicLink and GetPoem were two queries: the first enforced publication and revocation,
+// the second only deleted_at. An unpublish, revoke or soft delete between them could render a
+// withdrawn work to an anonymous holder. One statement carrying both predicates closes that gap;
+// a withdrawal after the read is still caught on submit by CreatePublicSubmission's own gate. The
+// public submission page needs the work's text, so it uses this instead.
+func GetPublicLinkPoem(ctx context.Context, token string) (PublicLink, models.Poem, error) {
+	var link PublicLink
+	var poem models.Poem
+	if token == "" {
+		return link, poem, ErrNoPublicLink
+	}
+	if err := database.Require(); err != nil {
+		return link, poem, err
+	}
+	err := database.Pool.QueryRow(ctx, fmt.Sprintf(`
+        SELECT l.id, l.poem_id, l.created_at, l.revoked_at, l.token_hash, p.content, p.created_at
+        FROM public_links l
+        JOIN poems p ON p.id = l.poem_id
+        WHERE l.token_hash = $1 AND l.revoked_at IS NULL AND %s`, models.PublishedFilter),
+		linktoken.HashToken(token)).
+		Scan(&link.ID, &link.PoemID, &link.CreatedAt, &link.RevokedAt, &link.TokenHash,
+			&poem.Content, &poem.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return link, poem, ErrNoPublicLink
+	}
+	if err != nil {
+		return link, poem, err
+	}
+	poem.ID = link.PoemID
+	return link, poem, nil
+}
+
 // CreatePublicSubmission appends one text. The EXISTS clause repeats the published and revocation
 // checks inside the write, so a link revoked after middleware ran cannot still accept a submission.
 func CreatePublicSubmission(ctx context.Context, link PublicLink, name, content string) (PublicSubmission, error) {

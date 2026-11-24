@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/divijg19/Verse/internal/services"
 )
 
 // This file exists because v0.3.7 added a content security policy that blocked the application's own
@@ -79,6 +81,44 @@ func TestGuestEditorMarkupObeysThePolicy(t *testing.T) {
 	}
 	if !strings.Contains(body, "Send main version") || !strings.Contains(body, "Send another version") {
 		t.Error("guest submit buttons do not carry their clearer labels")
+	}
+}
+
+// TestPublicSubmitMarkupObeysThePolicy covers the anonymous /p page. It needs a minted capability
+// and a guest client, so it cannot join surfacesToCheck; the assertion is the same one used for the
+// guest editor: one script with a src, no inline script and no inline handler.
+func TestPublicSubmitMarkupObeysThePolicy(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+	id := insertPoem(t, "A Work\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+	srv := newTestServer(t)
+	defer srv.Close()
+	token := mintPublicLink(t, srv.URL, id)
+
+	status, body, headers := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+token)
+	if status != http.StatusOK {
+		t.Fatalf("public page = %d", status)
+	}
+	if !strings.Contains(headers.Get("Content-Security-Policy"), "script-src 'self'") {
+		t.Fatalf("public page has no pinned script-src: %q", headers.Get("Content-Security-Policy"))
+	}
+	scripts := inlineScriptBlock.FindAllString(body, -1)
+	if len(scripts) != 1 {
+		t.Errorf("public page has %d script tags, want 1: %v", len(scripts), scripts)
+	}
+	for _, tag := range scripts {
+		if !srcAttribute.MatchString(tag) {
+			t.Errorf("public page has a script without src: %s", tag)
+		}
+	}
+	if inlineEventAttribute.MatchString(body) {
+		t.Error("public page contains an inline event handler")
+	}
+	if !strings.Contains(body, `<script src="/static/js/public_submit.js" defer>`) {
+		t.Error("public page does not load its one first-party bundle")
 	}
 }
 
