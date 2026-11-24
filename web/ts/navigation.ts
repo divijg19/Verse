@@ -16,10 +16,11 @@ import { lockBodyScroll, unlockBodyScroll } from "./scroll_lock";
  * The check is on identity rather than on a class or an attribute, so a swap anywhere else on the
  * page -- a library page's own swap, say -- does not move the screen out from under the reader.
  */
-function activeScreenSwapTarget(event: Event): HTMLElement | null {
+function activeScreenSwapTarget(
+  event: CustomEvent<VerseHtmxEventDetail>,
+): HTMLElement | null {
   const screen = document.getElementById("screen");
-  const detail = (event as CustomEvent<VerseHtmxEventDetail>).detail;
-  const target = detail ? detail.target : null;
+  const target = event.detail.target;
   if (!screen || target !== screen) {
     return null;
   }
@@ -27,7 +28,9 @@ function activeScreenSwapTarget(event: Event): HTMLElement | null {
 }
 
 /** Removes the transition classes a swap adds. */
-function restoreScreenTransition(event: Event): void {
+function restoreScreenTransition(
+  event: CustomEvent<VerseHtmxEventDetail>,
+): void {
   const screen = activeScreenSwapTarget(event);
   if (!screen) {
     return;

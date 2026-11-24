@@ -110,10 +110,10 @@ func connectTestDB(t *testing.T) {
 
 // truncatePoems empties the poems table.
 //
-// One of exactly three places in the repository that may issue a TRUNCATE; the others are
-// truncateE2EPoems in cmd/server and the login_attempts reset in tests/rate_limit_test.go. All three
-// re-check the gate rather than trusting the caller, so a test that reaches one through an unusual
-// path still cannot destroy a database that was never opted in.
+// One of exactly four places in the repository that may issue a TRUNCATE; the others are
+// truncateE2EPoems in cmd/server, the login_attempts reset in tests/rate_limit_test.go, and the
+// local-reset path in internal/seed. They re-check their gate rather than trusting the caller, so a
+// test that reaches one through an unusual path still cannot destroy an unopted-in database.
 //
 // This comment used to claim there were two, and to say a grep should return exactly two. It had
 // already drifted to three by the time anyone looked, which is the whole argument: an invariant
@@ -286,33 +286,13 @@ func csrfFromJarFor(t *testing.T, c *http.Client, baseURL string) string {
 // csrfFromJar returns the CSRF token the server issued for the current session.
 func csrfFromJar(t *testing.T, baseURL string) string {
 	t.Helper()
-
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		t.Fatalf("parse base url: %v", err)
-	}
-	for _, c := range authClient.Jar.Cookies(u) {
-		if c.Name == testCSRFCookie {
-			return c.Value
-		}
-	}
-	return ""
+	return csrfFromJarFor(t, authClient, baseURL)
 }
 
 // sessionFromJar returns the session cookie value, or "" when absent.
 func sessionFromJar(t *testing.T, baseURL string) string {
 	t.Helper()
-
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		t.Fatalf("parse base url: %v", err)
-	}
-	for _, c := range authClient.Jar.Cookies(u) {
-		if c.Name == testSessionCookie {
-			return c.Value
-		}
-	}
-	return ""
+	return sessionFromJarFor(t, authClient, baseURL)
 }
 
 // sessionFromJarFor returns the session cookie held by a specific client, for the same reason

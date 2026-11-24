@@ -85,7 +85,7 @@ func writePrivateLink(w http.ResponseWriter, r *http.Request, id string, forceNe
 		return
 	}
 
-	shareJSON(w, privateLinkResult{
+	writeJSONNoStore(w, privateLinkResult{
 		ID:        linkID,
 		URL:       linkURL(base, token, guestLinkPath),
 		ExpiresAt: expiresAt,
@@ -117,7 +117,7 @@ func ShareLinkRevokeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shareJSON(w, struct {
+	writeJSONNoStore(w, struct {
 		Revoked bool `json:"revoked"`
 	}{Revoked: true})
 }
@@ -160,9 +160,9 @@ func ShareProposalApplyHandler(w http.ResponseWriter, r *http.Request) {
 
 // privateLinkViews maps service rows to the Share screen's view model.
 //
-// A URL is recovered only for an active, non-revoked row whose seed derives a token matching the
-// stored hash. Legacy rows have no seed and a rotated key no longer matches: both fail closed with
-// an empty URL rather than emitting a link that would 404.
+// Expired rows are now kept so the author can see what happened; their capability is dead and no URL
+// is emitted. Recoverability is computed independently of the URL gate so an unrecoverable row is
+// reported as such rather than being confused with an ended one.
 func privateLinkViews(ctx context.Context, key linktoken.Key, base, poemID string) ([]templ.PrivateLinkView, error) {
 	links, err := services.ListPrivateLinks(ctx, poemID)
 	if err != nil {
@@ -177,17 +177,19 @@ func privateLinkViews(ctx context.Context, key linktoken.Key, base, poemID strin
 	now := clock.NowUTC()
 	views := make([]templ.PrivateLinkView, 0, len(links))
 	for _, link := range links {
-		// Expired links drop out of the list without ceremony. The row stays for history, but the
-		// capability is unreachable and there is nothing left for the author to act on.
-		if !now.Before(link.ExpiresAt) {
-			continue
-		}
 		revoked := link.RevokedAt != nil
+		expired := !now.Before(link.ExpiresAt)
+		recoverable := false
+		var token string
+		if link.TokenSeed.Valid {
+			token, err = linktoken.Recover(key, linktoken.Private, link.TokenSeed.String, link.TokenHash)
+			recoverable = err == nil
+		}
+		state := linkState(revoked, expired, true, recoverable)
+
 		url := ""
-		if !revoked && base != "" && link.TokenSeed.Valid {
-			if token, err := linktoken.Recover(key, linktoken.Private, link.TokenSeed.String, link.TokenHash); err == nil {
-				url = linkURL(base, token, guestLinkPath)
-			}
+		if state == templ.LinkStateActive && base != "" {
+			url = linkURL(base, token, guestLinkPath)
 		}
 		views = append(views, templ.PrivateLinkView{
 			ID:            link.ID,
@@ -196,6 +198,8 @@ func privateLinkViews(ctx context.Context, key linktoken.Key, base, poemID strin
 			ExpiresAt:     link.ExpiresAt,
 			Revoked:       revoked,
 			ProposalCount: counts[link.ID],
+			State:         string(state),
+			Copyable:      url != "",
 			URL:           url,
 		})
 	}

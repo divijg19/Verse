@@ -164,7 +164,7 @@ if (editorOverlay) {
 if (document.body.dataset.editorAfterRequestWired !== "true") {
   document.body.dataset.editorAfterRequestWired = "true";
   document.addEventListener("htmx:afterRequest", (event) => {
-    const trigger = (event as CustomEvent<{ elt?: Element }>).detail?.elt;
+    const trigger = event.detail?.elt;
     if (!(trigger instanceof HTMLFormElement)) {
       return;
     }

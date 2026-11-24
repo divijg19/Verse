@@ -25,8 +25,7 @@
   // web/ts/navigation.ts
   function activeScreenSwapTarget(event) {
     const screen = document.getElementById("screen");
-    const detail = event.detail;
-    const target = detail ? detail.target : null;
+    const target = event.detail.target;
     if (!screen || target !== screen) {
       return null;
     }

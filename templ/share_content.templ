@@ -151,6 +151,19 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 				border-bottom: 1px solid rgb(32 32 32);
 			}
 
+			/* Ended rows remain for the record but recede visually; the state is in the text. */
+			.verse-share-link-row-ended p,
+			.verse-share-link-row-ended small {
+				color: rgb(115 115 115);
+			}
+
+			.verse-share-links-note {
+				font-size: 0.72rem;
+				line-height: 1.5;
+				color: rgb(115 115 115);
+				margin: 0 0 0.45rem;
+			}
+
 			.verse-share-link-row p {
 				font-size: 0.78rem;
 				line-height: 1.5;
@@ -257,7 +270,11 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 				kept and reviewed in the work's history; it is never applied automatically.
 			</p>
 			<div class="verse-share-links" data-links hidden>
-				<p class="verse-share-links-title">Active links</p>
+				<p class="verse-share-links-title">Links</p>
+				<p class="verse-share-links-note">
+					Ended links stay listed for the record, last in each group. Revoke is hidden once a
+					link ends; New (private) or Rotate (public) issues a fresh one.
+				</p>
 				<div data-private-link-list></div>
 				<div data-public-link-list></div>
 			</div>

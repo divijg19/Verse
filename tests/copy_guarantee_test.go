@@ -32,6 +32,10 @@ func TestAuthorCopyUsesServerURL(t *testing.T) {
 		`data-new`,
 		`data-public-rotate`,
 		`data.created`,
+		`rowControls`,
+		`isEnded`,
+		`unrecoverable`,
+		`verse-share-link-row-ended`,
 	} {
 		if !strings.Contains(source, needle) {
 			t.Errorf("share.ts does not contain %q", needle)

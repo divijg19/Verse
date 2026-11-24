@@ -12,15 +12,56 @@
 
 import { copyText, savePNG, type ShareWork } from "./share_card";
 
+/** States are decided by the server; the browser never infers them from an empty URL. */
+type LinkState =
+  "active" | "unrecoverable" | "expired" | "revoked" | "unpublished";
+
+const endedStates: LinkState[] = ["expired", "revoked"];
+
+function isEnded(state: LinkState): boolean {
+  return endedStates.includes(state);
+}
+
+function stateLabel(state: LinkState): string {
+  switch (state) {
+    case "unrecoverable":
+      return "Active · URL not recoverable";
+    case "expired":
+      return "Expired";
+    case "revoked":
+      return "Revoked";
+    case "unpublished":
+      return "Unpublished";
+    default:
+      return "Active";
+  }
+}
+
+/** The controls a row may offer. Absent means the action cannot succeed, so it is not rendered. */
+function rowControls(
+  state: LinkState,
+  kind: "private" | "public",
+): { copy: boolean; fresh: boolean; rotate: boolean; revoke: boolean } {
+  const ended = isEnded(state);
+  return {
+    copy: state === "active",
+    fresh: kind === "private" && !ended,
+    // A revoked public row needs Rotate: it is the only repair path after the primary action 409s.
+    rotate: kind === "public" && state !== "unpublished",
+    revoke: !ended && state !== "unpublished",
+  };
+}
+
 /** One private link as the endpoint describes it. */
 interface PrivateLinkView {
   id: string;
   poemID: string;
   createdAt: string;
   expiresAt: string;
-  revoked: boolean;
   proposalCount: number;
-  /** Present only for an active link the server can still recover. */
+  state: LinkState;
+  copyable: boolean;
+  /** Present only when the server can supply a working capability URL. */
   url: string;
 }
 
@@ -28,9 +69,10 @@ interface PublicLinkView {
   id: string;
   poemID: string;
   createdAt: string;
-  revoked: boolean;
   submissionCount: number;
-  /** Present only for an active link the server can still recover. */
+  state: LinkState;
+  copyable: boolean;
+  /** Present only when the server can supply a working capability URL. */
   url: string;
 }
 
@@ -118,12 +160,12 @@ async function postForm(
 // active link's URL from a stored seed, so a row minted in an earlier session still has a working
 // Copy button after reload. A row whose token cannot be recovered simply has no URL and no Copy.
 
-/** Builds the row's buttons, with Revoke always rightmost. New and Rotate are explicit actions. */
+/** Builds only the controls this row may use, with Revoke rightmost when it is present. */
 function linkButtons(
   id: string,
   copyAttr: string,
   revokeAttr: string,
-  revoked: boolean,
+  controls: { copy: boolean; fresh: boolean; rotate: boolean; revoke: boolean },
   url: string,
   newAttr: string | null = null,
   rotateAttr: string | null = null,
@@ -131,7 +173,7 @@ function linkButtons(
   const group = document.createElement("div");
   group.className = "verse-share-link-buttons";
 
-  if (url) {
+  if (controls.copy && url) {
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "verse-share-link-copy";
@@ -141,7 +183,7 @@ function linkButtons(
     group.appendChild(copy);
   }
 
-  if (newAttr) {
+  if (controls.fresh && newAttr) {
     const fresh = document.createElement("button");
     fresh.type = "button";
     fresh.className = "verse-share-link-copy";
@@ -149,7 +191,7 @@ function linkButtons(
     fresh.setAttribute(newAttr, id);
     group.appendChild(fresh);
   }
-  if (rotateAttr) {
+  if (controls.rotate && rotateAttr) {
     const rotate = document.createElement("button");
     rotate.type = "button";
     rotate.className = "verse-share-link-copy";
@@ -158,13 +200,14 @@ function linkButtons(
     group.appendChild(rotate);
   }
 
-  const revoke = document.createElement("button");
-  revoke.type = "button";
-  revoke.className = "verse-share-link-revoke";
-  revoke.textContent = "Revoke";
-  revoke.setAttribute(revokeAttr, id);
-  revoke.disabled = revoked;
-  group.appendChild(revoke);
+  if (controls.revoke) {
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "verse-share-link-revoke";
+    revoke.textContent = "Revoke";
+    revoke.setAttribute(revokeAttr, id);
+    group.appendChild(revoke);
+  }
   return group;
 }
 
@@ -200,20 +243,26 @@ function renderLinks(links: PrivateLinkView[]): void {
     return;
   }
 
-  for (const link of links) {
+  // Stable sort preserves the service's newest-first order inside each group.
+  const ordered = [...links].sort(
+    (a, b) => Number(isEnded(a.state)) - Number(isEnded(b.state)),
+  );
+  for (const link of ordered) {
     const row = document.createElement("div");
-    row.className = "verse-share-link-row";
+    row.className = isEnded(link.state)
+      ? "verse-share-link-row verse-share-link-row-ended"
+      : "verse-share-link-row";
 
     const details = document.createElement("div");
     const summary = document.createElement("p");
-    const state = link.revoked
-      ? "Revoked"
-      : link.proposalCount > 0
-        ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
-        : "Active";
-    summary.textContent = `Private · ${state}`;
+    const count =
+      link.proposalCount > 0
+        ? ` · ${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
+        : "";
+    summary.textContent = `Private · ${stateLabel(link.state)}${count}`;
     const times = document.createElement("small");
-    times.textContent = `Created ${formatTime(link.createdAt)} · closes ${formatTime(link.expiresAt)}`;
+    const boundary = isEnded(link.state) ? "closed" : "closes";
+    times.textContent = `Created ${formatTime(link.createdAt)} · ${boundary} ${formatTime(link.expiresAt)}`;
     details.append(summary, times);
 
     row.append(
@@ -222,7 +271,7 @@ function renderLinks(links: PrivateLinkView[]): void {
         link.id,
         "data-copy",
         "data-revoke",
-        link.revoked,
+        rowControls(link.state, "private"),
         link.url ?? "",
         "data-new",
       ),
@@ -245,17 +294,21 @@ function renderPublicLinks(links: PublicLinkView[]): void {
     list.appendChild(empty);
     return;
   }
-  for (const link of links) {
+  const ordered = [...links].sort(
+    (a, b) => Number(isEnded(a.state)) - Number(isEnded(b.state)),
+  );
+  for (const link of ordered) {
     const row = document.createElement("div");
-    row.className = "verse-share-link-row";
+    row.className = isEnded(link.state)
+      ? "verse-share-link-row verse-share-link-row-ended"
+      : "verse-share-link-row";
     const details = document.createElement("div");
     const summary = document.createElement("p");
-    const state = link.revoked
-      ? "Revoked"
-      : link.submissionCount > 0
-        ? `${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
-        : "Active · no submissions yet";
-    summary.textContent = `Public · ${state}`;
+    const count =
+      link.submissionCount > 0
+        ? ` · ${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
+        : "";
+    summary.textContent = `Public · ${stateLabel(link.state)}${count}`;
     const times = document.createElement("small");
     times.textContent = `Created ${formatTime(link.createdAt)}`;
     details.append(summary, times);
@@ -265,7 +318,7 @@ function renderPublicLinks(links: PublicLinkView[]): void {
         link.id,
         "data-public-copy",
         "data-public-revoke",
-        link.revoked,
+        rowControls(link.state, "public"),
         link.url ?? "",
         null,
         "data-public-rotate",
@@ -278,10 +331,26 @@ function renderPublicLinks(links: PublicLinkView[]): void {
 /** Refreshes the link list for the work currently selected. */
 async function refreshLinks(id: string): Promise<void> {
   const data = await selectedWork(id);
-  if (data) {
-    renderLinks(data.links ?? []);
-    renderPublicLinks(data.publicLinks ?? []);
+  if (!data) {
+    // A work can be deleted while its Share screen is open. Clear the stale rows rather than
+    // leaving capabilities on screen for a work the server no longer serves.
+    for (const selector of [
+      "[data-private-link-list]",
+      "[data-public-link-list]",
+    ]) {
+      const list = document.querySelector<HTMLElement>(selector);
+      if (!list) continue;
+      list.replaceChildren();
+      const empty = document.createElement("p");
+      empty.className = "verse-share-links-empty";
+      empty.textContent = "This work is no longer available.";
+      list.appendChild(empty);
+    }
+    report("This work is no longer available.");
+    return;
   }
+  renderLinks(data.links ?? []);
+  renderPublicLinks(data.publicLinks ?? []);
 }
 
 /** Enables or disables the two actions that depend on publication and reader-origin config. */

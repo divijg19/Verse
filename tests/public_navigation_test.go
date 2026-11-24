@@ -439,7 +439,7 @@ func TestPublicRailArrowsPointOutward(t *testing.T) {
 		views.PublicIndexBody(site),
 	))
 
-	styles := readStaticFile(t, "../internal/publish/assets/public.css")
+	styles := readRepoFile(t, "../internal/publish/assets/public.css")
 	if !strings.Contains(styles, ".public-rail--right .rail-chevron {\n  order: 2;") {
 		t.Error("the right rail's arrow does not trail its label")
 	}

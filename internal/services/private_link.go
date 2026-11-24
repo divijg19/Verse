@@ -261,8 +261,8 @@ func PrivateLinkActive(ctx context.Context, linkID string) (poemID string, expir
 
 // ListPrivateLinks returns a work's links, newest first, including expired and revoked ones.
 //
-// The Share screen filters expired rows out before rendering: the row remains for history, but a
-// capability that can no longer be used has nothing left for the author to act on.
+// The Share screen renders every row and derives a state from the stored instants. Expired rows keep
+// their history but emit no capability URL; the service itself never filters them.
 func ListPrivateLinks(ctx context.Context, poemID string) ([]PrivateLink, error) {
 	if err := database.Require(); err != nil {
 		return nil, err

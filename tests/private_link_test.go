@@ -481,37 +481,32 @@ func checkTSBundles(root string) error {
 	return nil
 }
 
-func TestSharePickerOmitsExpiredPrivateLinks(t *testing.T) {
+// TestSharePickerShowsExpiredPrivateLinksAsEnded pins that expired rows remain visible for the
+// record but carry no capability URL and are labeled expired by the server.
+func TestSharePickerShowsExpiredPrivateLinksAsEnded(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)
 
 	id := insertPoem(t, "A Work\n\nIts body.")
 	srv := newTestServer(t)
 	defer srv.Close()
-	linkURL, token := mintLink(t, srv.URL, id)
-	linkID := strings.TrimPrefix(linkURL, srv.URL+"/s/")
+	_, token := mintLink(t, srv.URL, id)
 	guest := guestClient(t, srv)
 	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
 		t.Fatalf("entry = %d", status)
 	}
 	expireLink(t, id)
 
-	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
-	if status != http.StatusOK {
-		t.Fatalf("share data = %d", status)
+	payload := shareLinkPayload(t, srv.URL, id)
+	if len(payload.Links) != 1 {
+		t.Fatalf("expired link was dropped from Share: %+v", payload.Links)
 	}
-	var data struct {
-		Links []struct {
-			ID string `json:"id"`
-		} `json:"links"`
+	row := payload.Links[0]
+	if row.State != "expired" || row.URL != "" || row.Copyable {
+		t.Errorf("expired row = %+v, want expired with no URL", row)
 	}
-	if err := json.Unmarshal([]byte(body), &data); err != nil {
-		t.Fatal(err)
-	}
-	for _, link := range data.Links {
-		if link.ID == linkID {
-			t.Errorf("expired link %s still reported to the Share picker", linkID)
-		}
+	if status, _, _ := guestGet(t, guestClient(t, srv), srv.URL+"/s/"+token); status != http.StatusNotFound {
+		t.Errorf("expired capability still resolves: %d", status)
 	}
 }
 
@@ -555,7 +550,8 @@ func TestPrivateLinkExpiryBoundaryIsExclusive(t *testing.T) {
 	if _, _, err := services.PrivateLinkActive(t.Context(), links[0].ID); !errors.Is(err, services.ErrNoLink) {
 		t.Errorf("active check at the exact expiry = %v, want ErrNoLink", err)
 	}
-	if payload := shareLinkPayload(t, newTestServer(t).URL, id); len(payload.Links) != 0 {
-		t.Errorf("Share still lists the link at the exact expiry: %+v", payload.Links)
+	payload := shareLinkPayload(t, newTestServer(t).URL, id)
+	if len(payload.Links) != 1 || payload.Links[0].State != "expired" || payload.Links[0].URL != "" {
+		t.Errorf("Share at the exact expiry = %+v, want one expired row with no URL", payload.Links)
 	}
 }

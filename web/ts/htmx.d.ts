@@ -2,7 +2,8 @@
 //
 // htmx 2.0.4 ships no types of its own, and the vendored file is a dependency's bytes rather than
 // this project's, so it is neither type-checked nor re-exported. What is declared here is the four
-// events this application listens for and the one field of their detail it reads.
+// events this application listens for and the two fields of their detail it reads: target for the
+// screen transition and elt for the editor's focus restore.
 //
 // The detail shape is htmx's own: `target` is the element the request is for. It is the field the
 // screen-transition code compares against the #screen element to decide whether a swap is one of

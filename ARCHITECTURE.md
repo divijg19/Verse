@@ -113,7 +113,7 @@ verse/
 |   └── security.go    the CSRF field the mutating routes require
 |
 ├── web/ts/            TypeScript sources: editor.ts, navigation.ts, share.ts, guest.ts, public.ts, plus the
-dom.ts/scroll_lock.ts/share_card.ts modules they import
+|                      dom.ts/scroll_lock.ts/share_card.ts modules they import
 ├── static/
 |   ├── css/input.css  Tailwind entry point, with its @source directives
 |   └── js/            compiled editor.js, navigation.js, share.js, guest.js, and vendored htmx

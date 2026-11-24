@@ -118,10 +118,10 @@ func TestEveryTruncateIsBehindTheDisposableGate(t *testing.T) {
 	// deleted -- which is the drift this test exists to catch, repeated in its own assertion.
 	if found != 4 {
 		t.Errorf("found %d executable TRUNCATE statement(s), want exactly 4.\n"+
-			"  A fifth is a new destructive path that must be gated deliberately; a third is a\n"+
-			"  removal that the comment above truncatePoems has not been told about.\n"+
+			"  A fifth is a new destructive path that must be gated deliberately; a lower count\n"+
+			"  is a removal that the comment above truncatePoems has not been told about.\n"+
 			"  If the count is right and this is wrong, the pattern has stopped matching and the\n"+
 			"  gate half of this test is vacuous too.", found)
 	}
-	t.Logf("found %d executable TRUNCATE statement(s), all behind the disposable gate", found)
+	t.Logf("found %d executable TRUNCATE statement(s), all behind a destructive gate", found)
 }

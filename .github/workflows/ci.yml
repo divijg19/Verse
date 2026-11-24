@@ -2,7 +2,7 @@ name: CI
 
 # Trigger model.
 #
-# The previous configuration triggered only on `main`, but v0.3.x is the working branch and was 58
+# The previous configuration triggered only on `main`, but the v0.5.x branch is the working branch and was 58
 # commits ahead of main with none of them ever running CI.
 #
 # A commit is validated exactly twice, and each run answers a different question:
@@ -11,7 +11,7 @@ name: CI
 #   push to main -> is the merge result sound? This is what actually deploys.
 #
 # `v*` is deliberately absent from both branch filters. Every open and merged PR (#46-#51) targets
-# `main`, so `v*` under `pull_request` matched nothing. And a force-push to `v0.3.x` fires the
+# `main`, so `v*` under `pull_request` matched nothing. And a force-push to `v0.5.x` fires the
 # `synchronize` event on the open PR, so the working branch stays covered without a `push` trigger.
 #
 # Release tags deliberately do NOT trigger a run either. A tag points at a commit its pull request
@@ -85,7 +85,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           # Deliberately `latest`, and identical to the tag in the Dockerfile and to BUN_VERSION in
-          # render.yaml. The three build paths must agree on that policy, which the guard below
+          # render.yaml. The four build declarations must agree on that policy, which the guard below
           # asserts; they must never mix `latest` with a literal pin.
           bun-version: "latest"
 
@@ -132,7 +132,7 @@ jobs:
         # `bun check` is Bun's own type checker, not a script in package.json: it reads the
         # tsconfig and reports the same errors `tsc --noEmit` does, down to the codes
         # --strict-family flags produce. Using it means the repository does not carry the
-        # TypeScript compiler as a dependency for the sake of checking seven files, and the
+        # TypeScript compiler as a dependency for the sake of checking eleven files, and the
         # version of the checker is the version of the bundler that compiles the sources.
         run: bun check
 

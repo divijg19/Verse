@@ -126,14 +126,13 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		PublicLinks:             publicLinks,
 	}
 
-	shareJSON(w, out)
+	writeJSONNoStore(w, out)
 }
 
 // publicLinkViews maps public links and their submission counts for the Share screen.
 //
-// A URL is emitted only for a live link on a still-published work whose seed derives a token matching
-// the stored hash. Revoked links, legacy rows and links on unpublished works fail closed with an
-// empty URL.
+// Recoverability is computed even when no URL can be emitted, so a legacy row or a rotated key is
+// reported as unrecoverable rather than being mistaken for a revoked or unpublished link.
 func publicLinkViews(ctx context.Context, key linktoken.Key, base, poemID string, published bool) ([]templ.PublicLinkView, error) {
 	links, err := services.ListPublicLinks(ctx, poemID)
 	if err != nil {
@@ -146,11 +145,17 @@ func publicLinkViews(ctx context.Context, key linktoken.Key, base, poemID string
 	views := make([]templ.PublicLinkView, 0, len(links))
 	for _, link := range links {
 		revoked := link.RevokedAt != nil
+		recoverable := false
+		var token string
+		if link.TokenSeed.Valid {
+			token, err = linktoken.Recover(key, linktoken.Public, link.TokenSeed.String, link.TokenHash)
+			recoverable = err == nil
+		}
+		state := linkState(revoked, false, published, recoverable)
+
 		url := ""
-		if !revoked && published && base != "" && link.TokenSeed.Valid {
-			if token, err := linktoken.Recover(key, linktoken.Public, link.TokenSeed.String, link.TokenHash); err == nil {
-				url = linkURL(base, token, publicLinkPath)
-			}
+		if state == templ.LinkStateActive && base != "" {
+			url = linkURL(base, token, publicLinkPath)
 		}
 		views = append(views, templ.PublicLinkView{
 			ID:              link.ID,
@@ -158,6 +163,8 @@ func publicLinkViews(ctx context.Context, key linktoken.Key, base, poemID string
 			CreatedAt:       link.CreatedAt,
 			Revoked:         revoked,
 			SubmissionCount: counts[link.ID],
+			State:           string(state),
+			Copyable:        url != "",
 			URL:             url,
 		})
 	}

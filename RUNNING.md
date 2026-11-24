@@ -267,15 +267,15 @@ take a backup after upgrading, the only difference is the backup's own `exported
 
 There is deliberately no `DEFAULT` on the column. A `DEFAULT now()` would have published your entire
 library — every draft, every unfinished piece, anything you deleted and kept — the moment the next
-deploy ran, with no way to tell from the outside. **Every work is a draft until you publish it, and
-nothing in this repository publishes anything yet.**
+deploy ran, with no way to tell from the outside. **Every work was a draft until its author published it; at the time of this migration nothing in
+the repository published anything.**
 
 |                          |                                                                                                                                                     |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | What a draft is          | A work with `published_at` set to `NULL`. Nothing else.                                                                                             |
 | What you can see         | Everything, as before. The library, the search box, the dashboard and `/poem/<id>` are unchanged — they filter on `deleted_at`, not on publication. |
-| What a publisher can see | Nothing yet. There is no public site in this release.                                                                                               |
-| What to run              | Nothing. There is no publish command.                                                                                                               |
+| What a publisher can see | Nothing at the time. There was no public site in that release.                                                                                      |
+| What to run              | Nothing then; publishing arrived later.                                                                                                             |
 
 **If you want a backup anyway**, it is the command you already have:
 
@@ -842,7 +842,10 @@ On the authoring side, the Share screen has a work picker. The actions use a sma
 endpoint to read the selected work when an action needs its text. Copy Link is disabled for a draft,
 because a link to an unpublished work would lead nowhere; it says so rather than handing out an
 address that will 404. The endpoint builds that address from `PUBLIC_BASE_URL`, which is why the
-authoring service needs the reader's origin set.
+authoring service needs the reader's origin set. Expired and revoked rows stay visible under
+"Links", last in each list, with no Copy URL; New (private) or Rotate (public) issues a replacement.
+Unrecoverable rows are labelled as such rather than called ended, because an existing holder's URL
+still works.
 
 ### Private links and suggested changes
 

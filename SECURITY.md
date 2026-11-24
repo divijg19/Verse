@@ -22,6 +22,11 @@ draft is keyed by the link, so two holders of the same URL would share one body.
 returns the existing active link. Drafts persist after expiry or revocation but become unreachable through the
 guest routes.
 
+The author's Share screen keeps ended rows for the record, sorted last, with no Copy URL. A link
+that is merely unrecoverable (an old row without a seed, or a rotated key) is not ended: whoever
+holds its URL can still use it, and Rotate is the repair path. Revocation wins over expiry in the
+label. Hiding Revoke on ended rows does not delete anything; drafts and submissions remain in History.
+
 ### Link token recovery (v0.5.9+)
 
 To make Copy work on an active link after a reload, each row keeps a random, non-secret seed; the
