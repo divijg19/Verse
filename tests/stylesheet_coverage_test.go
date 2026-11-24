@@ -52,7 +52,7 @@ func TestEveryClassTheBrowserCodeAppliesIsInTheStylesheet(t *testing.T) {
 
 	stylesheet := readRepoFile(t, path)
 
-	for _, source := range []string{"editor.ts", "navigation.ts", "public.ts", "share.ts", "share_card.ts"} {
+	for _, source := range []string{"editor.ts", "navigation.ts", "public.ts", "public_submit.ts", "share.ts", "share_card.ts"} {
 		body := readRepoFile(t, filepath.Join("web", "ts", source))
 
 		for _, match := range classListPattern.FindAllStringSubmatch(body, -1) {

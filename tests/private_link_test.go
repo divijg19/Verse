@@ -420,7 +420,7 @@ func TestGuestSessionExpiresWithTheLink(t *testing.T) {
 }
 
 // A byte of JavaScript in the browser must come from a .ts file, except for the one vendored htmx
-// runtime. This is the guard on the JS-to-TS port: the four bundles are compiled from web/ts, and
+// runtime. This is the guard on the JS-to-TS port: the six bundles are compiled from web/ts, and
 // nothing else is allowed to appear in a served asset directory.
 func TestEveryAuthoredBrowserScriptHasATypeScriptSource(t *testing.T) {
 	root := repoRoot(t)
@@ -438,8 +438,8 @@ func checkTSBundles(root string) error {
 	}
 
 	outputs := regexp.MustCompile(`source:\s*"([^"]+)"[\s\S]*?output:\s*"([^"]+)"`).FindAllStringSubmatch(string(manifest), -1)
-	if len(outputs) != 5 {
-		return fmt.Errorf("found %d source/output pairs in build_js.ts, want 5", len(outputs))
+	if len(outputs) != 6 {
+		return fmt.Errorf("found %d source/output pairs in build_js.ts, want 6", len(outputs))
 	}
 
 	authored := make(map[string]bool, len(outputs))

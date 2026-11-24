@@ -37,6 +37,7 @@ var allowedStaticAssets = []string{
 	"/static/js/guest.js",
 	"/static/js/htmx.min.js",
 	"/static/js/navigation.js",
+	"/static/js/public_submit.js",
 	"/static/js/share.js",
 }
 

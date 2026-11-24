@@ -653,7 +653,10 @@ an explanatory title. The publish build refuses the reserved placeholder origin 
 
 ## Public submission links
 
-A Public Link is an unauthenticated URL for one published work. Anyone holding it can send a text;
+A Public Link is an unauthenticated URL for one published work. The page opens on a read-only slide
+with that work's full title and body and a Copy Text button; a second slide holds the suggestion
+form. Switching uses native radios and CSS, so it works with JavaScript disabled, and the page
+never exposes another work or any authoring surface. Anyone holding the URL can send a text;
 every submission is appended and appears in the work's History as "Public · read only". Nothing is
 applied to the work automatically, and there is no moderation queue in this release: revoke the link
 from the Share screen if submissions become unwanted. The link lives until revoked, including after
@@ -833,10 +836,13 @@ for Copy Link and Card Export, and the feed is a rooted `/feed.xml` link. The no
 is the complete server-rendered list with real title links and the work pages. It is the site's one
 script, shared with the archive's search box, so the one-script rule is unchanged.
 
-Copy Text puts the work's title and full body on the clipboard. The body is **not** published a
-second time: the script fetches the work's own page and reads the `.poem` element from it. Card
-Export draws a 1200x630 PNG on a canvas from the same text and saves it locally, with no request to
-any other origin.
+Copy Text puts the work's title and full body on the clipboard. On the static reader the body is
+**not** published a second time: the script fetches the work's own page and reads the `.poem`
+element from it. The anonymous `/p/{token}` page is a different surface — an authoring-origin
+capability page, not a published artifact. It shows the linked work's body once, read-only, and its
+Copy Text reads that rendered text from its own DOM; it holds no other work, no draft and no
+authoring chrome. Card Export draws a 1200x630 PNG on a canvas from the same text and saves it
+locally, with no request to any other origin.
 
 On the authoring side, the Share screen has a work picker. The actions use a small authenticated
 endpoint to read the selected work when an action needs its text. Copy Link is disabled for a draft,
@@ -1113,7 +1119,7 @@ unguarded `EventTarget` in the editor's backdrop handler.
 `bun check` is Bun's own type checker, not a script in `package.json`. It reads the repository's
 `tsconfig.json` and reports the same errors `tsc --noEmit` does, down to the codes the strict
 settings produce. Using it means the repository does not carry the TypeScript compiler as a
-dependency for the sake of checking seven files, and the type checker is always the same version
+dependency for the sake of checking the TypeScript sources, and the type checker is always the same version
 as the bundler that compiles the sources. The `qa` script runs it.
 
 `bun run dev:author` rebuilds the stylesheet and the bundles when they change. It did not until

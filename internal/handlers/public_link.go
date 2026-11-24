@@ -124,15 +124,11 @@ func SharePublicLinkRevokeHandler(w http.ResponseWriter, r *http.Request) {
 	}{Revoked: true})
 }
 
-// PublicSubmitHandler renders the anonymous submission form and issues a double-submit CSRF cookie.
+// PublicSubmitHandler renders the anonymous two-slide page — the linked work read-only, then the
+// submission form — and issues a double-submit CSRF cookie for the form.
 func PublicSubmitHandler(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
-	link, err := services.ResolvePublicLink(r.Context(), token)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	poem, err := services.GetPoem(r.Context(), link.PoemID)
+	_, poem, err := services.GetPublicLinkPoem(r.Context(), token)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -148,8 +144,9 @@ func PublicSubmitHandler(w http.ResponseWriter, r *http.Request) {
 		Name: publicCSRFCookie, Value: value, Path: "/p/", HttpOnly: true,
 		Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: int(time.Hour.Seconds()),
 	})
-	title := presenters.WorkTitle(poem.Content, presenters.TitleWidthWide)
-	renderPublic(w, r, templ.PublicSubmit(title, token, value, ""))
+	title := presenters.DisplayTitle(poem.Content)
+	body := presenters.BodyWithoutTitle(poem.Content)
+	renderPublic(w, r, templ.PublicSubmit(title, body, token, value))
 }
 
 // PublicSubmitPOSTHandler appends one submission from an anonymous holder of the link.

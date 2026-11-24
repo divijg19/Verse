@@ -473,12 +473,13 @@ func NewRouter() (*chi.Mux, error) {
 // comes back was written in this file. That is what makes traversal impossible rather than unlikely,
 // and it is also why the linter's path-traversal analysis has nothing to follow.
 var staticAssets = map[string]string{
-	"css/output.css":   "css/output.css",
-	"js/editor.js":     "js/editor.js",
-	"js/guest.js":      "js/guest.js",
-	"js/htmx.min.js":   "js/htmx.min.js",
-	"js/navigation.js": "js/navigation.js",
-	"js/share.js":      "js/share.js",
+	"css/output.css":      "css/output.css",
+	"js/editor.js":        "js/editor.js",
+	"js/guest.js":         "js/guest.js",
+	"js/htmx.min.js":      "js/htmx.min.js",
+	"js/navigation.js":    "js/navigation.js",
+	"js/public_submit.js": "js/public_submit.js",
+	"js/share.js":         "js/share.js",
 }
 
 // staticHandler serves the asset directory, and only the assets named in staticAssets.

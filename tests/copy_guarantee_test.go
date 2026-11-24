@@ -71,6 +71,42 @@ func TestViewerBundleWiresCopy(t *testing.T) {
 	}
 }
 
+// TestPublicSubmitBundleWiresCopy pins the v0.5.14 Copy Text path. The compiled bundle is what the
+// browser executes, so the needles must be there as well as in the source: a stale bundle would ship
+// a page with a hidden, dead button.
+func TestPublicSubmitBundleWiresCopy(t *testing.T) {
+	source := readRepoFile(t, filepath.Join("web", "ts", "public_submit.ts"))
+	bundle := readRepoFile(t, filepath.Join("static", "js", "public_submit.js"))
+	for _, needle := range []string{
+		`copyText`,
+		`textContent`,
+		`data-copy-title`,
+		`data-copy-body`,
+		`data-public-copy-text`,
+		`data-public-actions`,
+		`data-public-copy-hint`,
+		`hidden = false`,
+		`pageshow`,
+	} {
+		if !strings.Contains(source, needle) {
+			t.Errorf("public_submit.ts does not contain %q", needle)
+		}
+		if !strings.Contains(bundle, needle) {
+			t.Errorf("the compiled public submission bundle does not contain %q", needle)
+		}
+	}
+	// The capability URL is a write capability. It must never be an attribute or a copy target on
+	// this anonymous page.
+	for _, needle := range []string{`/p/`, `data-share-address`, `data-copy-url`, `innerHTML`} {
+		if strings.Contains(source, needle) {
+			t.Errorf("public_submit.ts must not carry the capability URL: %q", needle)
+		}
+		if strings.Contains(bundle, needle) {
+			t.Errorf("the compiled public submission bundle must not carry the capability URL: %q", needle)
+		}
+	}
+}
+
 // TestPublisherForbidsSubmissionRoutes ensures no future template can publish a capability URL as a
 // link on the reader's site. Today the static output contains none; this pins the validator rule.
 func TestPublisherForbidsSubmissionRoutes(t *testing.T) {

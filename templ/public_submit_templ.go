@@ -17,9 +17,13 @@ func publicThanks(name string) string {
 	return "Thank you, " + name + "."
 }
 
-// PublicSubmit is the unauthenticated form behind a Public Link. It has no script, no authoring
-// chrome and no third-party request; every submission is appended and reviewed by the author later.
-func PublicSubmit(title, token, csrf, status string) templ.Component {
+// PublicSubmit is the unauthenticated two-slide page behind a Public Link.
+//
+// Slide 1 is the linked work, read-only and copyable; slide 2 is the unchanged suggestion form. The
+// switch is a pair of native radios with CSS sibling selectors, so it works without JavaScript. The
+// one first-party bundle wires Copy Text only: it does not fetch, does not issue a session and never
+// exposes the /p capability as a link.
+func PublicSubmit(title, body, token, csrf string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -43,46 +47,46 @@ func PublicSubmit(title, token, csrf, status string) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 19, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 23, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0; min-height: 100vh; padding: 1.25rem; box-sizing: border-box;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23,23,23,0.9), rgba(10,10,10,0.98));\n\t\t\t\t\tcolor: rgb(229,229,229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tdisplay: flex; align-items: center; justify-content: center;\n\t\t\t\t}\n\t\t\t\t.verse-public-card {\n\t\t\t\t\twidth: 100%; max-width: 34rem; padding: 1.5rem; box-sizing: border-box;\n\t\t\t\t\tborder: 1px solid rgb(38,38,38); border-radius: 1rem;\n\t\t\t\t\tbackground: rgba(23,23,23,0.85);\n\t\t\t\t}\n\t\t\t\t.verse-public-card h1 { font-family: Georgia, serif; font-size: 1.5rem; margin: 0 0 0.5rem; }\n\t\t\t\t.verse-public-card p { font-size: 0.85rem; line-height: 1.6; color: rgb(163,163,163); }\n\t\t\t\t.verse-public-label {\n\t\t\t\t\tdisplay: block; margin: 1rem 0 0.4rem; font-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.18em; text-transform: uppercase; color: rgb(115,115,115);\n\t\t\t\t}\n\t\t\t\t.verse-public-input, .verse-public-textarea {\n\t\t\t\t\tdisplay: block; width: 100%; box-sizing: border-box; padding: 0.7rem 0.8rem;\n\t\t\t\t\tbackground: rgba(10,10,10,0.65); border: 1px solid rgb(38,38,38);\n\t\t\t\t\tborder-radius: 0.5rem; color: rgb(245,245,245); font-size: 1rem; outline: none;\n\t\t\t\t}\n\t\t\t\t.verse-public-textarea { min-height: 16rem; resize: vertical; line-height: 1.6; }\n\t\t\t\t.verse-public-submit {\n\t\t\t\t\twidth: 100%; min-height: 2.625rem; margin-top: 1rem; border: none;\n\t\t\t\t\tborder-radius: 0.375rem; background: rgb(147,51,234);\n\t\t\t\t\tcolor: rgb(250,245,255); font-size: 1rem; cursor: pointer;\n\t\t\t\t}\n\t\t\t\t.verse-public-status { min-height: 1.2rem; color: rgb(192,132,252); }\n\t\t\t</style></head><body><main class=\"verse-public-card\"><p class=\"verse-public-label\">Public link</p><h1>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/js/public_submit.js\" defer></script><style>\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0; min-height: 100vh; min-height: 100dvh; padding: 1.25rem; box-sizing: border-box;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23,23,23,0.9), rgba(10,10,10,0.98));\n\t\t\t\t\tcolor: rgb(229,229,229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tdisplay: flex; align-items: flex-start; justify-content: center;\n\t\t\t\t}\n\t\t\t\t.verse-public-card {\n\t\t\t\t\twidth: 100%; max-width: 34rem; padding: 1.5rem; box-sizing: border-box;\n\t\t\t\t\tmargin-block: auto;\n\t\t\t\t\tborder: 1px solid rgb(38,38,38); border-radius: 1rem;\n\t\t\t\t\tbackground: rgba(23,23,23,0.85);\n\t\t\t\t}\n\t\t\t\t.verse-public-card h1 { font-family: Georgia, serif; font-size: 1.5rem; margin: 0 0 0.5rem; overflow-wrap: anywhere; }\n\t\t\t\t.verse-public-card p { font-size: 0.85rem; line-height: 1.6; color: rgb(163,163,163); }\n\t\t\t\t/* Qualified so these win over the more specific \".verse-public-card p\" below. */\n\t\t\t\t.verse-public-card .verse-public-label {\n\t\t\t\t\tdisplay: block; margin: 1rem 0 0.4rem; font-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.18em; text-transform: uppercase; color: rgb(115,115,115);\n\t\t\t\t}\n\t\t\t\t.verse-public-switch { border: 0; padding: 0; margin: 0; min-width: 0; }\n\t\t\t\t.verse-public-radio { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; }\n\t\t\t\t.verse-public-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin: 0.75rem 0 1rem; }\n\t\t\t\t.verse-public-tabs label {\n\t\t\t\t\tdisplay: block; min-height: 2.75rem; padding: 0.6rem 0.5rem; box-sizing: border-box;\n\t\t\t\t\tborder: 1px solid rgb(38,38,38); border-radius: 0.375rem; text-align: center;\n\t\t\t\t\tline-height: 1.3; color: rgb(163,163,163); font-size: 0.85rem; cursor: pointer;\n\t\t\t\t}\n\t\t\t\t#verse-public-read:checked ~ .verse-public-tabs label[for=\"verse-public-read\"],\n\t\t\t\t#verse-public-write:checked ~ .verse-public-tabs label[for=\"verse-public-write\"] {\n\t\t\t\t\tborder-color: rgb(147,51,234); background: rgba(147,51,234,0.15); color: rgb(250,245,255);\n\t\t\t\t}\n\t\t\t\t.verse-public-panel { display: none; }\n\t\t\t\t/* The radios must stay before the tabs and panels: \"~\" cannot reach a preceding sibling. */\n\t\t\t\t#verse-public-read:checked ~ #verse-public-read-panel,\n\t\t\t\t#verse-public-write:checked ~ #verse-public-write-panel { display: block; }\n\t\t\t\t#verse-public-read:focus-visible ~ .verse-public-tabs label[for=\"verse-public-read\"],\n\t\t\t\t#verse-public-write:focus-visible ~ .verse-public-tabs label[for=\"verse-public-write\"] {\n\t\t\t\t\toutline: 2px solid rgb(192,132,252); outline-offset: 2px;\n\t\t\t\t}\n\t\t\t\t.verse-public-poem-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }\n\t\t\t\t.verse-public-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }\n\t\t\t\t.verse-public-actions[hidden] { display: none; }\n\t\t\t\t.verse-public-copy {\n\t\t\t\t\tmin-height: 2.625rem; padding: 0 0.9rem; border: 1px solid rgb(68,68,68);\n\t\t\t\t\tborder-radius: 0.375rem; background: rgba(10,10,10,0.65);\n\t\t\t\t\tcolor: rgb(229,229,229); font-size: 0.85rem; cursor: pointer;\n\t\t\t\t}\n\t\t\t\t.verse-public-input, .verse-public-textarea {\n\t\t\t\t\tdisplay: block; width: 100%; box-sizing: border-box; padding: 0.7rem 0.8rem;\n\t\t\t\t\tbackground: rgba(10,10,10,0.65); border: 1px solid rgb(38,38,38);\n\t\t\t\t\tborder-radius: 0.5rem; color: rgb(245,245,245); font-size: 1rem;\n\t\t\t\t}\n\t\t\t\t.verse-public-input:focus-visible, .verse-public-textarea:focus-visible {\n\t\t\t\t\tborder-color: rgb(192,132,252);\n\t\t\t\t\tbox-shadow: 0 0 0 2px rgba(192,132,252,0.35);\n\t\t\t\t}\n\t\t\t\t.verse-public-textarea { min-height: 16rem; resize: vertical; line-height: 1.6; }\n\t\t\t\t.verse-public-submit {\n\t\t\t\t\twidth: 100%; min-height: 2.625rem; margin-top: 1rem; border: none;\n\t\t\t\t\tborder-radius: 0.375rem; background: rgb(147,51,234);\n\t\t\t\t\tcolor: rgb(250,245,255); font-size: 1rem; cursor: pointer;\n\t\t\t\t}\n\t\t\t\t.verse-public-card .verse-public-status { min-height: 1.2rem; color: rgb(192,132,252); }\n\t\t\t</style></head><body><main class=\"verse-public-card\"><p class=\"verse-public-label\">Public link</p><fieldset class=\"verse-public-switch\"><legend class=\"verse-public-label\">Choose a view</legend> <input type=\"radio\" name=\"verse-public-view\" id=\"verse-public-read\" class=\"verse-public-radio\" checked> <input type=\"radio\" name=\"verse-public-view\" id=\"verse-public-write\" class=\"verse-public-radio\"><div class=\"verse-public-tabs\"><label id=\"verse-public-read-label\" for=\"verse-public-read\">Read the work</label> <label id=\"verse-public-write-label\" for=\"verse-public-write\">Send a suggestion</label></div><section id=\"verse-public-read-panel\" class=\"verse-public-panel\" role=\"region\" aria-labelledby=\"verse-public-read-label\"><h1 data-copy-title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 59, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 107, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</h1><p>Send a suggestion to the author. Every submission is kept and reviewed separately; it is not published automatically.</p><p class=\"verse-public-status\" role=\"status\" aria-live=\"polite\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</h1><div class=\"verse-public-poem-body\" data-copy-body>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(status)
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 61, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 108, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><form method=\"post\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"verse-public-actions\" data-public-actions hidden><button type=\"button\" class=\"verse-public-copy\" data-public-copy-text>Copy Text</button></div><p class=\"verse-public-status\" role=\"status\" aria-live=\"polite\" data-public-copy-status></p><p data-public-copy-hint>Select the text to copy it yourself if the button is unavailable.</p></section><section id=\"verse-public-write-panel\" class=\"verse-public-panel\" role=\"region\" aria-labelledby=\"verse-public-write-label\"><p>Send a suggestion to the author. Every submission is kept and reviewed separately; it is not published automatically.</p><form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/p/" + token + "/submit").ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 62, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 117, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -95,13 +99,13 @@ func PublicSubmit(title, token, csrf, status string) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(csrf).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 63, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 118, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"> <label class=\"verse-public-label\" for=\"public-name\">Your name (optional)</label> <input id=\"public-name\" class=\"verse-public-input\" type=\"text\" name=\"name\" maxlength=\"80\" placeholder=\"Anonymous\"> <label class=\"verse-public-label\" for=\"public-content\">Your suggestion</label> <textarea id=\"public-content\" class=\"verse-public-textarea\" name=\"content\" required></textarea> <button type=\"submit\" class=\"verse-public-submit\">Send suggestion</button></form></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"> <label class=\"verse-public-label\" for=\"public-name\">Your name (optional)</label> <input id=\"public-name\" class=\"verse-public-input\" type=\"text\" name=\"name\" maxlength=\"80\" placeholder=\"Anonymous\"> <label class=\"verse-public-label\" for=\"public-content\">Your suggestion</label> <textarea id=\"public-content\" class=\"verse-public-textarea\" name=\"content\" required></textarea> <button type=\"submit\" class=\"verse-public-submit\">Send suggestion</button></form></section></fieldset></main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -133,7 +137,7 @@ func PublicSubmitSent(name string) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(publicThanks(name))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 87, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 144, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {

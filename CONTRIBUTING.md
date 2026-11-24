@@ -75,7 +75,7 @@ run` does not enforce the formatters section, so the formatting gate is load-bea
     JavaScript, CSS, JSON, YAML and Markdown; the second is a full TypeScript type checker that
     reads the repository's `tsconfig.json` and reports the same errors `tsc --noEmit` does. Using
     them means the repository does not carry the TypeScript compiler as a dependency for the sake
-    of checking seven files, and the type checker is always the same version as the bundler that
+    of checking the TypeScript sources, and the type checker is always the same version as the bundler that
     compiles the sources.
 
     The script is named `qa` rather than `check` because `bun check` is a built-in command, and a

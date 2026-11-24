@@ -612,11 +612,12 @@ func TestTSGuardFailsOnAStrayJavaScriptFile(t *testing.T) {
   { source: "web/ts/three.ts", output: "static/js/three.js" },
   { source: "web/ts/four.ts", output: "internal/publish/assets/public.js" },
   { source: "web/ts/five.ts", output: "static/js/five.js" },
+  { source: "web/ts/six.ts", output: "static/js/six.js" },
 ];`
 	write("scripts/build_js.ts", manifest)
 	for _, path := range []string{
-		"web/ts/one.ts", "web/ts/two.ts", "web/ts/three.ts", "web/ts/four.ts", "web/ts/five.ts",
-		"static/js/one.js", "static/js/two.js", "static/js/three.js", "static/js/five.js",
+		"web/ts/one.ts", "web/ts/two.ts", "web/ts/three.ts", "web/ts/four.ts", "web/ts/five.ts", "web/ts/six.ts",
+		"static/js/one.js", "static/js/two.js", "static/js/three.js", "static/js/five.js", "static/js/six.js",
 		"internal/publish/assets/public.js",
 	} {
 		write(path, "// fixture")
