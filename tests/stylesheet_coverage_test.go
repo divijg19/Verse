@@ -26,8 +26,12 @@ import (
 // whole contents, because that is the property that broke: a name the code uses must be a name the
 // stylesheet defines.
 
-// classListPattern finds the class names a script adds to an element.
-var classListPattern = regexp.MustCompile(`classList\.(?:add|remove|toggle)\(\s*"([^"]+)"`)
+// classListPattern finds the argument list of a classList call. The old pattern captured only the
+// first quoted argument, so a two-class call like classList.remove("opacity-0", "translate-y-2")
+// silently skipped the second class -- one of the two defects this guard was written to catch.
+var classListPattern = regexp.MustCompile(`classList\.(?:add|remove|toggle)\(([^)]*)\)`)
+
+var quotedClassPattern = regexp.MustCompile(`"([^"]+)"`)
 
 // TestEveryClassTheBrowserCodeAppliesIsInTheStylesheet is the guard.
 //
@@ -52,10 +56,10 @@ func TestEveryClassTheBrowserCodeAppliesIsInTheStylesheet(t *testing.T) {
 		body := readRepoFile(t, filepath.Join("web", "ts", source))
 
 		for _, match := range classListPattern.FindAllStringSubmatch(body, -1) {
-			for _, name := range strings.Fields(match[1]) {
-				if !strings.Contains(stylesheet, "."+name+"{") {
+			for _, name := range quotedClassPattern.FindAllStringSubmatch(match[1], -1) {
+				if !strings.Contains(stylesheet, "."+name[1]+"{") {
 					t.Errorf("web/ts/%s applies the class %q, and the stylesheet does not define it; "+
-						"the element will carry the class and nothing will happen", source, name)
+						"the element will carry the class and nothing will happen", source, name[1])
 				}
 			}
 		}

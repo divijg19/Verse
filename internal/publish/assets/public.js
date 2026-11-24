@@ -143,7 +143,7 @@
         return null;
       }
       const index = body;
-      if (!Array.isArray(index.entries)) {
+      if (index.version !== 1 || !Array.isArray(index.entries)) {
         return null;
       }
       return index;
@@ -234,6 +234,7 @@
     box.autocomplete = "off";
     const status = document.createElement("p");
     status.className = "archive-search-status";
+    status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
     const field = document.createElement("div");
     field.className = "archive-search-field";

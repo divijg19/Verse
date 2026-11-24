@@ -17,17 +17,11 @@ import { copyText, savePNG, type ShareWork } from "./share_card";
 
 /** One entry in the search index. */
 interface VerseSearchEntry {
-  /** The work's stable identifier. */
-  id: string;
-
   /** The work's public path, which is also the link the list row carries. */
   path: string;
 
   /** The work's title. */
   title: string;
-
-  /** The work's publication date, as an ISO day. */
-  published: string;
 
   /** A bounded, plain-text summary of the work. */
   excerpt: string;
@@ -67,7 +61,8 @@ async function readIndex(): Promise<VerseSearchIndex | null> {
       return null;
     }
     const index = body as VerseSearchIndex;
-    if (!Array.isArray(index.entries)) {
+    // The publisher writes version:1 so a consumer can refuse an index shape it does not understand.
+    if (index.version !== 1 || !Array.isArray(index.entries)) {
       return null;
     }
     return index;
@@ -221,6 +216,7 @@ async function main(): Promise<void> {
 
   const status = document.createElement("p");
   status.className = "archive-search-status";
+  status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
 
   const field = document.createElement("div");

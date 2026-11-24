@@ -87,7 +87,7 @@ func writePrivateLink(w http.ResponseWriter, r *http.Request, id string, forceNe
 
 	shareJSON(w, privateLinkResult{
 		ID:        linkID,
-		URL:       guestLinkURL(base, token),
+		URL:       linkURL(base, token, guestLinkPath),
 		ExpiresAt: expiresAt,
 		Created:   created,
 	})
@@ -186,7 +186,7 @@ func privateLinkViews(ctx context.Context, key linktoken.Key, base, poemID strin
 		url := ""
 		if !revoked && base != "" && link.TokenSeed.Valid {
 			if token, err := linktoken.Recover(key, linktoken.Private, link.TokenSeed.String, link.TokenHash); err == nil {
-				url = guestLinkURL(base, token)
+				url = linkURL(base, token, guestLinkPath)
 			}
 		}
 		views = append(views, templ.PrivateLinkView{

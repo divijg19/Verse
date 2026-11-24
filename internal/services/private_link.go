@@ -226,7 +226,7 @@ func ResolvePrivateLink(ctx context.Context, token string) (PrivateLinkSession, 
 	if revokedAt != nil {
 		return session, ErrLinkRevoked
 	}
-	if clock.NowUTC().After(expiresAt) {
+	if !clock.NowUTC().Before(expiresAt) {
 		return session, ErrLinkExpired
 	}
 

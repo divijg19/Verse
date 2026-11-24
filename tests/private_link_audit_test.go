@@ -867,3 +867,53 @@ func TestGuestCSRFRejectsCrossOrigin(t *testing.T) {
 		t.Errorf("cross-origin proposal = %d, want 403", status)
 	}
 }
+
+// TestNoJsAlternativeButtonUsesSendAction models a native form post: the hidden branch field still
+// names the current tab, while the clicked submit button carries send_action. The server must prefer
+// the button so "Send another version" works without the script.
+func TestNoJsAlternativeButtonUsesSendAction(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	const original = "A Work\n\nThe original body."
+	id := insertPoem(t, original)
+	srv := newTestServer(t)
+	_, token := mintLink(t, srv.URL, id)
+	guest := guestClient(t, srv)
+	if status, _, _ := guestGet(t, guest, srv.URL+"/s/"+token); status != http.StatusSeeOther {
+		t.Fatalf("entry = %d", status)
+	}
+
+	send := func(content, hiddenBranch, action string) {
+		status, editor, _ := guestGet(t, guest, srv.URL+"/guest/edit")
+		if status != http.StatusOK {
+			t.Fatalf("editor = %d", status)
+		}
+		form := url.Values{
+			"csrf":    {csrfFromBody(t, editor)},
+			"content": {content}, "name": {"Ada"},
+			"branch": {hiddenBranch}, "send_action": {action},
+		}
+		status, body, _ := guestPost(t, guest, srv.URL+"/guest/propose", form)
+		if status != http.StatusOK {
+			t.Fatalf("submit action %q = %d; body: %s", action, status, truncate([]byte(body)))
+		}
+	}
+
+	send(original+"\nMain version.", services.PrimaryBranch, services.PrimaryBranch)
+	send(original+"\nAlternative version.", services.PrimaryBranch, "new")
+
+	proposals, err := services.ListWorkProposals(t.Context(), id)
+	if err != nil || len(proposals) != 2 {
+		t.Fatalf("proposals = %+v, err = %v", proposals, err)
+	}
+	alts := 0
+	for _, proposal := range proposals {
+		if strings.HasPrefix(proposal.Branch, "alt:") {
+			alts++
+		}
+	}
+	if alts != 1 {
+		t.Errorf("native alternative submit created %d alternative branches, want 1", alts)
+	}
+}

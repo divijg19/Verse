@@ -533,3 +533,29 @@ func TestPoemViewPlacesPublishBeforeDelete(t *testing.T) {
 		t.Errorf("publish/delete order wrong: publish=%d delete=%d", publish, deleteAt)
 	}
 }
+
+// TestPrivateLinkExpiryBoundaryIsExclusive pins the half-open window: at the stored expiry instant
+// entry, the per-request check and the Share list must all agree that the link has ended.
+func TestPrivateLinkExpiryBoundaryIsExclusive(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Boundary Work\n\nIts body.")
+	_, token := mintLink(t, newTestServer(t).URL, id)
+	links, err := services.ListPrivateLinks(t.Context(), id)
+	if err != nil || len(links) != 1 {
+		t.Fatalf("links = %+v, err = %v", links, err)
+	}
+	restore := clock.SetNow(func() time.Time { return links[0].ExpiresAt })
+	defer restore()
+
+	if _, err := services.ResolvePrivateLink(t.Context(), token); !errors.Is(err, services.ErrLinkExpired) {
+		t.Errorf("resolve at the exact expiry = %v, want ErrLinkExpired", err)
+	}
+	if _, _, err := services.PrivateLinkActive(t.Context(), links[0].ID); !errors.Is(err, services.ErrNoLink) {
+		t.Errorf("active check at the exact expiry = %v, want ErrNoLink", err)
+	}
+	if payload := shareLinkPayload(t, newTestServer(t).URL, id); len(payload.Links) != 0 {
+		t.Errorf("Share still lists the link at the exact expiry: %+v", payload.Links)
+	}
+}

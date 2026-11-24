@@ -134,9 +134,9 @@ func TestContentSecurityPolicyMatchesTheMarkup(t *testing.T) {
 	for _, surface := range surfacesToCheck {
 		code, page, surfaceHeaders := get(t, srv.URL+surface, nil)
 		if code != http.StatusOK {
-			// A surface that redirects or refuses is not a surface this test can judge, and saying so
-			// is better than silently skipping it.
-			t.Logf("skipping %s: returned %d", surface, code)
+			// A surface that redirects or refuses cannot be judged, and a log line is invisible to
+			// CI's no-skip assertion. Fail so a control surface cannot silently leave this guard.
+			t.Errorf("%s returned %d, so its policy and markup cannot be checked", surface, code)
 			continue
 		}
 		if got := surfaceHeaders.Get("Content-Security-Policy"); got != csp {

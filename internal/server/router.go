@@ -463,7 +463,7 @@ func NewRouter() (*chi.Mux, error) {
 // VENDOR.md and VENDOR.sha256 exist to be read by a human doing a supply-chain check, which is not
 // the same thing as being served to a browser.
 //
-// Adding an asset means adding it here, and the test in tests/static_files_test.go fails on any file
+// Adding an asset means adding it here, and the test in tests/static_allowlist_test.go fails on any file
 // under static/ that is neither listed nor explicitly excluded, so this list cannot drift from the
 // directory without someone being told.
 //

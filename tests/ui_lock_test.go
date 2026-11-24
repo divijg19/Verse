@@ -413,3 +413,12 @@ func assertContainsAll(t *testing.T, body string, needles ...string) {
 		}
 	}
 }
+
+// TestSignOutNavSlotIsOOB pins that every out-of-band nav slot, including sign-out, carries the OOB
+// marker. Without it an HTMX navigation appended a second sign-out control into #screen.
+func TestSignOutNavSlotIsOOB(t *testing.T) {
+	body := renderComponent(t, views.NavOOB("editor"))
+	if !strings.Contains(body, `id="nav-signout" hx-swap-oob="outerHTML"`) {
+		t.Errorf("sign-out nav slot is not out-of-band: %s", truncate([]byte(body)))
+	}
+}

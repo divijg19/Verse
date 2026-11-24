@@ -149,6 +149,13 @@ func truncatePoems(t *testing.T) {
 // meant to protect.
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return newTestServerWithSecret(t, testAuthSecret)
+}
+
+// newTestServerWithSecret builds the same router with a chosen signing secret. It exists so a test
+// can simulate rotating VERSE_AUTH_SECRET between minting a link and loading Share again.
+func newTestServerWithSecret(t *testing.T, secret string) *httptest.Server {
+	t.Helper()
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -165,7 +172,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	}
 
 	t.Setenv("VERSE_AUTHORIZATION", testPassphrase)
-	t.Setenv("VERSE_AUTH_SECRET", testAuthSecret)
+	t.Setenv("VERSE_AUTH_SECRET", secret)
 
 	// A TLS server, deliberately. Session cookies are issued with the Secure flag, which a browser
 	// and Go's cookie jar both refuse to store over plain HTTP. Testing against http:// would

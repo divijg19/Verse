@@ -149,7 +149,7 @@ func publicLinkViews(ctx context.Context, key linktoken.Key, base, poemID string
 		url := ""
 		if !revoked && published && base != "" && link.TokenSeed.Valid {
 			if token, err := linktoken.Recover(key, linktoken.Public, link.TokenSeed.String, link.TokenHash); err == nil {
-				url = publicLinkURL(base, token)
+				url = linkURL(base, token, publicLinkPath)
 			}
 		}
 		views = append(views, templ.PublicLinkView{

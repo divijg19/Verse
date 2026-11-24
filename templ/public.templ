@@ -124,7 +124,7 @@ templ PublicIndexBody(site PublicSite) {
 	</section>
 
 	<section class="listing" aria-labelledby="recent-heading">
-		<p class="eyebrow" id="recent-heading">Recent</p>
+		<h2 class="eyebrow" id="recent-heading">Recent</h2>
 		if len(site.Works) == 0 {
 			<p class="empty">Nothing published yet.</p>
 		} else {
@@ -184,7 +184,7 @@ templ PublicArchiveBody(site PublicSite) {
 		</ol>
 
 		<section class="archive-feed" aria-labelledby="feed-heading">
-			<p class="eyebrow" id="feed-heading">Follow</p>
+			<h2 class="eyebrow" id="feed-heading">Follow</h2>
 			<p><a href="/feed.xml">RSS feed</a></p>
 		</section>
 	}

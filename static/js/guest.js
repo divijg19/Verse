@@ -41,6 +41,7 @@
     }
     body.set("content", textarea.value);
     body.set("name", nameField?.value ?? "");
+    body.set("branch", form.querySelector("[data-guest-branch]")?.value ?? "");
     try {
       const response = await fetch("/guest/draft", {
         method: "POST",

@@ -112,4 +112,22 @@
       }
     });
   }
+  if (document.body.dataset.editorAfterRequestWired !== "true") {
+    document.body.dataset.editorAfterRequestWired = "true";
+    document.addEventListener("htmx:afterRequest", (event) => {
+      const trigger = event.detail?.elt;
+      if (!(trigger instanceof HTMLFormElement)) {
+        return;
+      }
+      if (
+        !trigger.classList.contains("verse-editor-root-frame") &&
+        !trigger.classList.contains("verse-editor-overlay-form")
+      ) {
+        return;
+      }
+      requestAnimationFrame(() => {
+        document.querySelector(".verse-editor-root-frame textarea")?.focus();
+      });
+    });
+  }
 })();

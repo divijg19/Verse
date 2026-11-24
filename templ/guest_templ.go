@@ -316,7 +316,7 @@ func GuestEditor(data GuestEditorData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p><div class=\"verse-guest-actions\"><button type=\"submit\" name=\"branch\" value=\"primary\" data-guest-send=\"primary\" class=\"verse-guest-submit\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p><div class=\"verse-guest-actions\"><button type=\"submit\" name=\"send_action\" value=\"primary\" data-guest-send=\"primary\" class=\"verse-guest-submit\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -326,7 +326,7 @@ func GuestEditor(data GuestEditorData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, ">Send main version</button> <button type=\"submit\" name=\"branch\" value=\"new\" data-guest-send=\"alternative\" class=\"verse-guest-submit verse-guest-alternative\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, ">Send main version</button> <button type=\"submit\" name=\"send_action\" value=\"new\" data-guest-send=\"alternative\" class=\"verse-guest-submit verse-guest-alternative\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

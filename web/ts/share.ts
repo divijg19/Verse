@@ -48,8 +48,8 @@ interface ShareWorkResponse {
 
 /**
  * The Share surface can arrive two ways: as a full page load, or as an HTMX swap into #screen.
- * An HTMX swap does not execute script tags in the swapped markup, so the bundle is loaded once in
- * the layout and re-initialized after each swap.
+ * The vendored htmx re-inserts script tags from swapped markup, so this module is loaded from the
+ * layout and re-initialized after each swap rather than relying on a script in the fragment.
  *
  * The controls are queried inside the handlers rather than once at module load. At module load the
  * Share page may not exist at all -- the reader can start on any surface -- so a captured element
@@ -284,35 +284,32 @@ async function refreshLinks(id: string): Promise<void> {
   }
 }
 
-/** Enabled or disables Copy Link for the selected work. */
+/** Enables or disables the two actions that depend on publication and reader-origin config. */
 function syncLinkButton(select: HTMLSelectElement): void {
-  const button = document.querySelector<HTMLButtonElement>(
-    'button[data-share-action="link"]',
-  );
-  if (!button) {
-    return;
-  }
-
   const option = select.selectedOptions[0];
   const published = option?.getAttribute("data-published") === "true";
-
   const configured =
     document
       .querySelector<HTMLElement>("[data-public-address-configured]")
       ?.getAttribute("data-public-address-configured") === "true";
-  const linkAction = button.getAttribute("data-share-action");
-  const needsPublished = linkAction === "link" || linkAction === "public";
-  button.disabled =
-    (needsPublished && !published) || (linkAction === "link" && !configured);
-  button.title = !published
-    ? "Publish this work first"
-    : !configured
-      ? "Set PUBLIC_BASE_URL to the reader origin"
-      : "";
 
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    'button[data-share-action="link"], button[data-share-action="public"]',
+  )) {
+    const action = button.getAttribute("data-share-action");
+    button.disabled = !published || (action === "link" && !configured);
+    button.title = !published
+      ? "Publish this work first"
+      : action === "link" && !configured
+        ? "Set PUBLIC_BASE_URL to the reader origin"
+        : "";
+  }
+
+  // The hint explains both disabled reasons, so a published work with no reader origin is not left
+  // with a dead button and no explanation.
   const hint = document.querySelector<HTMLElement>(".verse-share-link-hint");
   if (hint) {
-    hint.hidden = published;
+    hint.hidden = published && configured;
   }
 
   const status = statusLine();

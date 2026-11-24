@@ -56,6 +56,12 @@ async function save(keepalive = false): Promise<void> {
   }
   body.set("content", textarea.value);
   body.set("name", nameField?.value ?? "");
+  // A FormData built from nothing does not carry the form's hidden fields. Without this the server
+  // defaults every autosave to "primary", so editing an alternative overwrites the main draft.
+  body.set(
+    "branch",
+    form.querySelector<HTMLInputElement>("[data-guest-branch]")?.value ?? "",
+  );
 
   try {
     const response = await fetch("/guest/draft", {
