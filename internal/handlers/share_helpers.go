@@ -42,17 +42,12 @@ func shareAddress() string {
 	return strings.TrimRight(value, "/")
 }
 
-// guestLinkURL builds the shareable URL the author copies on the authoring service's own origin.
+// linkURL builds a shareable URL on the authoring service's own origin.
 //
 // The base comes from the request, not PUBLIC_BASE_URL: the latter names the reader's static site,
-// which has no /s/{token} route. There is deliberately no relative form -- a path nobody else can
-// open would be worse than a refused request.
-func guestLinkURL(base, token string) string {
-	return strings.TrimRight(base, "/") + guestLinkPath + url.PathEscape(token)
-}
-
-// publicLinkURL builds a public submission link on the authoring origin, using the same escaping
-// and base handling as private links so the two cannot drift apart.
-func publicLinkURL(base, token string) string {
-	return strings.TrimRight(base, "/") + publicLinkPath + url.PathEscape(token)
+// which has no /s/{token} or /p/{token} route. There is deliberately no relative form -- a path
+// nobody else can open would be worse than a refused request. Both link kinds go through this one
+// builder so base trimming and escaping cannot drift apart.
+func linkURL(base, token, path string) string {
+	return strings.TrimRight(base, "/") + path + url.PathEscape(token)
 }

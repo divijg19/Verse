@@ -353,7 +353,8 @@ func TestHealthProbeYieldsWhenThePoolIsExhausted(t *testing.T) {
 
 // TestAnInboundRequestIDIsBoundedOnTheResponse pins the reflection, which was unbounded.
 //
-// middleware.RequestID honors an inbound X-Request-Id verbatim, so without a bound any caller -- not
+// middleware.RequestID is deliberately not installed; inboundRequestIDMiddleware bounds the value it
+// accepts. Without that bound any caller -- not
 // just an authenticated one -- chooses the contents of a response header on every route. Go's writer
 // replaces CR and LF so this cannot be used for response splitting, but a megabyte of caller-supplied
 // text per response is still a megabyte the service did not choose to send.

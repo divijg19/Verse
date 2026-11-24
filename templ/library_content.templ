@@ -255,7 +255,7 @@ templ LibraryContent(query string, groups []PoemGroup) {
 		<section class="relative z-[1]" style="flex: none;">
 			<div class="verse-library-search-band">
 				<div class="verse-library-search-top">
-					<p class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-600">Search</p>
+					<label for="library-search" class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-600">Search</label>
 					<a
 						href="/recycle"
 						hx-get="/recycle"
@@ -335,7 +335,7 @@ templ LibraryResults(query string, groups []PoemGroup) {
 		<details class="space-y-4 pb-20 md:grid md:grid-cols-[4.75rem_minmax(0,1fr)] md:gap-10 md:space-y-0 verse-library-group">
 			<summary class="md:contents">
 				<div class="pb-1 md:pt-4 flex items-center justify-between">
-					<h3 class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-500">{ group.Label }</h3>
+					<h2 class="text-[0.56rem] uppercase tracking-[0.18em] text-neutral-500">{ group.Label }</h2>
 					<span class="verse-group-toggle">▸</span>
 				</div>
 			</summary>

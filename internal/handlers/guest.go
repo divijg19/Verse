@@ -233,9 +233,14 @@ func GuestProposalHandler(w http.ResponseWriter, r *http.Request) {
 	renderGuest(w, r, templ.GuestProposalSent(name))
 }
 
-// branchFromForm reads the selected branch from the hidden field the editor's script keeps in sync
-// with the clicked submit button. An empty value is the primary branch for the no-JS form.
+// branchFromForm reads the selected branch. The submit buttons carry send_action so a native form
+// post names the clicked button unambiguously: with two buttons named "branch", the hidden field
+// would always win and "Send another version" could never create an alternative without the script.
+// Autosave has no send_action and uses the hidden field the script keeps in sync.
 func branchFromForm(r *http.Request) string {
+	if action := r.PostFormValue("send_action"); action != "" {
+		return action
+	}
 	branch := r.PostFormValue("branch")
 	if branch == "" {
 		return services.PrimaryBranch
@@ -276,7 +281,7 @@ func writeGuestJSONError(w http.ResponseWriter, err error) {
 		status, message = http.StatusNotFound, "this link is no longer available"
 	case errors.Is(err, services.ErrContentTooLong):
 		status, message = http.StatusRequestEntityTooLarge, err.Error()
-	case errors.Is(err, services.ErrEmptyContent):
+	case errors.Is(err, services.ErrEmptyContent), errors.Is(err, services.ErrInvalidSubmission):
 		status, message = http.StatusBadRequest, err.Error()
 	}
 	w.Header().Set("Content-Type", "application/json")

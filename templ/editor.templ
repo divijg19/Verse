@@ -403,7 +403,6 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 			hx-post={ editorAction(poemID) }
 			hx-target="#result"
 			hx-swap="innerHTML"
-			hx-on::after-request="this.querySelector('textarea').focus()"
 			class="verse-editor-root-frame"
 		>
 			@CSRFField(ctx)
@@ -465,8 +464,7 @@ templ EditorContent(ctx context.Context, title string, poemID string, content st
 						hx-post={ editorAction(poemID) }
 						hx-target="#result-fullscreen"
 						hx-swap="innerHTML"
-						hx-on::after-request="this.querySelector('textarea').focus()"
-						class="verse-editor-overlay-form"
+									class="verse-editor-overlay-form"
 					>
 						@CSRFField(ctx)
 						@If(poemID != "") {

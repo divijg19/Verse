@@ -321,28 +321,26 @@
     }
   }
   function syncLinkButton(select) {
-    const button = document.querySelector('button[data-share-action="link"]');
-    if (!button) {
-      return;
-    }
     const option = select.selectedOptions[0];
     const published = option?.getAttribute("data-published") === "true";
     const configured =
       document
         .querySelector("[data-public-address-configured]")
         ?.getAttribute("data-public-address-configured") === "true";
-    const linkAction = button.getAttribute("data-share-action");
-    const needsPublished = linkAction === "link" || linkAction === "public";
-    button.disabled =
-      (needsPublished && !published) || (linkAction === "link" && !configured);
-    button.title = !published
-      ? "Publish this work first"
-      : !configured
-        ? "Set PUBLIC_BASE_URL to the reader origin"
-        : "";
+    for (const button of document.querySelectorAll(
+      'button[data-share-action="link"], button[data-share-action="public"]',
+    )) {
+      const action = button.getAttribute("data-share-action");
+      button.disabled = !published || (action === "link" && !configured);
+      button.title = !published
+        ? "Publish this work first"
+        : action === "link" && !configured
+          ? "Set PUBLIC_BASE_URL to the reader origin"
+          : "";
+    }
     const hint = document.querySelector(".verse-share-link-hint");
     if (hint) {
-      hint.hidden = published;
+      hint.hidden = published && configured;
     }
     const status = statusLine();
     if (status) {

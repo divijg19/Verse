@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -165,5 +166,49 @@ func TestPublicEntryIsRateLimited(t *testing.T) {
 	}
 	if !limited {
 		t.Error("the public entry route never returned 429")
+	}
+}
+
+// TestPublicLinkStopsWorkingWhenTheWorkIsWithdrawn pins the write-time gate: unpublishing or
+// soft-deleting a work must make an outstanding public URL inert on both the form and the submit
+// route, even though the link row itself is retained for history.
+func TestPublicLinkStopsWorkingWhenTheWorkIsWithdrawn(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		withdraw func(context.Context, string) error
+	}{
+		{"unpublish", services.UnpublishPoem},
+		{"soft delete", services.SoftDeletePoem},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			connectTestDB(t)
+			truncatePoems(t)
+
+			id := insertPoem(t, "A Withdrawn Work\n\nIts body.")
+			if err := services.PublishPoem(t.Context(), id); err != nil {
+				t.Fatal(err)
+			}
+			srv := newTestServer(t)
+			defer srv.Close()
+			token := mintPublicLink(t, srv.URL, id)
+			visitor := guestClient(t, srv)
+			status, page, _ := guestGet(t, visitor, srv.URL+"/p/"+token)
+			if status != http.StatusOK {
+				t.Fatalf("form = %d", status)
+			}
+			csrf := csrfFromBody(t, page)
+
+			if err := tc.withdraw(t.Context(), id); err != nil {
+				t.Fatal(err)
+			}
+			if status, _, _ := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+token); status != http.StatusNotFound {
+				t.Errorf("form after %s = %d, want 404", tc.name, status)
+			}
+			if status, _, _ := guestPost(t, visitor, srv.URL+"/p/"+token+"/submit", url.Values{
+				"csrf": {csrf}, "content": {"After withdrawal."},
+			}); status != http.StatusNotFound {
+				t.Errorf("submit after %s = %d, want 404", tc.name, status)
+			}
+		})
 	}
 }

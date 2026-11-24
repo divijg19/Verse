@@ -473,7 +473,7 @@ func PublicIndexBody(site PublicSite) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</p></section><section class=\"listing\" aria-labelledby=\"recent-heading\"><p class=\"eyebrow\" id=\"recent-heading\">Recent</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</p></section><section class=\"listing\" aria-labelledby=\"recent-heading\"><h2 class=\"eyebrow\" id=\"recent-heading\">Recent</h2>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -741,7 +741,7 @@ func PublicArchiveBody(site PublicSite) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</ol><section class=\"archive-feed\" aria-labelledby=\"feed-heading\"><p class=\"eyebrow\" id=\"feed-heading\">Follow</p><p><a href=\"/feed.xml\">RSS feed</a></p></section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</ol><section class=\"archive-feed\" aria-labelledby=\"feed-heading\"><h2 class=\"eyebrow\" id=\"feed-heading\">Follow</h2><p><a href=\"/feed.xml\">RSS feed</a></p></section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

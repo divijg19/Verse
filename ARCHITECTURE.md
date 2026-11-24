@@ -112,7 +112,8 @@ verse/
 |   ├── public.templ   the static public site: index, archive, work pages, and 404
 |   └── security.go    the CSRF field the mutating routes require
 |
-├── web/ts/            TypeScript sources for editor.ts, navigation.ts, share.ts, guest.ts, public.ts
+├── web/ts/            TypeScript sources: editor.ts, navigation.ts, share.ts, guest.ts, public.ts, plus the
+dom.ts/scroll_lock.ts/share_card.ts modules they import
 ├── static/
 |   ├── css/input.css  Tailwind entry point, with its @source directives
 |   └── js/            compiled editor.js, navigation.js, share.js, guest.js, and vendored htmx
@@ -146,7 +147,8 @@ service and publish workflow use the same `PUBLIC_BASE_URL` name.
 
 ## Anonymous write routes
 
-`GET /p/{token}` and `POST /p/{token}/submit` are the only unauthenticated write surface. A public
+`GET /p/{token}` and `POST /p/{token}/submit` are the only write surface open to anyone who obtains
+the URL. Private-link routes also write without an author session, but require their own capability. A public
 link is a token for one published work; every submission is appended to `public_submissions` and
 reviewed read-only in History. The route group carries no-store/noindex, its token is redacted from
 logs, both entry and submit are rate-limited per address, and a double-submit CSRF cookie guards the
@@ -279,7 +281,7 @@ written without it.
 author/viewer split. It has no `DEFAULT`, so the migration backfilled existing rows to `NULL` without
 a rewrite and published nothing. Publication is an explicit act by the author.
 
-It follows `deleted_at` rather than introducing a `status` enum, because twelve query sites already
+It follows `deleted_at` rather than introducing a `status` enum, because many query sites already
 read `deleted_at IS NULL` and a second idiom for the same kind of fact is a second thing to get wrong.
 The publisher's filter is `published_at IS NOT NULL AND deleted_at IS NULL` — both halves
 load-bearing, since a work can be published and then deleted — and it lives in exactly one place,

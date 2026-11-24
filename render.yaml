@@ -124,7 +124,7 @@ services:
     # Bun is `latest`, the same policy CI and the Dockerfile follow. Render's default depends on when
     # the service was created, and this one defaulted to 1.3.4 while the repository was on 1.3.5 and
     # then 1.4.2 -- so the production build used a package manager version that no other build path
-    # used, and nothing noticed. CI now asserts all three paths name the same policy, so they cannot
+    # used, and nothing noticed. CI now asserts all four paths name the same policy, so they cannot
     # diverge again; what it cannot do is make `latest` reproducible across time, which is the
     # accepted cost of always building with current Bun.
     #

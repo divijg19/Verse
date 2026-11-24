@@ -240,3 +240,76 @@ func TestRevokedLinkHasNoCopyURL(t *testing.T) {
 		t.Errorf("revoked URL = %d, want 404", status)
 	}
 }
+
+// TestSecretRotationIsFailClosedAcrossTheAuthoringFlow exercises the documented rotation contract
+// end to end: holders keep their URLs, the browser loses Copy, the private primary mints a fresh
+// row, the public primary refuses with 409, and explicit Rotate repairs the public row.
+func TestSecretRotationIsFailClosedAcrossTheAuthoringFlow(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Rotating Work\n\nIts body.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+
+	first := newTestServerWithSecret(t, testAuthSecret)
+	privateURL, _ := mintLink(t, first.URL, id)
+	publicToken := mintPublicLink(t, first.URL, id)
+	publicURL := first.URL + "/p/" + publicToken
+
+	second := newTestServerWithSecret(t, testAuthSecret+"-after-rotation")
+
+	payload := shareLinkPayload(t, second.URL, id)
+	if len(payload.Links) == 0 || len(payload.PublicLinks) == 0 {
+		t.Fatalf("Share lost the links after rotation: %+v", payload)
+	}
+	if payload.Links[0].URL != "" || payload.PublicLinks[0].URL != "" {
+		t.Errorf("a stale URL was emitted after rotation: %+v", payload)
+	}
+
+	// Resolution is hash-based and key-independent, so old URLs keep working.
+	guest := guestClient(t, second)
+	if status, _, _ := guestGet(t, guest, privateURL); status != http.StatusSeeOther {
+		t.Errorf("old private URL stopped working: %d", status)
+	}
+	if status, _, _ := guestGet(t, guestClient(t, second), publicURL); status != http.StatusOK {
+		t.Errorf("old public URL stopped working: %d", status)
+	}
+
+	// The private primary is additive: it mints a fresh row rather than rewriting the old one.
+	status, body, _ := postForm(t, second.URL+"/share/link", urlValues("id", id), nil)
+	if status != http.StatusOK {
+		t.Fatalf("private primary after rotation = %d; body: %s", status, truncate([]byte(body)))
+	}
+	var fresh mintResult
+	if err := json.Unmarshal([]byte(body), &fresh); err != nil {
+		t.Fatal(err)
+	}
+	if !fresh.Created || fresh.URL == privateURL {
+		t.Errorf("private primary did not mint a fresh link: %+v", fresh)
+	}
+
+	// The public primary cannot repair in place without invalidating holders, so it refuses.
+	status, body, _ = postForm(t, second.URL+"/share/public-link", urlValues("id", id), nil)
+	if status != http.StatusConflict {
+		t.Fatalf("public primary after rotation = %d, want 409; body: %s", status, truncate([]byte(body)))
+	}
+
+	// Explicit Rotate is the repair path.
+	publicID := payload.PublicLinks[0].ID
+	status, body, _ = postForm(t, second.URL+"/share/public-link/rotate", url.Values{"id": {id}, "link": {publicID}}, nil)
+	if status != http.StatusOK {
+		t.Fatalf("public rotate after rotation = %d; body: %s", status, truncate([]byte(body)))
+	}
+	var rotated mintResult
+	if err := json.Unmarshal([]byte(body), &rotated); err != nil {
+		t.Fatal(err)
+	}
+	if rotated.ID != publicID || rotated.URL == publicURL {
+		t.Errorf("rotate did not preserve the id and retire the old token: %+v", rotated)
+	}
+	if status, _, _ := guestGet(t, guestClient(t, second), publicURL); status != http.StatusNotFound {
+		t.Errorf("old public token still resolves after rotate: %d", status)
+	}
+}

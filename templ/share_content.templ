@@ -121,6 +121,7 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 			.verse-share-link-copy,
 			.verse-share-link-revoke {
 				flex: none;
+				min-height: 2.25rem;
 				border-radius: 0.375rem;
 				font-size: 0.68rem;
 				padding: 0.35rem 0.6rem;
@@ -226,7 +227,7 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 				</select>
 			</div>
 			<p class="verse-share-links-title">Copy</p>
-			<div class="verse-share-modes">
+			<div class="verse-share-modes" role="group" aria-label="Copy">
 				<button type="button" data-share-action="text" class="verse-share-mode verse-panel-soft">
 					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Text</p>
 				</button>
@@ -235,7 +236,7 @@ templ ShareContent(works []ShareWorkOption, publicAddressConfigured bool) {
 				</button>
 			</div>
 			<p class="verse-share-links-title">Link</p>
-			<div class="verse-share-modes">
+			<div class="verse-share-modes" role="group" aria-label="Link">
 				<button type="button" data-share-action="link" class="verse-share-mode verse-panel-soft">
 					<p class="font-serif text-[1rem] leading-snug text-neutral-100">Copy Link</p>
 				</button>

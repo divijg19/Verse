@@ -15,8 +15,7 @@
     "dev:setup": "bun scripts/dev.ts setup",
     "build": "go build ./...",
     "qa": "bun fmt --check && bun check && bun scripts/build_js.ts --check && bun fmt:go && bun vet && bun lint && bun staticcheck && bun vuln && bun run test",
-    "test": "bun test && go test ./... -count=1 -race",
-    "test:scripts": "bun test scripts/"
+    "test": "bun test && go test ./... -count=1 -race"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.3.5"

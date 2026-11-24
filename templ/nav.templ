@@ -91,7 +91,7 @@ templ signOut() {
 // three by three with the content in the middle, and the sign-out is the fourth thing in the
 // frame: it belongs to the chrome, not to the content, and it is out of the way of both.
 templ desktopSignOut() {
-	<div id="nav-signout">
+	<div id="nav-signout" hx-swap-oob="outerHTML">
 		@signOut()
 	</div>
 }
@@ -166,7 +166,6 @@ templ navButton(surface string, path string, label string) {
 		hx-get={ path }
 		hx-target="#screen"
 		hx-swap="innerHTML"
-		role="button"
 		aria-label={ "Navigate to " + label }
 		title={ label }
 		class="verse-desktop-nav-button"

@@ -82,7 +82,7 @@ func run() error {
 		return reportList(ctx)
 	}
 
-	if *baseURL == publish.DefaultBaseURL {
+	if strings.TrimRight(*baseURL, "/") == publish.DefaultBaseURL {
 		// The address is carried on the reader's archive rows for Copy Link and Card Export, so a
 		// placeholder would be copied as a real link with a success message. A real build must name
 		// its origin.

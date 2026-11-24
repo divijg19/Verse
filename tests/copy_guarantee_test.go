@@ -77,3 +77,33 @@ func TestPublisherForbidsSubmissionRoutes(t *testing.T) {
 		}
 	}
 }
+
+// TestGuestAutosaveCarriesTheBranch pins the browser-path fix: a FormData built from nothing drops
+// the form's hidden fields, so the branch has to be copied explicitly into the autosave body.
+func TestGuestAutosaveCarriesTheBranch(t *testing.T) {
+	for _, file := range []string{
+		filepath.Join("web", "ts", "guest.ts"),
+		filepath.Join("static", "js", "guest.js"),
+	} {
+		body := readRepoFile(t, file)
+		if !strings.Contains(body, `"branch"`) || !strings.Contains(body, `[data-guest-branch]`) {
+			t.Errorf("%s does not include the selected branch in autosave", file)
+		}
+	}
+}
+
+// TestEditorFocusRestoreIsInsideTheBundle pins the CSP-safe replacement for hx-on: the markup must
+// no longer rely on inline handlers, and the first-party editor bundle must wire htmx:afterRequest.
+func TestEditorFocusRestoreIsInsideTheBundle(t *testing.T) {
+	markup := readRepoFile(t, filepath.Join("templ", "editor.templ"))
+	if strings.Contains(markup, "hx-on") {
+		t.Error("editor still uses hx-on, which CSP blocks")
+	}
+	bundle := readRepoFile(t, filepath.Join("static", "js", "editor.js"))
+	for _, needle := range []string{"htmx:afterRequest", "after-request"} {
+		if strings.Contains(bundle, needle) {
+			return
+		}
+	}
+	t.Error("editor bundle does not wire htmx:afterRequest for focus restore")
+}

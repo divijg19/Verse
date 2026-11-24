@@ -5,14 +5,16 @@ multi-tenancy: whoever holds the passphrase has the whole library.
 
 ## Database credentials
 
-The authoring service runs with a serving credential that no longer holds DDL rights. Migrations
-run at boot through `MIGRATION_DATABASE_URL`, a separate owner credential; when that variable is
-absent the service logs the fallback rather than silently granting itself DDL. See RUNNING.md.
+The authoring service runs with a serving credential that holds no DDL rights when
+`MIGRATION_DATABASE_URL` is configured as a separate owner credential. If that variable is absent,
+the service logs the fallback and runs migrations with the serving credential rather than silently
+granting itself DDL. See RUNNING.md.
 
 ## Public submission links
 
-A Public Link is the only unauthenticated write surface: the URL is a bearer capability for one
-published work. Its submissions are appended, never applied automatically, and reviewed by the
+A Public Link is the only write surface open to anyone who obtains its URL: it is a bearer
+capability for one published work. Private links also allow unauthenticated writes, but only after
+the holder redeems a per-link URL. Its submissions are appended, never applied automatically, and reviewed by the
 author. Entry and submission are rate-limited per address; a double-submit CSRF cookie is defence in
 depth, not the access control. A private link is a different capability for one person: the editor
 draft is keyed by the link, so two holders of the same URL would share one body. Use the explicit

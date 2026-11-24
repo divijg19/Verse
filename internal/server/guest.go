@@ -126,7 +126,7 @@ func (cfg *authConfig) parseGuestToken(value string, now time.Time) (*guestSessi
 		expiry = expiry<<8 | int64(b)
 	}
 	expiresAt := time.Unix(expiry, 0)
-	if now.After(expiresAt) {
+	if !now.Before(expiresAt) {
 		return nil, errNoGuestSession
 	}
 

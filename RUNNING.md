@@ -199,6 +199,7 @@ in the environment would preserve exactly the credential rotation is meant to re
 | `DB_MAX_CONN_IDLE`               | `5m`                                                                                                                                                                                                                                                                                  | Idle time before a connection is closed                                                                                                                                                                                                 |
 | `VERSE_STATIC_DIR`               | `static`                                                                                                                                                                                                                                                                              | Asset directory, resolved relative to the working directory                                                                                                                                                                             |
 | `PUBLIC_BASE_URL`                | _(unset)_                                                                                                                                                                                                                                                                             | The reader's origin. Needed only for the public address that Copy Link copies; private links derive their origin from the request. Without it, Copy Link reports that the address is not configured rather than copying a relative path |
+| `VERSE_AUTHOR_BASE_URL`          | _(unset)_                                                                                                                                                                                                                                                                             | Explicit authoring origin for private and public submission links. Used when a proxy hides the external host; must be a bare http(s) origin with no path or query                                                                       |
 | `TRUSTED_CLIENT_IP_HEADER`       | _(unset)_                                                                                                                                                                                                                                                                             | Request header to take the caller's address from, for the login rate limiter. See below                                                                                                                                                 |
 | `SERVER_READ_HEADER_TIMEOUT_SEC` | `10`                                                                                                                                                                                                                                                                                  |                                                                                                                                                                                                                                         |
 | `SERVER_READ_TIMEOUT_SEC`        | `30`                                                                                                                                                                                                                                                                                  |                                                                                                                                                                                                                                         |
@@ -254,6 +255,10 @@ the runner needs nothing from disk. A deployed `./migrate` therefore cannot appl
 different version of the repository than the code it ships with.
 
 ### `007_published_at.sql` and what it did to your library
+
+**Historical section.** This describes what migration 007 did when it shipped. The public site and
+the publish command exist now; see "Building and deploying the public site" below for the current
+state. The migration itself still did nothing to existing rows.
 
 **Nothing, and that is the point.** The migration added a nullable `published_at` column to `poems` and
 left every existing row `NULL`. Your library is byte-for-byte what it was: the same works, the same
@@ -560,9 +565,9 @@ single host on a platform that serves a wildcard domain.
 
 ### Remaining limitation
 
-The public reading site that would use a genuinely read-only publisher credential does not exist
-yet, so there is nothing to grant one to. That is the only reason the DDL rights above are still
-worth removing.
+The public reading site is a static build with no database credential of its own; it consumes a JSON
+export produced by a separate publish step. Removing DDL rights from the serving credential remains
+worth doing, but the reason is separation of duties, not the absence of a reader site.
 
 ---
 
@@ -697,7 +702,7 @@ Three things to know:
   forgotten without any test failing.
 
 The gate lives in `internal/testsupport` and is shared by both test packages, so `cmd/server` and
-`tests` cannot drift apart. `git grep TRUNCATE` returns exactly two executable lines, and both sit
+`tests` cannot drift apart. `tests/truncate_guard_test.go` asserts the exact set of executable `TRUNCATE` lines, and each sits
 inside a helper that re-checks the gate at the moment of destruction rather than trusting the
 caller.
 
@@ -1328,7 +1333,7 @@ to the live service deliberately and knowingly.
 | `migration <file> was modified after it was applied`                         | An already-applied `.sql` file was edited                                                         | Restore the original file, or write a new migration. Do not edit history                                                                                                                                       |
 | `these migrations are recorded as applied but no longer exist`               | An applied `.sql` file was deleted or renamed                                                     | Restore it. Renaming an applied migration is indistinguishable from deleting it                                                                                                                                |
 | `apply migration <file>: ...`                                                | The SQL in a migration failed                                                                     | Nothing was recorded and nothing was left behind; fix the file and re-run                                                                                                                                      |
-| Production stylesheet differs from CI                                        | Render's Bun drifted from the repository's                                                        | Check `BUN_VERSION` on the service; CI asserts all three build paths agree                                                                                                                                     |
+| Production stylesheet differs from CI                                        | Render's Bun drifted from the repository's                                                        | Check `BUN_VERSION` on the service; CI asserts all four build declarations agree                                                                                                                               |
 | Deploy used a stale or different build command                               | The dashboard diverged from `render.yaml`                                                         | Re-sync the dashboard from `render.yaml`; CI cannot detect this                                                                                                                                                |
 | A fix is deployed but the browser still behaves as before                    | The browser is running an older script or stylesheet                                              | Reload with the cache bypassed. Static assets are revalidated, so this should only be needed once                                                                                                              |
 | Unstyled page                                                                | The stylesheet was not built                                                                      | `bunx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify`                                                                                                                          |

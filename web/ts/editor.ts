@@ -157,3 +157,29 @@ if (editorOverlay) {
     }
   });
 }
+
+// Restore focus after an editor save. This used to be an hx-on attribute; htmx implements those with
+// new Function, which the content security policy blocks because script-src is 'self' with no
+// unsafe-eval. A first-party listener is the same behaviour within the policy.
+if (document.body.dataset.editorAfterRequestWired !== "true") {
+  document.body.dataset.editorAfterRequestWired = "true";
+  document.addEventListener("htmx:afterRequest", (event) => {
+    const trigger = (event as CustomEvent<{ elt?: Element }>).detail?.elt;
+    if (!(trigger instanceof HTMLFormElement)) {
+      return;
+    }
+    if (
+      !trigger.classList.contains("verse-editor-root-frame") &&
+      !trigger.classList.contains("verse-editor-overlay-form")
+    ) {
+      return;
+    }
+    // The swap happens around this event, so focus on a node in the old tree can be lost. Re-query
+    // the live editor on the next frame and focus that instead.
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLTextAreaElement>(".verse-editor-root-frame textarea")
+        ?.focus();
+    });
+  });
+}

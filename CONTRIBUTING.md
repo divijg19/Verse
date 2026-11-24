@@ -11,8 +11,8 @@ the environment variables, and the constraints that are not obvious from the cod
 
 ## Running the tests
 
-The database-backed tests `TRUNCATE` tables, so they are gated on three things and **skip** without
-them — deliberately, so `go test ./...` still passes for someone with no test database.
+The database-backed tests `TRUNCATE` tables, so they are gated on explicit environment variables and
+**skip** without them — deliberately, so `go test ./...` still passes for someone with no test database.
 
 ```bash
 export VERSE_E2E_DATABASE_URL='postgres://…/verse_test?sslmode=disable'
@@ -99,10 +99,10 @@ run` does not enforce the formatters section, so the formatting gate is load-bea
 
 ## Branches and releases
 
-One long-lived branch per minor line: `v0.4.x`. Never a branch named after a release.
+One long-lived branch per minor line: `v0.5.x`. Never a branch named after a release.
 
 ```
-v0.4.x  →  feature work
+v0.5.x  →  feature work
 main    →  released, tagged work only
 ```
 

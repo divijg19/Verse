@@ -866,6 +866,11 @@ a:hover {
     min-height: 2.75rem;
   }
 
+  /* 16px stops Mobile Safari from zooming the field when it gains focus. */
+  .archive-search {
+    font-size: 16px;
+  }
+
   .work-grid {
     grid-template-columns: minmax(0, 1fr);
   }
