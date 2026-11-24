@@ -71,6 +71,7 @@ func ValidatedOverride(value string) (string, error) {
 	return parsed.Scheme + "://" + parsed.Host, nil
 }
 
+// FromRequest returns scheme://host for r, or ErrInvalid if either part is unusable.
 func FromRequest(r *http.Request) (string, error) {
 	// An explicit authoring origin wins where a proxy rewrites or hides the external host. It is
 	// configuration, not a request header, so a caller cannot point a capability at themselves.

@@ -15,8 +15,10 @@ import (
 )
 
 type shareLinkRow struct {
-	ID  string `json:"id"`
-	URL string `json:"url"`
+	ID       string `json:"id"`
+	URL      string `json:"url"`
+	State    string `json:"state"`
+	Copyable bool   `json:"copyable"`
 }
 
 func shareLinkPayload(t *testing.T, srvURL, poemID string) struct {
@@ -56,12 +58,12 @@ func TestRecoveredLinkURLsSurviveReload(t *testing.T) {
 
 	// A fresh request with no client-side state stands in for a reload.
 	payload := shareLinkPayload(t, srv.URL, id)
-	if len(payload.Links) != 1 || payload.Links[0].URL != privateURL {
-		t.Fatalf("private links = %+v, want one row with URL %q", payload.Links, privateURL)
+	if len(payload.Links) != 1 || payload.Links[0].URL != privateURL || payload.Links[0].State != "active" || !payload.Links[0].Copyable {
+		t.Fatalf("private links = %+v, want one active row with URL %q", payload.Links, privateURL)
 	}
 	publicURL := srv.URL + "/p/" + publicToken
-	if len(payload.PublicLinks) != 1 || payload.PublicLinks[0].URL != publicURL {
-		t.Fatalf("public links = %+v, want one row with URL %q", payload.PublicLinks, publicURL)
+	if len(payload.PublicLinks) != 1 || payload.PublicLinks[0].URL != publicURL || payload.PublicLinks[0].State != "active" || !payload.PublicLinks[0].Copyable {
+		t.Fatalf("public links = %+v, want one active row with URL %q", payload.PublicLinks, publicURL)
 	}
 
 	// The recovered URLs are real capabilities, not merely stable strings.
@@ -96,8 +98,8 @@ func TestLegacyLinkHasNoCopyURL(t *testing.T) {
 	if len(payload.Links) != 1 {
 		t.Fatalf("legacy link was filtered out: %+v", payload.Links)
 	}
-	if payload.Links[0].URL != "" {
-		t.Errorf("legacy row got URL %q, want none", payload.Links[0].URL)
+	if payload.Links[0].URL != "" || payload.Links[0].State != "unrecoverable" || payload.Links[0].Copyable {
+		t.Errorf("legacy row = %+v, want unrecoverable with no URL", payload.Links[0])
 	}
 }
 
@@ -232,8 +234,8 @@ func TestRevokedLinkHasNoCopyURL(t *testing.T) {
 	}
 
 	for _, link := range shareLinkPayload(t, srv.URL, id).Links {
-		if link.URL != "" {
-			t.Errorf("revoked link still has URL %q", link.URL)
+		if link.URL != "" || link.State != "revoked" || link.Copyable {
+			t.Errorf("revoked link = %+v, want revoked with no URL", link)
 		}
 	}
 	if status, _, _ := guestGet(t, guestClient(t, srv), privateURL); status != http.StatusNotFound {
@@ -266,6 +268,9 @@ func TestSecretRotationIsFailClosedAcrossTheAuthoringFlow(t *testing.T) {
 	}
 	if payload.Links[0].URL != "" || payload.PublicLinks[0].URL != "" {
 		t.Errorf("a stale URL was emitted after rotation: %+v", payload)
+	}
+	if payload.Links[0].State != "unrecoverable" || payload.PublicLinks[0].State != "unrecoverable" {
+		t.Errorf("unrecoverable rows must not be ended: %+v", payload)
 	}
 
 	// Resolution is hash-based and key-independent, so old URLs keep working.

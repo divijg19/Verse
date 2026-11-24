@@ -267,6 +267,10 @@ func TestRevokedPublicRequiresExplicitRotate(t *testing.T) {
 	if status, _, _ := guestGet(t, guestClient(t, srv), srv.URL+"/p/"+oldToken); status != http.StatusNotFound {
 		t.Errorf("revoked link was revived: %d", status)
 	}
+	ended := shareLinkPayload(t, srv.URL, id).PublicLinks[0]
+	if ended.State != "revoked" || ended.URL != "" || ended.Copyable {
+		t.Errorf("revoked public row = %+v, want revoked with no URL", ended)
+	}
 
 	status, body, _ = postForm(t, srv.URL+"/share/public-link/rotate", url.Values{"id": {id}, "link": {linkID}}, nil)
 	if status != http.StatusOK {

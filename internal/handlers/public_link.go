@@ -51,7 +51,7 @@ func SharePublicLinkHandler(w http.ResponseWriter, r *http.Request) {
 		writePublicLinkError(w, r, err, "failed to create a public submission link")
 		return
 	}
-	shareJSON(w, publicLinkResult{ID: linkID, URL: linkURL(base, token, publicLinkPath), Created: created})
+	writeJSONNoStore(w, publicLinkResult{ID: linkID, URL: linkURL(base, token, publicLinkPath), Created: created})
 }
 
 // SharePublicLinkRotateHandler issues a fresh token on the same row. Submissions keep their link_id
@@ -82,7 +82,7 @@ func SharePublicLinkRotateHandler(w http.ResponseWriter, r *http.Request) {
 		writePublicLinkError(w, r, err, "failed to rotate a public submission link")
 		return
 	}
-	shareJSON(w, publicLinkResult{ID: publicID, URL: linkURL(base, token, publicLinkPath), Created: true})
+	writeJSONNoStore(w, publicLinkResult{ID: publicID, URL: linkURL(base, token, publicLinkPath), Created: true})
 }
 
 func writePublicLinkError(w http.ResponseWriter, r *http.Request, err error, message string) {
@@ -119,7 +119,7 @@ func SharePublicLinkRevokeHandler(w http.ResponseWriter, r *http.Request) {
 		fail500(w, r, "failed to revoke a public submission link", err)
 		return
 	}
-	shareJSON(w, struct {
+	writeJSONNoStore(w, struct {
 		Revoked bool `json:"revoked"`
 	}{Revoked: true})
 }

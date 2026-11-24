@@ -3,7 +3,6 @@ package tests
 import (
 	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -123,7 +122,7 @@ func TestEditorFocusModeKeepsScrollInsideOverlayPanel(t *testing.T) {
 	// test asserted they were in the rendered page. It could not have been right for long: those
 	// statements were in the markup and therefore never ran in any browser, and this test passed
 	// anyway. The assertion is kept, against the file the policy now permits.
-	assertContainsAll(t, readStaticFile(t, filepath.Join("static", "js", "editor.js")),
+	assertContainsAll(t, readRepoFile(t, filepath.Join("static", "js", "editor.js")),
 		`viewport.dataset.editorOverlayActive = "true";`,
 		`delete viewport.dataset.editorOverlayActive;`,
 	)
@@ -181,21 +180,6 @@ func TestEditorOverlayStateDoesNotCollideWithItsOpenControl(t *testing.T) {
 		`overlay.close()`,
 		`editorOverlay.addEventListener("close"`,
 	)
-}
-
-// readStaticFile reads a file from the repository's static directory, from either the repository root
-// or the tests directory, since the suite runs with either as its working directory.
-func readStaticFile(t *testing.T, path string) string {
-	t.Helper()
-
-	if _, err := os.Stat(path); err != nil {
-		path = filepath.Join("..", path)
-	}
-	body, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s failed: %v", path, err)
-	}
-	return string(body)
 }
 
 func TestDashboardHeatmapScalesDownOnSmallerScreens(t *testing.T) {
@@ -311,6 +295,7 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 		`>Copy Link</p>`,
 		`>Card Export</p>`,
 		`>Private Link</p>`,
+		`>Links</p>`,
 		`data-private-link-list`,
 		`id="share-work-picker"`,
 		`data-published="true"`,
@@ -320,6 +305,7 @@ func TestShareUsesCompactModeSurface(t *testing.T) {
 	)
 
 	for _, removed := range []string{
+		`>Active links</p>`,
 		`>Quiet Copy</p>`,
 		`>Soon</span>`,
 		`>Share Studio</p>`,

@@ -73,9 +73,6 @@ type PublicLink struct {
 
 	// URL is where the entry goes. It is always absolute, and always http or https.
 	URL string
-
-	// Note is an optional line of context under the label.
-	Note string
 }
 
 // PublicPage names one of the reader's screens.

@@ -33,12 +33,6 @@ import (
 // vector by someone who holds a link.
 const maxGuestName = 80
 
-// guestLinkPath is the prefix of every shareable private link.
-const guestLinkPath = "/s/"
-
-// publicLinkPath is the prefix of every shareable public submission link.
-const publicLinkPath = "/p/"
-
 // guestEditorPath is where an entry redirects and where the limited editor lives.
 const guestEditorPath = "/guest/edit"
 
@@ -48,7 +42,7 @@ const guestEditorPath = "/guest/edit"
 // to the guest editor, which drops the raw token from the address bar. The raw token is never put in
 // a cookie or a log; only its hash is stored, and only the signed session id reaches the browser.
 //
-// Every failure is a bare 404. Whether a link expired, was revoked, or never existed is not
+// Every dead-link failure is a bare 404. Whether a link expired, was revoked, or never existed is not
 // information the holder of a dead URL is entitled to, and the three cases must look identical.
 func PrivateLinkEntryHandler(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(chi.URLParam(r, "token"))
@@ -265,11 +259,7 @@ func writeGuestServiceError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func writeGuestJSON(w http.ResponseWriter, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	if err := json.NewEncoder(w).Encode(value); err != nil {
-		log.Printf("write the guest response: %v", err)
-	}
+	writeJSONNoStore(w, value)
 }
 
 // writeGuestJSONError keeps the autosave endpoint's media type consistent on failures. The script

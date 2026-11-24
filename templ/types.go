@@ -93,6 +93,23 @@ func (p ProposalView) BranchLabel() string {
 	return "Alternative " + suffix
 }
 
+// LinkState is the server-derived state of one Share row. The browser never infers state from an
+// empty URL: an unrecoverable link still works for whoever holds its URL, while an ended one does not.
+type LinkState string
+
+const (
+	LinkStateActive        LinkState = "active"
+	LinkStateUnrecoverable LinkState = "unrecoverable"
+	LinkStateExpired       LinkState = "expired"
+	LinkStateRevoked       LinkState = "revoked"
+	LinkStateUnpublished   LinkState = "unpublished"
+)
+
+// Ended reports whether the capability itself is over, as opposed to merely not copyable.
+func (s LinkState) Ended() bool {
+	return s == LinkStateExpired || s == LinkStateRevoked
+}
+
 // PublicLinkView is one public submission link on the author's Share screen.
 type PublicLinkView struct {
 	ID              string    `json:"id"`
@@ -101,8 +118,12 @@ type PublicLinkView struct {
 	Revoked         bool      `json:"revoked"`
 	SubmissionCount int       `json:"submissionCount"`
 
-	// URL is empty for revoked links, legacy rows without a recoverable seed, and works no longer
-	// published. The browser renders Copy only when it is present.
+	// State is derived by the server from revocation, expiry, publication and recoverability.
+	State string `json:"state"`
+	// Copyable is true exactly when URL is a working capability the author can copy again.
+	Copyable bool `json:"copyable"`
+
+	// URL is empty when Copyable is false. The browser renders Copy only when it is present.
 	URL string `json:"url"`
 }
 
@@ -148,7 +169,12 @@ type PrivateLinkView struct {
 	Revoked       bool      `json:"revoked"`
 	ProposalCount int       `json:"proposalCount"`
 
-	// URL is empty for expired or revoked links and for legacy rows with no recoverable seed.
+	// State is derived by the server from revocation, expiry and recoverability.
+	State string `json:"state"`
+	// Copyable is true exactly when URL is a working capability the author can copy again.
+	Copyable bool `json:"copyable"`
+
+	// URL is empty when Copyable is false.
 	URL string `json:"url"`
 }
 

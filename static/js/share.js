@@ -128,6 +128,33 @@
   }
 
   // web/ts/share.ts
+  var endedStates = ["expired", "revoked"];
+  function isEnded(state) {
+    return endedStates.includes(state);
+  }
+  function stateLabel(state) {
+    switch (state) {
+      case "unrecoverable":
+        return "Active · URL not recoverable";
+      case "expired":
+        return "Expired";
+      case "revoked":
+        return "Revoked";
+      case "unpublished":
+        return "Unpublished";
+      default:
+        return "Active";
+    }
+  }
+  function rowControls(state, kind) {
+    const ended = isEnded(state);
+    return {
+      copy: state === "active",
+      fresh: kind === "private" && !ended,
+      rotate: kind === "public" && state !== "unpublished",
+      revoke: !ended && state !== "unpublished",
+    };
+  }
   function picker() {
     return document.querySelector("#share-work-picker");
   }
@@ -175,14 +202,14 @@
     id,
     copyAttr,
     revokeAttr,
-    revoked,
+    controls,
     url,
     newAttr = null,
     rotateAttr = null,
   ) {
     const group = document.createElement("div");
     group.className = "verse-share-link-buttons";
-    if (url) {
+    if (controls.copy && url) {
       const copy = document.createElement("button");
       copy.type = "button";
       copy.className = "verse-share-link-copy";
@@ -191,7 +218,7 @@
       copy.setAttribute("data-copy-url", url);
       group.appendChild(copy);
     }
-    if (newAttr) {
+    if (controls.fresh && newAttr) {
       const fresh = document.createElement("button");
       fresh.type = "button";
       fresh.className = "verse-share-link-copy";
@@ -199,7 +226,7 @@
       fresh.setAttribute(newAttr, id);
       group.appendChild(fresh);
     }
-    if (rotateAttr) {
+    if (controls.rotate && rotateAttr) {
       const rotate = document.createElement("button");
       rotate.type = "button";
       rotate.className = "verse-share-link-copy";
@@ -207,13 +234,14 @@
       rotate.setAttribute(rotateAttr, id);
       group.appendChild(rotate);
     }
-    const revoke = document.createElement("button");
-    revoke.type = "button";
-    revoke.className = "verse-share-link-revoke";
-    revoke.textContent = "Revoke";
-    revoke.setAttribute(revokeAttr, id);
-    revoke.disabled = revoked;
-    group.appendChild(revoke);
+    if (controls.revoke) {
+      const revoke = document.createElement("button");
+      revoke.type = "button";
+      revoke.className = "verse-share-link-revoke";
+      revoke.textContent = "Revoke";
+      revoke.setAttribute(revokeAttr, id);
+      group.appendChild(revoke);
+    }
     return group;
   }
   function formatTime(raw) {
@@ -243,19 +271,24 @@
       list.appendChild(empty);
       return;
     }
-    for (const link of links) {
+    const ordered = [...links].sort(
+      (a, b) => Number(isEnded(a.state)) - Number(isEnded(b.state)),
+    );
+    for (const link of ordered) {
       const row = document.createElement("div");
-      row.className = "verse-share-link-row";
+      row.className = isEnded(link.state)
+        ? "verse-share-link-row verse-share-link-row-ended"
+        : "verse-share-link-row";
       const details = document.createElement("div");
       const summary = document.createElement("p");
-      const state = link.revoked
-        ? "Revoked"
-        : link.proposalCount > 0
-          ? `${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
-          : "Active";
-      summary.textContent = `Private · ${state}`;
+      const count =
+        link.proposalCount > 0
+          ? ` · ${link.proposalCount} submission branch${link.proposalCount === 1 ? "" : "es"}`
+          : "";
+      summary.textContent = `Private · ${stateLabel(link.state)}${count}`;
       const times = document.createElement("small");
-      times.textContent = `Created ${formatTime(link.createdAt)} · closes ${formatTime(link.expiresAt)}`;
+      const boundary = isEnded(link.state) ? "closed" : "closes";
+      times.textContent = `Created ${formatTime(link.createdAt)} · ${boundary} ${formatTime(link.expiresAt)}`;
       details.append(summary, times);
       row.append(
         details,
@@ -263,7 +296,7 @@
           link.id,
           "data-copy",
           "data-revoke",
-          link.revoked,
+          rowControls(link.state, "private"),
           link.url ?? "",
           "data-new",
         ),
@@ -284,17 +317,21 @@
       list.appendChild(empty);
       return;
     }
-    for (const link of links) {
+    const ordered = [...links].sort(
+      (a, b) => Number(isEnded(a.state)) - Number(isEnded(b.state)),
+    );
+    for (const link of ordered) {
       const row = document.createElement("div");
-      row.className = "verse-share-link-row";
+      row.className = isEnded(link.state)
+        ? "verse-share-link-row verse-share-link-row-ended"
+        : "verse-share-link-row";
       const details = document.createElement("div");
       const summary = document.createElement("p");
-      const state = link.revoked
-        ? "Revoked"
-        : link.submissionCount > 0
-          ? `${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
-          : "Active · no submissions yet";
-      summary.textContent = `Public · ${state}`;
+      const count =
+        link.submissionCount > 0
+          ? ` · ${link.submissionCount} submission${link.submissionCount === 1 ? "" : "s"}`
+          : "";
+      summary.textContent = `Public · ${stateLabel(link.state)}${count}`;
       const times = document.createElement("small");
       times.textContent = `Created ${formatTime(link.createdAt)}`;
       details.append(summary, times);
@@ -304,7 +341,7 @@
           link.id,
           "data-public-copy",
           "data-public-revoke",
-          link.revoked,
+          rowControls(link.state, "public"),
           link.url ?? "",
           null,
           "data-public-rotate",
@@ -315,10 +352,24 @@
   }
   async function refreshLinks(id) {
     const data = await selectedWork(id);
-    if (data) {
-      renderLinks(data.links ?? []);
-      renderPublicLinks(data.publicLinks ?? []);
+    if (!data) {
+      for (const selector of [
+        "[data-private-link-list]",
+        "[data-public-link-list]",
+      ]) {
+        const list = document.querySelector(selector);
+        if (!list) continue;
+        list.replaceChildren();
+        const empty = document.createElement("p");
+        empty.className = "verse-share-links-empty";
+        empty.textContent = "This work is no longer available.";
+        list.appendChild(empty);
+      }
+      report("This work is no longer available.");
+      return;
     }
+    renderLinks(data.links ?? []);
+    renderPublicLinks(data.publicLinks ?? []);
   }
   function syncLinkButton(select) {
     const option = select.selectedOptions[0];

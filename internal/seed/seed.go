@@ -443,7 +443,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, opts Options) (Report, error) 
 	opts = opts.WithDefaults()
 
 	if opts.Reset {
-		// All three named tables hold foreign keys into poems: Postgres refuses to TRUNCATE a table
+		// Every table named here holds a foreign key into poems: Postgres refuses to TRUNCATE a table
 		// another table references, so truncating poems alone fails. Naming them avoids CASCADE,
 		// which would silently empty a future referencing table.
 		if _, err := pool.Exec(ctx, `TRUNCATE TABLE guest_requests, public_submissions, public_links, guest_drafts, work_proposals, private_links, poem_versions, poems`); err != nil {

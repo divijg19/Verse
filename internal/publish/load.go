@@ -130,7 +130,6 @@ func normalizeLinks(links []publictempl.PublicLink) ([]publictempl.PublicLink, e
 		cleaned = append(cleaned, publictempl.PublicLink{
 			Label: label,
 			URL:   address,
-			Note:  strings.TrimSpace(link.Note),
 		})
 	}
 
