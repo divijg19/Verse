@@ -259,12 +259,34 @@ func CreatePublicSubmission(ctx context.Context, link PublicLink, name, content 
 	return submission, err
 }
 
-// ListPublicSubmissions returns a work's public feedback, newest first.
+// ListPublicSubmissions returns a work's public feedback, newest first, with no limit.
 func ListPublicSubmissions(ctx context.Context, poemID string) ([]PublicSubmission, error) {
-	rows, err := database.Pool.Query(ctx, `
+	return listPublicSubmissions(ctx, poemID, 0)
+}
+
+// ListRecentPublicSubmissions returns at most limit submissions for one work, newest first.
+//
+// History keeps the complete record. The Share overlay reads a bounded slice because a single
+// submission can be 200,000 runes and that payload is fetched on every picker change; the client
+// shows the total from the per-link counts so the bound is never presented as the whole record.
+func ListRecentPublicSubmissions(ctx context.Context, poemID string, limit int) ([]PublicSubmission, error) {
+	if limit <= 0 {
+		return []PublicSubmission{}, nil
+	}
+	return listPublicSubmissions(ctx, poemID, limit)
+}
+
+func listPublicSubmissions(ctx context.Context, poemID string, limit int) ([]PublicSubmission, error) {
+	query := `
         SELECT id, link_id, poem_id, guest_name, content, created_at
         FROM public_submissions WHERE poem_id = $1
-        ORDER BY created_at DESC, id DESC`, poemID)
+        ORDER BY created_at DESC, id DESC`
+	args := []any{poemID}
+	if limit > 0 {
+		query += " LIMIT $2"
+		args = append(args, limit)
+	}
+	rows, err := database.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -130,14 +130,14 @@ func PublicSubmitSent(name string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Suggestion sent — Verse</title><meta name=\"robots\" content=\"noindex, nofollow\"></head><body><main class=\"verse-public-card\"><p class=\"verse-public-label\">Suggestion sent</p><h1>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Suggestion sent — Verse</title><meta name=\"robots\" content=\"noindex, nofollow\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\t\t/* The confirmation is a standalone document: these rules cannot live in PublicSubmit's\n\t\t\t\t   style block, and output.css has no verse-public utilities. Keep them in step with\n\t\t\t\t   the entry page, including the v0.5.14 scroll fix. */\n\t\t\t\t:root { color-scheme: dark; }\n\t\t\t\tbody {\n\t\t\t\t\tmargin: 0; min-height: 100vh; min-height: 100dvh; padding: 1.25rem; box-sizing: border-box;\n\t\t\t\t\tbackground: linear-gradient(180deg, rgba(23,23,23,0.9), rgba(10,10,10,0.98));\n\t\t\t\t\tcolor: rgb(229,229,229);\n\t\t\t\t\tfont-family: ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n\t\t\t\t\tdisplay: flex; align-items: flex-start; justify-content: center;\n\t\t\t\t}\n\t\t\t\t.verse-public-card {\n\t\t\t\t\twidth: 100%; max-width: 34rem; padding: 1.5rem; box-sizing: border-box;\n\t\t\t\t\tmargin-block: auto;\n\t\t\t\t\tborder: 1px solid rgb(38,38,38); border-radius: 1rem;\n\t\t\t\t\tbackground: rgba(23,23,23,0.85);\n\t\t\t\t}\n\t\t\t\t.verse-public-card h1 { font-family: Georgia, serif; font-size: 1.5rem; margin: 0 0 0.5rem; overflow-wrap: anywhere; }\n\t\t\t\t.verse-public-card p { font-size: 0.85rem; line-height: 1.6; color: rgb(163,163,163); }\n\t\t\t\t.verse-public-card .verse-public-label {\n\t\t\t\t\tdisplay: block; margin: 1rem 0 0.4rem; font-size: 0.62rem;\n\t\t\t\t\tletter-spacing: 0.18em; text-transform: uppercase; color: rgb(115,115,115);\n\t\t\t\t}\n\t\t\t\t.verse-public-card > .verse-public-label:first-child { margin-top: 0; }\n\t\t\t</style></head><body><main class=\"verse-public-card\"><p class=\"verse-public-label\">Suggestion sent</p><h1>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(publicThanks(name))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 144, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templ/public_submit.templ`, Line: 171, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {

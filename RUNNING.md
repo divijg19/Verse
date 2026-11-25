@@ -657,8 +657,9 @@ A Public Link is an unauthenticated URL for one published work. The page opens o
 with that work's full title and body and a Copy Text button; a second slide holds the suggestion
 form. Switching uses native radios and CSS, so it works with JavaScript disabled, and the page
 never exposes another work or any authoring surface. Anyone holding the URL can send a text;
-every submission is appended and appears in the work's History as "Public · read only". Nothing is
-applied to the work automatically, and there is no moderation queue in this release: revoke the link
+every submission is appended and appears in the work's History as "Public · read only"; the newest
+ones can also be read from **View suggestions** on each public-link row of the Share screen, while
+History stays the complete record. Nothing is applied to the work automatically, and there is no moderation queue in this release: revoke the link
 from the Share screen if submissions become unwanted. The link lives until revoked, including after
 the work is unpublished, but the submit route re-checks `published_at` and `deleted_at` on every
 request so a withdrawn work cannot receive more text.

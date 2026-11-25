@@ -127,6 +127,24 @@
     });
   }
 
+  // web/ts/scroll_lock.ts
+  function bodyScrollLockCount() {
+    return Number(document.body.dataset.verseScrollLocks || "0");
+  }
+  function lockBodyScroll() {
+    document.body.dataset.verseScrollLocks = String(bodyScrollLockCount() + 1);
+    document.body.style.overflow = "hidden";
+  }
+  function unlockBodyScroll() {
+    const next = Math.max(0, bodyScrollLockCount() - 1);
+    if (next === 0) {
+      delete document.body.dataset.verseScrollLocks;
+      document.body.style.overflow = "";
+      return;
+    }
+    document.body.dataset.verseScrollLocks = String(next);
+  }
+
   // web/ts/share.ts
   var endedStates = ["expired", "revoked"];
   function isEnded(state) {
@@ -155,6 +173,8 @@
       revoke: !ended && state !== "unpublished",
     };
   }
+  var suggestionsOpener = null;
+  var suggestionsLocked = false;
   function picker() {
     return document.querySelector("#share-work-picker");
   }
@@ -256,6 +276,107 @@
       minute: "2-digit",
     });
   }
+  function suggestionsDialog() {
+    return document.querySelector("[data-suggestions-overlay]");
+  }
+  function closeSuggestions() {
+    const dialog = suggestionsDialog();
+    if (dialog?.open) {
+      dialog.close();
+    }
+  }
+  function renderSuggestions(submissions, total) {
+    const list = document.querySelector("[data-suggestions-list]");
+    const status = document.querySelector("[data-suggestions-status]");
+    if (!list || !status) {
+      return;
+    }
+    list.replaceChildren();
+    if (submissions.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "verse-suggestions-empty";
+      empty.textContent =
+        total > 0
+          ? "Suggestions are temporarily unavailable."
+          : "No suggestions for this work yet.";
+      list.appendChild(empty);
+      status.textContent = "";
+      return;
+    }
+    for (const submission of submissions) {
+      const bubble = document.createElement("article");
+      bubble.className = "verse-suggestion-bubble";
+      const meta = document.createElement("p");
+      meta.className = "verse-suggestion-meta";
+      meta.textContent = `${submission.guestName || "Anonymous"} · ${formatTime(submission.createdAt)}`;
+      const text = document.createElement("pre");
+      text.className = "verse-suggestion-text";
+      text.textContent = submission.content;
+      bubble.append(meta, text);
+      list.appendChild(bubble);
+    }
+    status.textContent =
+      total > submissions.length
+        ? `Showing the ${submissions.length} most recent of ${total} suggestions.`
+        : "";
+  }
+  function wireSuggestions() {
+    const dialog = suggestionsDialog();
+    if (!dialog || dialog.dataset.suggestionsWired === "true") {
+      return;
+    }
+    if (suggestionsLocked && !dialog.open) {
+      unlockBodyScroll();
+      suggestionsLocked = false;
+    }
+    dialog.dataset.suggestionsWired = "true";
+    dialog.addEventListener("close", () => {
+      if (suggestionsLocked) {
+        unlockBodyScroll();
+        suggestionsLocked = false;
+      }
+      const opener = suggestionsOpener;
+      suggestionsOpener = null;
+      if (opener?.isConnected) {
+        opener.focus();
+      }
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) {
+        dialog.close();
+      }
+    });
+  }
+  async function openSuggestions(opener) {
+    const dialog = suggestionsDialog();
+    if (!dialog || dialog.open) {
+      return;
+    }
+    const workID = picker()?.value ?? "";
+    if (!workID) {
+      return;
+    }
+    suggestionsOpener = opener;
+    const data = await selectedWork(workID);
+    if (!data || (picker()?.value ?? "") !== workID) {
+      suggestionsOpener = null;
+      return;
+    }
+    const total = (data.publicLinks ?? []).reduce(
+      (sum, link) => sum + link.submissionCount,
+      0,
+    );
+    renderSuggestions(data.publicSubmissions ?? [], total);
+    if (dialog.open) {
+      return;
+    }
+    dialog.showModal();
+    lockBodyScroll();
+    suggestionsLocked = true;
+    requestAnimationFrame(() => {
+      dialog.querySelector("[data-suggestions-close]")?.focus();
+    });
+  }
   function renderLinks(links) {
     const section = document.querySelector("[data-links]");
     const list = document.querySelector("[data-private-link-list]");
@@ -335,6 +456,12 @@
       const times = document.createElement("small");
       times.textContent = `Created ${formatTime(link.createdAt)}`;
       details.append(summary, times);
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "verse-share-link-open";
+      open.dataset.suggestionsOpen = "";
+      open.textContent = "View suggestions";
+      open.setAttribute("aria-label", "View all suggestions for this work");
       row.append(
         details,
         linkButtons(
@@ -346,11 +473,13 @@
           null,
           "data-public-rotate",
         ),
+        open,
       );
       list.appendChild(row);
     }
   }
   async function refreshLinks(id) {
+    closeSuggestions();
     const data = await selectedWork(id);
     if (!data) {
       for (const selector of [
@@ -404,6 +533,7 @@
       return;
     }
     select.dataset.shareWired = "true";
+    wireSuggestions();
     select.addEventListener("change", () => {
       syncLinkButton(select);
       if (select.value) {
@@ -419,6 +549,14 @@
       document.body.addEventListener("click", async (event) => {
         const target = event.target;
         if (!(target instanceof HTMLButtonElement)) {
+          return;
+        }
+        if (target.dataset.suggestionsClose !== undefined) {
+          closeSuggestions();
+          return;
+        }
+        if (target.dataset.suggestionsOpen !== undefined) {
+          openSuggestions(target);
           return;
         }
         const freshID = target.dataset.new;
@@ -593,4 +731,13 @@ ${data.body}`);
   }
   document.addEventListener("DOMContentLoaded", init);
   document.body.addEventListener("htmx:afterSwap", init);
+  document.body.addEventListener("htmx:afterSwap", () => {
+    if (
+      suggestionsLocked &&
+      !document.querySelector("[data-suggestions-overlay]")
+    ) {
+      unlockBodyScroll();
+      suggestionsLocked = false;
+    }
+  });
 })();

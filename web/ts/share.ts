@@ -11,6 +11,7 @@
 // at the moment it is copied rather than from a copy embedded in the HTML.
 
 import { copyText, savePNG, type ShareWork } from "./share_card";
+import { lockBodyScroll, unlockBodyScroll } from "./scroll_lock";
 
 /** States are decided by the server; the browser never infers them from an empty URL. */
 type LinkState =
@@ -76,6 +77,15 @@ interface PublicLinkView {
   url: string;
 }
 
+/** One read-only public suggestion, newest first, bounded by shareSubmissionLimit. */
+interface PublicSubmission {
+  id: string;
+  linkID: string;
+  guestName: string;
+  content: string;
+  createdAt: string;
+}
+
 /** The work the endpoint returns. */
 interface ShareWorkResponse {
   title: string;
@@ -86,7 +96,14 @@ interface ShareWorkResponse {
   publicAddressConfigured: boolean;
   links: PrivateLinkView[];
   publicLinks: PublicLinkView[];
+  publicSubmissions: PublicSubmission[];
 }
+
+/** The opener that should receive focus again when the overlay closes. */
+let suggestionsOpener: HTMLButtonElement | null = null;
+
+/** The counted body lock is module state because an HTMX swap can remove the dialog before close. */
+let suggestionsLocked = false;
 
 /**
  * The Share surface can arrive two ways: as a full page load, or as an HTMX swap into #screen.
@@ -225,6 +242,131 @@ function formatTime(raw: string): string {
   });
 }
 
+/** The suggestions dialog, found at use time because an HTMX swap replaces the surface. */
+function suggestionsDialog(): HTMLDialogElement | null {
+  return document.querySelector<HTMLDialogElement>(
+    "[data-suggestions-overlay]",
+  );
+}
+
+/** Closes the overlay if it is open. Every lifecycle path goes through the dialog's close event. */
+function closeSuggestions(): void {
+  const dialog = suggestionsDialog();
+  if (dialog?.open) {
+    dialog.close();
+  }
+}
+
+/** Draws one bubble per submission. Bubbles are read-only text, never parsed HTML. */
+function renderSuggestions(
+  submissions: PublicSubmission[],
+  total: number,
+): void {
+  const list = document.querySelector<HTMLElement>("[data-suggestions-list]");
+  const status = document.querySelector<HTMLElement>(
+    "[data-suggestions-status]",
+  );
+  if (!list || !status) {
+    return;
+  }
+  list.replaceChildren();
+  if (submissions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "verse-suggestions-empty";
+    // The payload degrades to [] on a read failure while the per-link counts still succeed. A
+    // positive total with no text therefore means the fetch failed, not that nobody wrote in.
+    empty.textContent =
+      total > 0
+        ? "Suggestions are temporarily unavailable."
+        : "No suggestions for this work yet.";
+    list.appendChild(empty);
+    status.textContent = "";
+    return;
+  }
+  for (const submission of submissions) {
+    const bubble = document.createElement("article");
+    bubble.className = "verse-suggestion-bubble";
+    const meta = document.createElement("p");
+    meta.className = "verse-suggestion-meta";
+    meta.textContent = `${submission.guestName || "Anonymous"} · ${formatTime(submission.createdAt)}`;
+    const text = document.createElement("pre");
+    text.className = "verse-suggestion-text";
+    text.textContent = submission.content;
+    bubble.append(meta, text);
+    list.appendChild(bubble);
+  }
+  status.textContent =
+    total > submissions.length
+      ? `Showing the ${submissions.length} most recent of ${total} suggestions.`
+      : "";
+}
+
+/** Wires the dialog's close and backdrop paths once per mounted surface. */
+function wireSuggestions(): void {
+  const dialog = suggestionsDialog();
+  if (!dialog || dialog.dataset.suggestionsWired === "true") {
+    return;
+  }
+  // A swap replaces an open dialog, so its close event never fires on this new element. Release
+  // the lock here instead of leaving the page unscrollable.
+  if (suggestionsLocked && !dialog.open) {
+    unlockBodyScroll();
+    suggestionsLocked = false;
+  }
+  dialog.dataset.suggestionsWired = "true";
+  dialog.addEventListener("close", () => {
+    if (suggestionsLocked) {
+      unlockBodyScroll();
+      suggestionsLocked = false;
+    }
+    const opener = suggestionsOpener;
+    suggestionsOpener = null;
+    if (opener?.isConnected) {
+      opener.focus();
+    }
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+}
+
+/** Fetches fresh suggestions on open so a withdrawn work or revoked link cannot show cached text. */
+async function openSuggestions(opener: HTMLButtonElement): Promise<void> {
+  const dialog = suggestionsDialog();
+  if (!dialog || dialog.open) {
+    return;
+  }
+  const workID = picker()?.value ?? "";
+  if (!workID) {
+    return;
+  }
+  suggestionsOpener = opener;
+  const data = await selectedWork(workID);
+  // The picker may have changed while the request was in flight. Never show another work's text.
+  if (!data || (picker()?.value ?? "") !== workID) {
+    suggestionsOpener = null;
+    return;
+  }
+  const total = (data.publicLinks ?? []).reduce(
+    (sum, link) => sum + link.submissionCount,
+    0,
+  );
+  renderSuggestions(data.publicSubmissions ?? [], total);
+  if (dialog.open) {
+    return;
+  }
+  dialog.showModal();
+  lockBodyScroll();
+  suggestionsLocked = true;
+  requestAnimationFrame(() => {
+    dialog
+      .querySelector<HTMLButtonElement>("[data-suggestions-close]")
+      ?.focus();
+  });
+}
+
 /** Draws the selected work's private links. Elements are built, never parsed from HTML. */
 function renderLinks(links: PrivateLinkView[]): void {
   const section = document.querySelector<HTMLElement>("[data-links]");
@@ -312,6 +454,14 @@ function renderPublicLinks(links: PublicLinkView[]): void {
     const times = document.createElement("small");
     times.textContent = `Created ${formatTime(link.createdAt)}`;
     details.append(summary, times);
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "verse-share-link-open";
+    // The overlay shows every public submission for the selected work, not just this link's, so
+    // the accessible name must say work-wide. The marker exists for delegation; it carries no id.
+    open.dataset.suggestionsOpen = "";
+    open.textContent = "View suggestions";
+    open.setAttribute("aria-label", "View all suggestions for this work");
     row.append(
       details,
       linkButtons(
@@ -323,6 +473,7 @@ function renderPublicLinks(links: PublicLinkView[]): void {
         null,
         "data-public-rotate",
       ),
+      open,
     );
     list.appendChild(row);
   }
@@ -330,6 +481,8 @@ function renderPublicLinks(links: PublicLinkView[]): void {
 
 /** Refreshes the link list for the work currently selected. */
 async function refreshLinks(id: string): Promise<void> {
+  // Rows are rebuilt here, so the opener the dialog would restore focus to is about to disappear.
+  closeSuggestions();
   const data = await selectedWork(id);
   if (!data) {
     // A work can be deleted while its Share screen is open. Clear the stale rows rather than
@@ -394,6 +547,7 @@ function init(): void {
     return;
   }
   select.dataset.shareWired = "true";
+  wireSuggestions();
 
   select.addEventListener("change", () => {
     syncLinkButton(select);
@@ -413,6 +567,14 @@ function init(): void {
     document.body.addEventListener("click", async (event) => {
       const target = event.target;
       if (!(target instanceof HTMLButtonElement)) {
+        return;
+      }
+      if (target.dataset.suggestionsClose !== undefined) {
+        closeSuggestions();
+        return;
+      }
+      if (target.dataset.suggestionsOpen !== undefined) {
+        void openSuggestions(target);
         return;
       }
       const freshID = target.dataset.new;
@@ -600,3 +762,15 @@ function init(): void {
 
 document.addEventListener("DOMContentLoaded", init);
 document.body.addEventListener("htmx:afterSwap", init);
+
+// A swap away from Share removes the dialog without firing its close event. Release the counted
+// body lock here; the boolean makes a later close event on the detached element a no-op.
+document.body.addEventListener("htmx:afterSwap", () => {
+  if (
+    suggestionsLocked &&
+    !document.querySelector("[data-suggestions-overlay]")
+  ) {
+    unlockBodyScroll();
+    suggestionsLocked = false;
+  }
+});
