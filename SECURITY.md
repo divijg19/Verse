@@ -18,7 +18,7 @@ first slide; it carries no other works, drafts, proposals or authoring chrome, a
 script only wires Copy Text from the text the server rendered (it also reloads on a
 back/forward-cache restore). Private links also allow unauthenticated writes, but only after
 the holder redeems a per-link URL. Its submissions are appended, never applied automatically, and reviewed by the
-author. Entry and submission are rate-limited per address; a double-submit CSRF cookie is defence in
+author in History or from the Share screen's **View suggestions** overlay. Entry and submission are rate-limited per address; a double-submit CSRF cookie is defence in
 depth, not the access control. A private link is a different capability for one person: the editor
 draft is keyed by the link, so two holders of the same URL would share one body. Use the explicit
 **New** action to create a separate link for each reviewer; the primary "Private Link" button

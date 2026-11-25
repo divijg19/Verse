@@ -151,7 +151,10 @@ service and publish workflow use the same `PUBLIC_BASE_URL` name.
 `GET /p/{token}` and `POST /p/{token}/submit` are the only write surface open to anyone who obtains
 the URL. Private-link routes also write without an author session, but require their own capability. A public
 link is a token for one published work; every submission is appended to `public_submissions` and
-reviewed read-only in History. The route group carries no-store/noindex, its token is redacted from
+reviewed read-only in History and in a native-dialog overlay opened from the public-link row on the
+author's Share screen. That overlay reads the newest suggestions through the existing selected-work
+endpoint, bounded so a single payload cannot grow without limit; History keeps the complete record.
+The route group carries no-store/noindex, its token is redacted from
 logs, both entry and submit are rate-limited per address, and a double-submit CSRF cookie guards the
 form. The reader's static site is unchanged.
 

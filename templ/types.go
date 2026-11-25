@@ -127,12 +127,15 @@ type PublicLinkView struct {
 	URL string `json:"url"`
 }
 
-// PublicSubmissionView is one appended text from a Public Link, shown read-only in History.
+// PublicSubmissionView is one appended text from a Public Link, shown read-only in History and in
+// the author's Share overlay. LinkID identifies the link that carried it; neither surface renders
+// the identifier itself (both show guest name and time).
 type PublicSubmissionView struct {
-	ID        string
-	GuestName string
-	Content   string
-	CreatedAt time.Time
+	ID        string    `json:"id"`
+	LinkID    string    `json:"linkID"`
+	GuestName string    `json:"guestName"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // GuestBranchView is one tab in the guest editor's left-hand branch rail.

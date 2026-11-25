@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/divijg19/Verse/internal/services"
+	views "github.com/divijg19/Verse/templ"
 )
 
 func mintPublicLink(t *testing.T, srvURL, poemID string) string {
@@ -58,6 +59,10 @@ func TestPublicLinkRecordsEverySubmission(t *testing.T) {
 		})
 		if status != http.StatusOK {
 			t.Fatalf("submit = %d; body: %s", status, truncate([]byte(body)))
+		}
+		if !strings.Contains(body, `.verse-public-card {`) ||
+			!strings.Contains(body, `<link rel="stylesheet" href="/static/css/output.css">`) {
+			t.Error("the POST confirmation renders without its card styling")
 		}
 	}
 	submissions, err := services.ListPublicSubmissions(t.Context(), id)
@@ -218,6 +223,34 @@ func TestPublicLinkStopsWorkingWhenTheWorkIsWithdrawn(t *testing.T) {
 				t.Errorf("submit after %s = %d, want 404", tc.name, status)
 			}
 		})
+	}
+}
+
+// TestPublicSubmitSentIsStyled pins the v0.5.15 fix: the confirmation is a standalone document and
+// must carry its own stylesheet link and card rules, not borrow them from the entry page's DOM.
+func TestPublicSubmitSentIsStyled(t *testing.T) {
+	body := renderComponent(t, views.PublicSubmitSent("Reader"))
+	for _, needle := range []string{
+		`<link rel="stylesheet" href="/static/css/output.css">`,
+		`<style>`,
+		`.verse-public-card {`,
+		`margin-block: auto`,
+		`min-height: 100dvh`,
+		`align-items: flex-start`,
+		`.verse-public-card .verse-public-label`,
+		`<main class="verse-public-card">`,
+		`<p class="verse-public-label">Suggestion sent</p>`,
+		`<h1>`,
+		`Thank you, Reader.`,
+	} {
+		if !strings.Contains(body, needle) {
+			t.Errorf("the confirmation page is missing %q", needle)
+		}
+	}
+	for _, needle := range []string{`data-copy-title`, `data-copy-body`, `<script`} {
+		if strings.Contains(body, needle) {
+			t.Errorf("the confirmation page carries the entry page's %q", needle)
+		}
 	}
 }
 

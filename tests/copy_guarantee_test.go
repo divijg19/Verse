@@ -71,6 +71,42 @@ func TestViewerBundleWiresCopy(t *testing.T) {
 	}
 }
 
+// TestShareBundleWiresTheSuggestionsOverlay pins the v0.5.15 author-side surface in both the
+// source and the compiled bundle: a stale bundle would ship rows with a dead opener.
+func TestShareBundleWiresTheSuggestionsOverlay(t *testing.T) {
+	source := readRepoFile(t, filepath.Join("web", "ts", "share.ts"))
+	bundle := readRepoFile(t, filepath.Join("static", "js", "share.js"))
+	for _, needle := range []string{
+		`data-suggestions-overlay`,
+		`data-suggestions-list`,
+		`showModal`,
+		`lockBodyScroll`,
+		`unlockBodyScroll`,
+		`suggestionsLocked`,
+		`suggestionsOpen`,
+		`text.textContent = submission.content`,
+		`publicSubmissions`,
+		`dialog.addEventListener("close"`,
+		`dialog.close()`,
+		`opener.focus()`,
+		`opener?.isConnected`,
+		`dataset.suggestionsWired`,
+		`requestAnimationFrame`,
+	} {
+		if !strings.Contains(source, needle) {
+			t.Errorf("share.ts does not contain %q", needle)
+		}
+		if !strings.Contains(bundle, needle) {
+			t.Errorf("the compiled Share bundle does not contain %q", needle)
+		}
+	}
+	for _, needle := range []string{`innerHTML`, `insertAdjacentHTML`, `outerHTML`} {
+		if strings.Contains(source, needle) || strings.Contains(bundle, needle) {
+			t.Errorf("the suggestions overlay parses HTML; guest text must use textContent: %q", needle)
+		}
+	}
+}
+
 // TestPublicSubmitBundleWiresCopy pins the v0.5.14 Copy Text path. The compiled bundle is what the
 // browser executes, so the needles must be there as well as in the source: a stale bundle would ship
 // a page with a hidden, dead button.

@@ -18,6 +18,11 @@ import (
 // is for. A bounded list keeps the page light and keeps the action on its purpose.
 const shareWorkLimit = 100
 
+// The Share overlay shows the newest suggestions, not the whole record: a single submission can be
+// 200,000 runes and this payload is fetched on every picker change and link mutation. History keeps
+// the unbounded record; the overlay states the total from the per-link counts when it truncates.
+const shareSubmissionLimit = 200
+
 // ShareHandler renders the Share surface and supports HTMX partial responses.
 //
 // The picker needs the author's works, so this handler reads them. The bodies are deliberately not
@@ -105,16 +110,26 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		publicLinks = nil
 	}
 
+	// The overlay is an addition to this endpoint, not a precondition for the actions that were
+	// here first. A failed submission read degrades to an empty list, as the two link reads do.
+	recent, err := services.ListRecentPublicSubmissions(r.Context(), id, shareSubmissionLimit)
+	if err != nil {
+		log.Printf("failed to list public submissions for %s: %v", id, err) // #nosec G706 -- validated UUID
+		recent = nil
+	}
+	submissions := publicSubmissionViews(recent)
+
 	body := presenters.BodyWithoutTitle(poem.Content)
 	out := struct {
-		Title                   string                  `json:"title"`
-		Body                    string                  `json:"body"`
-		Address                 string                  `json:"address"`
-		Published               string                  `json:"published"`
-		IsPublished             bool                    `json:"isPublished"`
-		PublicAddressConfigured bool                    `json:"publicAddressConfigured"`
-		Links                   []templ.PrivateLinkView `json:"links"`
-		PublicLinks             []templ.PublicLinkView  `json:"publicLinks"`
+		Title                   string                       `json:"title"`
+		Body                    string                       `json:"body"`
+		Address                 string                       `json:"address"`
+		Published               string                       `json:"published"`
+		IsPublished             bool                         `json:"isPublished"`
+		PublicAddressConfigured bool                         `json:"publicAddressConfigured"`
+		Links                   []templ.PrivateLinkView      `json:"links"`
+		PublicLinks             []templ.PublicLinkView       `json:"publicLinks"`
+		PublicSubmissions       []templ.PublicSubmissionView `json:"publicSubmissions"`
 	}{
 		Title:                   presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Body:                    body,
@@ -124,9 +139,26 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		PublicAddressConfigured: publicAddressConfigured,
 		Links:                   links,
 		PublicLinks:             publicLinks,
+		PublicSubmissions:       submissions,
 	}
 
 	writeJSONNoStore(w, out)
+}
+
+// publicSubmissionViews maps stored submissions for both the History surface and the Share
+// overlay. One projection keeps the two read-only surfaces from drifting when a field is added.
+func publicSubmissionViews(submissions []services.PublicSubmission) []templ.PublicSubmissionView {
+	views := make([]templ.PublicSubmissionView, 0, len(submissions))
+	for _, submission := range submissions {
+		views = append(views, templ.PublicSubmissionView{
+			ID:        submission.ID,
+			LinkID:    submission.LinkID,
+			GuestName: submission.GuestName,
+			Content:   submission.Content,
+			CreatedAt: submission.CreatedAt,
+		})
+	}
+	return views
 }
 
 // publicLinkViews maps public links and their submission counts for the Share screen.
