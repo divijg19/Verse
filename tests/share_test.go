@@ -57,10 +57,64 @@ func TestShareEndpointReturnsOneWork(t *testing.T) {
 	}
 }
 
-// TestShareEndpointGivesAPublishedWorkItsAddress covers the Copy Link half.
-//
-// A published work is marked as such so the browser can enable Copy Link; a draft is not, which is
-// why the page disables the button rather than handing out a link that would 404.
+// TestShareWorkPayloadHasNoOverlayData pins the split introduced when suggestions moved to their
+// own endpoint: the work payload stays small and never carries guest text.
+func TestShareWorkPayloadHasNoOverlayData(t *testing.T) {
+	connectTestDB(t)
+	truncatePoems(t)
+
+	id := insertPoem(t, "A Shared Work\n\nThe body that should be copied verbatim.")
+	if err := services.PublishPoem(t.Context(), id); err != nil {
+		t.Fatal(err)
+	}
+	srv := newTestServer(t)
+	defer srv.Close()
+	token := mintPublicLink(t, srv.URL, id)
+	visitor := guestClient(t, srv)
+	status, page, _ := guestGet(t, visitor, srv.URL+"/p/"+token)
+	if status != http.StatusOK {
+		t.Fatalf("public page = %d", status)
+	}
+	status, _, _ = guestPost(t, visitor, srv.URL+"/p/"+token+"/submit", url.Values{
+		"csrf": {csrfFromBody(t, page)}, "name": {"Reader"}, "content": {"SUBMISSION SENTINEL"},
+	})
+	if status != http.StatusOK {
+		t.Fatalf("submit = %d", status)
+	}
+
+	status, body, _ := get(t, srv.URL+"/share/work/"+id, nil)
+	if status != http.StatusOK {
+		t.Fatalf("GET /share/work/%s = %d", id, status)
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(body), &raw); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"title", "body", "address", "published", "isPublished", "publicAddressConfigured",
+		"links", "publicLinks",
+	}
+	if len(raw) != len(want) {
+		t.Errorf("share payload has %d keys, want %d: %s", len(raw), len(want), truncate([]byte(body)))
+	}
+	for _, key := range want {
+		if _, ok := raw[key]; !ok {
+			t.Errorf("share payload is missing %q", key)
+		}
+	}
+	for _, key := range []string{"publicSubmissions", "submissions", "unavailable", "total"} {
+		if _, ok := raw[key]; ok {
+			t.Errorf("share payload carries overlay field %q", key)
+		}
+	}
+	if strings.Contains(body, "SUBMISSION SENTINEL") {
+		t.Error("the selected-work payload leaked submission text")
+	}
+}
+
+// TestShareEndpointGivesAPublishedWorkItsAddress covers the Copy Link half. A published work is
+// marked as such so the browser can enable Copy Link; a draft is not, which is why the page
+// disables the button rather than handing out a link that would 404.
 func TestShareEndpointGivesAPublishedWorkItsAddress(t *testing.T) {
 	connectTestDB(t)
 	truncatePoems(t)

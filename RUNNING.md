@@ -407,8 +407,8 @@ self-announcing rather than a new requirement.
 
 #### Setting it up
 
-1. Run [`db/roles.sql`](db/roles.sql) once, as an owner or superuser, **connected to the
-   application database**:
+1. Run [`db/roles.sql`](db/roles.sql) once, **as the role `MIGRATION_DATABASE_URL` will use** — the
+   role that runs the migrations and owns the tables — **connected to the application database**:
 
    ```bash
    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v app_password='choose-something-long' -f db/roles.sql
@@ -431,8 +431,13 @@ self-announcing rather than a new requirement.
    This exact command is what the `Least privilege` CI job runs on every pull request, so the file is
    exercised rather than merely described.
 
-2. Add `ALTER DEFAULT PRIVILEGES FOR ROLE <your migration role> ... GRANT ... TO verse_runtime` as
-   described in that file, or the first future migration will create a table the service cannot read.
+2. The script now also installs `ALTER DEFAULT PRIVILEGES` for the role that executed it, so tables
+   created by later migrations are readable by `verse_runtime` without a per-table `GRANT`. Re-run
+   it **before** deploying the first migration that creates a table, using the same owner credential
+   as step 1 — `$MIGRATION_DATABASE_URL` once the split is in place, **not** the restricted
+   `$DATABASE_URL`. Check with `\ddp`: the row's Owner must be the role that runs the migrations;
+   a row owned by the wrong role looks like success but grants nothing to the service. No role name
+   is filled in anywhere: the target is `current_user`, which is why step 1 matters.
 3. On Render, set `MIGRATION_DATABASE_URL` to the current credential — the same value `DATABASE_URL`
    has today — and change `DATABASE_URL` to the `verse_app` one.
 
@@ -442,7 +447,7 @@ self-announcing rather than a new requirement.
 #### What the serving credential cannot do
 
 This is checked on every pull request by the `Least privilege` CI job, which boots the service on a
-restricted role and asserts fourteen properties. It cannot `CREATE`, `ALTER` or `DROP`; it cannot
+restricted role and asserts its grants and denials. It cannot `CREATE`, `ALTER` or `DROP`; it cannot
 `DELETE` or `TRUNCATE` a work; it cannot modify a retained revision; and **it cannot read
 `schema_migrations`** — the boot log reports which migrations ran, but the serving process cannot
 query the table that records it.
@@ -846,7 +851,8 @@ authoring chrome. Card Export draws a 1200x630 PNG on a canvas from the same tex
 locally, with no request to any other origin.
 
 On the authoring side, the Share screen has a work picker. The actions use a small authenticated
-endpoint to read the selected work when an action needs its text. Copy Link is disabled for a draft,
+endpoint to read the selected work when an action needs its text; public suggestions are fetched from
+a second endpoint only when the overlay opens. Copy Link is disabled for a draft,
 because a link to an unpublished work would lead nowhere; it says so rather than handing out an
 address that will 404. The endpoint builds that address from `PUBLIC_BASE_URL`, which is why the
 authoring service needs the reader's origin set. Expired and revoked rows stay visible under

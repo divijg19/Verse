@@ -19,8 +19,8 @@ import (
 const shareWorkLimit = 100
 
 // The Share overlay shows the newest suggestions, not the whole record: a single submission can be
-// 200,000 runes and this payload is fetched on every picker change and link mutation. History keeps
-// the unbounded record; the overlay states the total from the per-link counts when it truncates.
+// 200,000 runes. History keeps the unbounded record; the overlay states the total so the bound is
+// never presented as the whole record. The separate endpoint fetches this only when the overlay opens.
 const shareSubmissionLimit = 200
 
 // ShareHandler renders the Share surface and supports HTMX partial responses.
@@ -110,26 +110,16 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		publicLinks = nil
 	}
 
-	// The overlay is an addition to this endpoint, not a precondition for the actions that were
-	// here first. A failed submission read degrades to an empty list, as the two link reads do.
-	recent, err := services.ListRecentPublicSubmissions(r.Context(), id, shareSubmissionLimit)
-	if err != nil {
-		log.Printf("failed to list public submissions for %s: %v", id, err) // #nosec G706 -- validated UUID
-		recent = nil
-	}
-	submissions := publicSubmissionViews(recent)
-
 	body := presenters.BodyWithoutTitle(poem.Content)
 	out := struct {
-		Title                   string                       `json:"title"`
-		Body                    string                       `json:"body"`
-		Address                 string                       `json:"address"`
-		Published               string                       `json:"published"`
-		IsPublished             bool                         `json:"isPublished"`
-		PublicAddressConfigured bool                         `json:"publicAddressConfigured"`
-		Links                   []templ.PrivateLinkView      `json:"links"`
-		PublicLinks             []templ.PublicLinkView       `json:"publicLinks"`
-		PublicSubmissions       []templ.PublicSubmissionView `json:"publicSubmissions"`
+		Title                   string                  `json:"title"`
+		Body                    string                  `json:"body"`
+		Address                 string                  `json:"address"`
+		Published               string                  `json:"published"`
+		IsPublished             bool                    `json:"isPublished"`
+		PublicAddressConfigured bool                    `json:"publicAddressConfigured"`
+		Links                   []templ.PrivateLinkView `json:"links"`
+		PublicLinks             []templ.PublicLinkView  `json:"publicLinks"`
 	}{
 		Title:                   presenters.WorkTitle(poem.Content, presenters.TitleWidthWide),
 		Body:                    body,
@@ -139,10 +129,51 @@ func ShareWorkHandler(w http.ResponseWriter, r *http.Request) {
 		PublicAddressConfigured: publicAddressConfigured,
 		Links:                   links,
 		PublicLinks:             publicLinks,
-		PublicSubmissions:       submissions,
 	}
 
 	writeJSONNoStore(w, out)
+}
+
+// ShareWorkSubmissionsHandler returns one work's newest public suggestions for the Share overlay.
+//
+// This is a separate endpoint on purpose: the selected-work payload above is fetched on every
+// picker change and every link mutation, and a submission can be 200,000 runes. Reading them here
+// means the large text is fetched only when the author opens the overlay. The two submission reads
+// degrade independently: a failure returns an empty list with unavailable set, not an error, so the
+// rest of the Share screen keeps working and the overlay can say what happened. A missing work still
+// returns a normal 404 through writePoemFetchError.
+func ShareWorkSubmissionsHandler(w http.ResponseWriter, r *http.Request) {
+	id, ok := requirePathWorkID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := services.GetPoem(r.Context(), id); err != nil {
+		writePoemFetchError(w, r, id, err)
+		return
+	}
+
+	recent, recentErr := services.ListRecentPublicSubmissions(r.Context(), id, shareSubmissionLimit)
+	if recentErr != nil {
+		log.Printf("failed to list public submissions for %s: %v", id, recentErr) // #nosec G706 -- validated UUID
+	}
+	counts, countErr := services.CountPublicSubmissionsByLink(r.Context(), id)
+	if countErr != nil {
+		log.Printf("failed to count public submissions for %s: %v", id, countErr) // #nosec G706 -- validated UUID
+	}
+	total := 0
+	for _, count := range counts {
+		total += count
+	}
+
+	writeJSONNoStore(w, struct {
+		Submissions []templ.PublicSubmissionView `json:"submissions"`
+		Total       int                          `json:"total"`
+		Unavailable bool                         `json:"unavailable"`
+	}{
+		Submissions: publicSubmissionViews(recent),
+		Total:       total,
+		Unavailable: recentErr != nil || countErr != nil,
+	})
 }
 
 // publicSubmissionViews maps stored submissions for both the History surface and the Share

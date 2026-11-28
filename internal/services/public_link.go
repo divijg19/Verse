@@ -267,8 +267,8 @@ func ListPublicSubmissions(ctx context.Context, poemID string) ([]PublicSubmissi
 // ListRecentPublicSubmissions returns at most limit submissions for one work, newest first.
 //
 // History keeps the complete record. The Share overlay reads a bounded slice because a single
-// submission can be 200,000 runes and that payload is fetched on every picker change; the client
-// shows the total from the per-link counts so the bound is never presented as the whole record.
+// submission can be 200,000 runes; its own endpoint is fetched only when the overlay opens and
+// returns an explicit total so the bound is never presented as the whole record.
 func ListRecentPublicSubmissions(ctx context.Context, poemID string, limit int) ([]PublicSubmission, error) {
 	if limit <= 0 {
 		return []PublicSubmission{}, nil

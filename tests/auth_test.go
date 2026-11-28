@@ -30,9 +30,10 @@ var privateRoutes = []struct {
 	{http.MethodGet, "/caelum"},
 	{http.MethodGet, "/library"},
 	{http.MethodGet, "/share"},
-	// The Share picker's work data. Added in v0.5.0's successor: it returns one work verbatim, so
-	// it stays behind the session like every other read of work text.
+	// The Share picker's work data, and the separate read of its public suggestions. Both return
+	// work text or guest text, so both stay behind the session like every other such read.
 	{http.MethodGet, "/share/work/some-id"},
+	{http.MethodGet, "/share/work/some-id/submissions"},
 	// Private and public links: the primary action is idempotent, New and Rotate issue a fresh
 	// capability, and Revoke withdraws one. All mutate except the primary action; all carry CSRF.
 	{http.MethodPost, "/share/link"},

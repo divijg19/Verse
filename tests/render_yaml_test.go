@@ -217,4 +217,15 @@ func TestDocumentedRoleSetupMatchesCI(t *testing.T) {
 		t.Error("the Least privilege job contains its own copy of the poems grant.\n" +
 			"  Two copies of the privilege model is the condition this test exists to prevent.")
 	}
+
+	// R20: the future-table grants are load-bearing now that the serving credential is restricted.
+	// CI probes them against a real table; these assertions stop the script or the runbook from
+	// quietly dropping the mechanism the probe depends on.
+	if !strings.Contains(string(roles), "ALTER DEFAULT PRIVILEGES") {
+		t.Error("db/roles.sql no longer installs default privileges for future tables")
+	}
+	if !strings.Contains(string(roles), "MIGRATION_DATABASE_URL") ||
+		!strings.Contains(string(docs), "MIGRATION_DATABASE_URL") {
+		t.Error("db/roles.sql and RUNNING.md must both name MIGRATION_DATABASE_URL as the role that runs the script")
+	}
 }

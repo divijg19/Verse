@@ -71,8 +71,9 @@ func TestViewerBundleWiresCopy(t *testing.T) {
 	}
 }
 
-// TestShareBundleWiresTheSuggestionsOverlay pins the v0.5.15 author-side surface in both the
-// source and the compiled bundle: a stale bundle would ship rows with a dead opener.
+// TestShareBundleWiresTheSuggestionsOverlay pins the v0.5.16 author-side surface in both the
+// source and the compiled bundle: a stale bundle would ship rows with a dead opener, or present a
+// bounded list as the whole record when the count read fails.
 func TestShareBundleWiresTheSuggestionsOverlay(t *testing.T) {
 	source := readRepoFile(t, filepath.Join("web", "ts", "share.ts"))
 	bundle := readRepoFile(t, filepath.Join("static", "js", "share.js"))
@@ -85,7 +86,10 @@ func TestShareBundleWiresTheSuggestionsOverlay(t *testing.T) {
 		`suggestionsLocked`,
 		`suggestionsOpen`,
 		`text.textContent = submission.content`,
-		`publicSubmissions`,
+		`encodeURIComponent(id)}/submissions`,
+		`unavailable`,
+		`total`,
+		`showing what could be read`,
 		`dialog.addEventListener("close"`,
 		`dialog.close()`,
 		`opener.focus()`,
@@ -104,6 +108,9 @@ func TestShareBundleWiresTheSuggestionsOverlay(t *testing.T) {
 		if strings.Contains(source, needle) || strings.Contains(bundle, needle) {
 			t.Errorf("the suggestions overlay parses HTML; guest text must use textContent: %q", needle)
 		}
+	}
+	if strings.Contains(source, `publicSubmissions`) || strings.Contains(bundle, `publicSubmissions`) {
+		t.Error("the old combined payload field is still wired into the Share bundle")
 	}
 }
 

@@ -397,6 +397,9 @@ func NewRouter() (*chi.Mux, error) {
 		// One work's share data for the picker. It returns the body of a single work, so it stays
 		// inside the authenticated group like every other read of work text.
 		priv.Get("/share/work/{id}", handlers.ShareWorkHandler)
+		// Public suggestions are read separately: they can be large, and the work payload above is
+		// fetched on every picker change and link mutation. Still authenticated, like all work text.
+		priv.Get("/share/work/{id}/submissions", handlers.ShareWorkSubmissionsHandler)
 		// Private links mint and revoke capabilities to edit one work. They are mutations despite
 		// living on the Share screen, so CSRF applies to both.
 		priv.Post("/share/link", handlers.ShareLinkHandler)

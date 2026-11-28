@@ -41,23 +41,12 @@ func TestAReadFaultIsLoggedOnEveryReadSurface(t *testing.T) {
 	database.Pool = nil
 	t.Cleanup(func() { database.Pool = live })
 
-	// Every surface that reads the database and can therefore fail on it. The heatmap and search
-	// fragments are included because they are the paths an author reaches *during* an incident --
-	// clicking a month arrow, typing in the search box -- which is exactly when silence is least
-	// acceptable.
-	// Every surface that reads the database and can therefore fail on it. The search fragment and
-	// the heatmap fragment are included because they are the paths an author reaches *during* an
-	// incident -- typing in the search box, clicking a month arrow -- which is exactly when silence
-	// is least acceptable.
-	//
-	// /share is deliberately absent: it renders a static component and touches no database, so it
-	// cannot fault and there is nothing for it to log.
 	// Every surface that reads the database and can therefore fail on it. The two fragments matter
 	// as much as the pages: they are what an author reaches *during* an incident -- typing in the
 	// search box, clicking a month arrow -- which is exactly when silence is least acceptable.
-	//
-	// /share is deliberately absent. It renders a static component and touches no database, so it
-	// cannot fault and there is nothing for it to log.
+	// /share/work/{id} and its submissions endpoint are deliberately absent: they need a work id,
+	// and their GetPoem failure already goes through writePoemFetchError -> fail500, which logs. The
+	// link and submission reads degrade on their own and are covered by their own tests.
 	cases := []struct {
 		name    string
 		path    string
@@ -65,6 +54,7 @@ func TestAReadFaultIsLoggedOnEveryReadSurface(t *testing.T) {
 	}{
 		{name: "library", path: "/library"},
 		{name: "dashboard", path: "/dashboard"},
+		{name: "share", path: "/share"},
 		{name: "search fragment", path: "/poems?q=work"},
 		{name: "recycle", path: "/recycle"},
 		{name: "export", path: "/export"},

@@ -206,6 +206,20 @@
       return null;
     }
   }
+  async function fetchSubmissions(id) {
+    try {
+      const response = await fetch(
+        `/share/work/${encodeURIComponent(id)}/submissions`,
+        { headers: { accept: "application/json" } },
+      );
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
   async function postForm(path, fields) {
     const body = new FormData();
     body.set("csrf", csrf());
@@ -285,7 +299,7 @@
       dialog.close();
     }
   }
-  function renderSuggestions(submissions, total) {
+  function renderSuggestions(submissions, total, unavailable) {
     const list = document.querySelector("[data-suggestions-list]");
     const status = document.querySelector("[data-suggestions-status]");
     if (!list || !status) {
@@ -295,10 +309,9 @@
     if (submissions.length === 0) {
       const empty = document.createElement("p");
       empty.className = "verse-suggestions-empty";
-      empty.textContent =
-        total > 0
-          ? "Suggestions are temporarily unavailable."
-          : "No suggestions for this work yet.";
+      empty.textContent = unavailable
+        ? "Suggestions are temporarily unavailable."
+        : "No suggestions for this work yet.";
       list.appendChild(empty);
       status.textContent = "";
       return;
@@ -315,10 +328,14 @@
       bubble.append(meta, text);
       list.appendChild(bubble);
     }
-    status.textContent =
-      total > submissions.length
-        ? `Showing the ${submissions.length} most recent of ${total} suggestions.`
-        : "";
+    if (unavailable) {
+      status.textContent =
+        "Suggestions are temporarily unavailable; showing what could be read.";
+    } else if (total > submissions.length) {
+      status.textContent = `Showing the ${submissions.length} most recent of ${total} suggestions.`;
+    } else {
+      status.textContent = "";
+    }
   }
   function wireSuggestions() {
     const dialog = suggestionsDialog();
@@ -357,24 +374,30 @@
       return;
     }
     suggestionsOpener = opener;
-    const data = await selectedWork(workID);
-    if (!data || (picker()?.value ?? "") !== workID) {
-      suggestionsOpener = null;
+    const data = await fetchSubmissions(workID);
+    const current = suggestionsDialog();
+    if (
+      (picker()?.value ?? "") !== workID ||
+      !current ||
+      current !== dialog ||
+      !current.isConnected ||
+      current.open
+    ) {
+      if (suggestionsOpener === opener) {
+        suggestionsOpener = null;
+      }
       return;
     }
-    const total = (data.publicLinks ?? []).reduce(
-      (sum, link) => sum + link.submissionCount,
-      0,
+    renderSuggestions(
+      data?.submissions ?? [],
+      data?.total ?? 0,
+      !data || data.unavailable,
     );
-    renderSuggestions(data.publicSubmissions ?? [], total);
-    if (dialog.open) {
-      return;
-    }
-    dialog.showModal();
+    current.showModal();
     lockBodyScroll();
     suggestionsLocked = true;
     requestAnimationFrame(() => {
-      dialog.querySelector("[data-suggestions-close]")?.focus();
+      current.querySelector("[data-suggestions-close]")?.focus();
     });
   }
   function renderLinks(links) {
@@ -461,7 +484,7 @@
       open.className = "verse-share-link-open";
       open.dataset.suggestionsOpen = "";
       open.textContent = "View suggestions";
-      open.setAttribute("aria-label", "View all suggestions for this work");
+      open.setAttribute("aria-label", "View recent suggestions for this work");
       row.append(
         details,
         linkButtons(

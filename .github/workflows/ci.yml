@@ -422,6 +422,16 @@ jobs:
           set -euo pipefail
           DSN="postgres://verse_app:ci-throwaway-password@localhost:5432/verse?sslmode=disable"
 
+          # R20: a table created by the migration role AFTER db/roles.sql ran. No per-table GRANT
+          # is issued for this table, so the default privileges in db/roles.sql are the only thing
+          # that can make the assertions below pass. A serial column, unlike an identity column,
+          # has a real sequence whose USAGE privilege the INSERT below must exercise.
+          psql "postgres://verse:verse@localhost:5432/verse" -v ON_ERROR_STOP=1 -c '
+            CREATE TABLE verse_r20_probe (
+              id serial,
+              note text
+            )'
+
           as_app() { { PGOPTIONS='-c role=verse_app' psql "$DSN" -tAc "$1" 2>&1 || true; } | head -1; }
 
           allowed() {
@@ -465,8 +475,8 @@ jobs:
           #
           # Nothing writes the column, so this is latent rather than live, and it is recorded as R24
           # in the project's risk register with two costed fixes. Asserting the denial would turn
-          # this job permanently red, and a permanently red job is a job whose other fourteen
-          # assertions stop being read.
+          # this job permanently red, and a permanently red job is a job whose other assertions
+          # stop being read.
           allowed "SELECT count(published_at) FROM poems"                "read the publication instant"
           # The migration grants these only when verse_runtime already exists; in this job it does
           # not, so db/roles.sql is the operative grant. Assert every privilege the private-link
@@ -491,6 +501,12 @@ jobs:
           allowed "INSERT INTO login_attempts (subject, failures, first_failure) VALUES ('\\x00'::bytea, 1, now())" "record a login attempt"
           allowed "DELETE FROM login_attempts"                           "clear a login attempt"
           allowed "SELECT to_regclass('poems')"                         "check the schema is there"
+          # R20: the post-roles table above has no explicit grant. These pass only if the default
+          # privileges were installed correctly and the role executing roles.sql was the one that
+          # runs the migrations.
+          allowed "SELECT count(*) FROM verse_r20_probe"                "read a post-roles table"
+          allowed "INSERT INTO verse_r20_probe (note) VALUES ('after roles.sql')" "insert into a post-roles table"
+          allowed "UPDATE verse_r20_probe SET note = note WHERE false"  "update a post-roles table"
 
           echo "the serving credential may not:"
           # No CREATE/ALTER/DROP: the migration runs over the other credential.
