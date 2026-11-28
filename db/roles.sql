@@ -1,21 +1,27 @@
 -- Least-privilege database roles for Verse.
 --
--- Run this ONCE, as an owner or superuser, against the application database. It is deliberately not
--- a migration: migrations are applied automatically at every boot by the service, and this needs a
--- credential the service should never hold. Shipping it inside migrations/ would mean every deploy
--- attempted to create roles, and a service without CREATEROLE would fail to boot.
+-- Run this against the application database as the role MIGRATION_DATABASE_URL will use: the role
+-- that runs the migrations and owns the tables. Running it as some other owner would register the
+-- future-table grants against the wrong role, and the serving credential would still be denied.
+-- It is deliberately not a migration: migrations are applied automatically at every boot by the
+-- service, and this needs a credential the service should never hold. Shipping it inside
+-- migrations/ would mean every deploy attempted to create roles, and a service without CREATEROLE
+-- would fail to boot. Re-running the script adds no privileges, but it does reset verse_app's
+-- password (see below), so pass the current one unless a rotation is intended.
 --
 -- After running it, point the service at the two credentials:
 --
 --   MIGRATION_DATABASE_URL   the owner (or any role with CREATE/ALTER and ownership of the tables)
---   DATABASE_URL             verse_runtime, which is what the service holds for its whole life
+--   DATABASE_URL             verse_app, a LOGIN member of verse_runtime; the service uses this
+--                            credential for its whole life and never connects as verse_runtime
 --
 -- The service accepts MIGRATION_DATABASE_URL being unset, and falls back to DATABASE_URL for the
 -- migration. That fallback exists so a deployment which has not run this script yet keeps booting;
 -- while it is in use, the serving credential still holds DDL rights, and the boot log says so on
 -- every start. The arrangement is opt-in and self-announcing rather than a new requirement.
 --
--- RUNNING.md carries the same SQL with the Render-specific steps.
+-- RUNNING.md carries the setup procedure and the Render-specific steps, including the credential
+-- split; this file is the privilege model that both CI and the operator apply.
 
 -- ---------------------------------------------------------------------------------------------
 -- The runtime role. NO LOGIN is deliberate: the role is a property of the database, and a password
@@ -33,7 +39,7 @@ $$;
 -- Wrapped in a DO block because GRANT ... ON DATABASE takes a literal, not an expression.
 --
 -- A psql variable (:"dbname") would need a -v dbname=... on the command line, and this file is
--- documented as "run db/roles.sql once, as an owner or superuser" with no such argument -- so the
+-- documented as "run db/roles.sql as the migration role" with no such argument -- so the
 -- documented procedure failed on this line with a syntax error, and the operator action that closes
 -- R2 could not be completed. current_database() is always the database psql is connected to, which
 -- is the one the operator connected to on purpose. %I quotes the identifier, so a database name
@@ -123,18 +129,17 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON login_attempts TO verse_runtime;
 -- Future tables.
 -- ---------------------------------------------------------------------------------------------
 --
--- Default privileges apply only to objects created by the role that executed the ALTER, and the
--- migrations run as the migration role rather than as verse_runtime. Without FOR ROLE, the first
--- migration that creates a table produces one the service cannot read, and it fails during a
--- publication -- which is the scenario RISK_REGISTER R20 describes and why it is open.
+-- Default privileges attach to the role that executes the ALTER. This script is run as the
+-- migration role, so no FOR ROLE is needed and no operator-specific role name belongs here: the
+-- target is current_user. Without these statements, the first later migration that creates a
+-- table produces one the serving credential cannot read, and the failure surfaces at request time
+-- rather than at deploy time. This is the scenario RISK_REGISTER R20 describes.
 --
--- FOR ROLE <migration_role> is what closes it. Replace the role name with whichever role your
--- MIGRATION_DATABASE_URL connects as; on Neon that is typically the database owner.
---
--- ALTER DEFAULT PRIVILEGES FOR ROLE verse_owner IN SCHEMA public
---     GRANT SELECT, INSERT, UPDATE ON TABLES TO verse_runtime;
--- ALTER DEFAULT PRIVILEGES FOR ROLE verse_owner IN SCHEMA public
---     GRANT USAGE ON SEQUENCES TO verse_runtime;
+-- Both statements are idempotent: re-running the script adds no duplicate privileges.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT SELECT, INSERT, UPDATE ON TABLES TO verse_runtime;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT USAGE ON SEQUENCES TO verse_runtime;
 
 -- ---------------------------------------------------------------------------------------------
 -- The login role.

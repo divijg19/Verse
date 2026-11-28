@@ -86,7 +86,7 @@ interface PublicSubmission {
   createdAt: string;
 }
 
-/** The work the endpoint returns. */
+/** The work the endpoint returns. Suggestions are read only when the overlay opens. */
 interface ShareWorkResponse {
   title: string;
   body: string;
@@ -96,7 +96,13 @@ interface ShareWorkResponse {
   publicAddressConfigured: boolean;
   links: PrivateLinkView[];
   publicLinks: PublicLinkView[];
-  publicSubmissions: PublicSubmission[];
+}
+
+/** The overlay's own payload, including an explicit flag so a failed read is never called empty. */
+interface ShareSubmissionsResponse {
+  submissions: PublicSubmission[];
+  total: number;
+  unavailable: boolean;
 }
 
 /** The opener that should receive focus again when the overlay closes. */
@@ -151,6 +157,24 @@ async function selectedWork(id: string): Promise<ShareWorkResponse | null> {
       return null;
     }
     return (await response.json()) as ShareWorkResponse;
+  } catch {
+    return null;
+  }
+}
+
+/** Reads one work's suggestions only when the overlay is opened. */
+async function fetchSubmissions(
+  id: string,
+): Promise<ShareSubmissionsResponse | null> {
+  try {
+    const response = await fetch(
+      `/share/work/${encodeURIComponent(id)}/submissions`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as ShareSubmissionsResponse;
   } catch {
     return null;
   }
@@ -261,6 +285,7 @@ function closeSuggestions(): void {
 function renderSuggestions(
   submissions: PublicSubmission[],
   total: number,
+  unavailable: boolean,
 ): void {
   const list = document.querySelector<HTMLElement>("[data-suggestions-list]");
   const status = document.querySelector<HTMLElement>(
@@ -273,12 +298,11 @@ function renderSuggestions(
   if (submissions.length === 0) {
     const empty = document.createElement("p");
     empty.className = "verse-suggestions-empty";
-    // The payload degrades to [] on a read failure while the per-link counts still succeed. A
-    // positive total with no text therefore means the fetch failed, not that nobody wrote in.
-    empty.textContent =
-      total > 0
-        ? "Suggestions are temporarily unavailable."
-        : "No suggestions for this work yet.";
+    // The endpoint says explicitly when a read failed; a total is not enough because the count
+    // read can fail in the same incident.
+    empty.textContent = unavailable
+      ? "Suggestions are temporarily unavailable."
+      : "No suggestions for this work yet.";
     list.appendChild(empty);
     status.textContent = "";
     return;
@@ -295,10 +319,16 @@ function renderSuggestions(
     bubble.append(meta, text);
     list.appendChild(bubble);
   }
-  status.textContent =
-    total > submissions.length
-      ? `Showing the ${submissions.length} most recent of ${total} suggestions.`
-      : "";
+  // A count-only failure leaves the list usable but makes its bound unknowable. Say so rather than
+  // letting the newest slice look like the whole record.
+  if (unavailable) {
+    status.textContent =
+      "Suggestions are temporarily unavailable; showing what could be read.";
+  } else if (total > submissions.length) {
+    status.textContent = `Showing the ${submissions.length} most recent of ${total} suggestions.`;
+  } else {
+    status.textContent = "";
+  }
 }
 
 /** Wires the dialog's close and backdrop paths once per mounted surface. */
@@ -343,25 +373,32 @@ async function openSuggestions(opener: HTMLButtonElement): Promise<void> {
     return;
   }
   suggestionsOpener = opener;
-  const data = await selectedWork(workID);
-  // The picker may have changed while the request was in flight. Never show another work's text.
-  if (!data || (picker()?.value ?? "") !== workID) {
-    suggestionsOpener = null;
+  const data = await fetchSubmissions(workID);
+  // An HTMX swap during the request replaces the dialog. Never show another work's text in a
+  // detached element, and never clear an opener that a later open already claimed.
+  const current = suggestionsDialog();
+  if (
+    (picker()?.value ?? "") !== workID ||
+    !current ||
+    current !== dialog ||
+    !current.isConnected ||
+    current.open
+  ) {
+    if (suggestionsOpener === opener) {
+      suggestionsOpener = null;
+    }
     return;
   }
-  const total = (data.publicLinks ?? []).reduce(
-    (sum, link) => sum + link.submissionCount,
-    0,
+  renderSuggestions(
+    data?.submissions ?? [],
+    data?.total ?? 0,
+    !data || data.unavailable,
   );
-  renderSuggestions(data.publicSubmissions ?? [], total);
-  if (dialog.open) {
-    return;
-  }
-  dialog.showModal();
+  current.showModal();
   lockBodyScroll();
   suggestionsLocked = true;
   requestAnimationFrame(() => {
-    dialog
+    current
       .querySelector<HTMLButtonElement>("[data-suggestions-close]")
       ?.focus();
   });
@@ -457,11 +494,11 @@ function renderPublicLinks(links: PublicLinkView[]): void {
     const open = document.createElement("button");
     open.type = "button";
     open.className = "verse-share-link-open";
-    // The overlay shows every public submission for the selected work, not just this link's, so
-    // the accessible name must say work-wide. The marker exists for delegation; it carries no id.
+    // The overlay shows the newest public submissions for the whole work, bounded to the most
+    // recent ones, so the accessible name must be work-wide without promising completeness.
     open.dataset.suggestionsOpen = "";
     open.textContent = "View suggestions";
-    open.setAttribute("aria-label", "View all suggestions for this work");
+    open.setAttribute("aria-label", "View recent suggestions for this work");
     row.append(
       details,
       linkButtons(

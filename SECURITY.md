@@ -91,6 +91,12 @@ These are documented rather than hidden, and are tracked as issues where they ha
   why taking an export is not optional.
 - **A single shared secret.** Anyone with both environment variables has everything. There is no
   second factor and no per-request authorisation.
+- **Draft change detection is not a secret.** `guest_drafts.base_hash` is an unkeyed SHA-256 of a
+  canonical body, kept beside that body in the same row. Keying it with `VERSE_AUTH_SECRET` would
+  hide nothing already visible to a database reader, would not stop a database writer (who can set
+  the body and hash together), and would make secret rotation fail open: every draft would appear
+  changed and duplicate-send detection would stop matching. It is deliberately left unkeyed; only
+  the link tokens, whose raw value is never stored, are HMAC-derived.
 
 ## Handling the work itself
 
